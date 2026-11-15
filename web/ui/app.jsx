@@ -13,6 +13,7 @@ import {Participant, Records} from "./records.jsx";
 import {MatchReplay} from "./match-replay.jsx";
 import {CasePicker, Home, Mast, SiteFooter, runHref} from "./home.jsx";
 import {InfoPage, infoPages} from "./info-pages.jsx";
+import {LoadingStatus} from "./loading-status.jsx";
 import {caseTitle} from "./cases.js";
 import {en, gameTitle, language, siteTitle, tr} from "./locale.js";
 import "@astryxdesign/core/reset.css";
@@ -99,6 +100,7 @@ function Dialogue({event, players}) {
 function Replay({initialRun, caseId}) {
   const replay = useReplay(initialRun, caseId);
   const {match, frame, view} = replay;
+  const loading = !match && replay.connection === "loading";
   const full = match?.format === "match";
   const players = useMemo(() => Object.keys(match?.scores ?? {}), [match]);
   const state = useMemo(() => match && !full ? snapshot(match, frame, view) : null, [match, full, frame, view]);
@@ -121,7 +123,7 @@ function Replay({initialRun, caseId}) {
   const status = replay.connection === "error" ? tr("연결 끊김", "Connection lost") :
     replay.connection === "empty" ? tr("플레이 기록 대기 중", "Waiting for a replay") :
     replay.connection === "missing" ? tr("플레이 기록을 찾을 수 없어요", "Replay not found") :
-    !match ? tr("불러오는 중", "Loading") : match.complete ? tr("플레이 종료", "Run complete") :
+    match?.complete ? tr("플레이 종료", "Run complete") :
     replay.mode === "follow" ? tr("실시간 추적 중", "Following live") : tr("다시 보기", "Replay");
   const live = Boolean(match && !match.complete && replay.mode === "follow" && replay.connection === "ready");
   const cue = state?.lastSpeech ?? state?.feed.at(-1);
@@ -130,7 +132,8 @@ function Replay({initialRun, caseId}) {
     <Mast replayPosition={match ? replay : undefined}>
       {replay.caseRecord && <CaseNavigation replay={replay} />}
     </Mast>
-    {!match ? <main className="shell replay"><p className="empty" role="status">{status}</p></main> :
+    {loading ? <main className="shell replay-loading"><LoadingStatus /></main> :
+    !match ? <main className="shell replay"><p className="empty" role="status">{status}</p></main> :
     full ? <MatchReplay key={replay.id} replay={replay} caseName={replay.caseRecord && caseTitle(replay.caseRecord)}
       transport={<Transport replay={replay} />} /> : <>
     <main className="shell replay">

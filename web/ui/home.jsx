@@ -4,6 +4,7 @@ import {drawSet, setHeight, setPoint, setWidth} from "./floor.js";
 import {fetchCases} from "./replay.js";
 import {Sprite} from "./scene.jsx";
 import {InfoNav} from "./info-pages.jsx";
+import {LoadingStatus} from "./loading-status.jsx";
 import {gameTitle, href, language, siteTitle, tr} from "./locale.js";
 
 const games = [
@@ -158,10 +159,11 @@ export function CasePicker({game, onClose}) {
       </div>
       <form method="dialog"><button className="case-dialog-close" aria-label={tr("닫기", "Close")}>✕</button></form>
     </div>
-    {!available?.length ? <p role="status" className="muted">{failed ?
-      tr("플레이 기록을 불러오지 못했어요. 다시 열어 주세요.", "Couldn’t load the replays. Close and try again.") : cases ?
-        (game ? tr("이 매치의 기록이 아직 없어요.", "No replays are available for this match yet.") :
-          tr("아직 볼 수 있는 플레이 기록이 없어요.", "No replays are available yet.")) : tr("불러오는 중", "Loading")}</p> :
+    {!failed && !cases ? <LoadingStatus /> :
+    !available?.length ? <p role="status" className="muted">{failed ?
+      tr("플레이 기록을 불러오지 못했어요. 다시 열어 주세요.", "Couldn’t load the replays. Close and try again.") :
+      game ? tr("이 매치의 기록이 아직 없어요.", "No replays are available for this match yet.") :
+        tr("아직 볼 수 있는 플레이 기록이 없어요.", "No replays are available yet.")}</p> :
       <ol className="home-grid home-case-grid">
         {available.map(({record, match}) => (
           <li key={record.id}>
