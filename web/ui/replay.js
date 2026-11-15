@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import {en, tr} from "./locale.js";
+import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
   choice_2_negotiation: tr("팀 구성 협상", "Team formation talks"),
@@ -168,11 +168,27 @@ export function snapshot(match, frame, perspective) {
 }
 
 const emptyReplay = {id: "", match: null, frame: 0, mode: "follow", stage: "", view: "operator", selected: ""};
+const staticBuild = typeof STATIC_REPLAY_BUILD !== "undefined" && STATIC_REPLAY_BUILD;
 
-export async function getJSON(url, signal) {
-  const response = await fetch(url, {cache: "no-store", signal});
+async function getJSON(url, signal) {
+  const response = await fetch(url, {cache: staticBuild ? "default" : "no-store", signal});
   if (!response.ok) throw new Error(String(response.status));
   return response.json();
+}
+
+export function fetchCases(signal) {
+  return getJSON(staticBuild ? "/replays/cases.json" : "/api/cases", signal);
+}
+
+async function fetchMatch(id, signal) {
+  if (!staticBuild) return getJSON(`/api/match?run=${encodeURIComponent(id)}${en ? "&lang=en" : ""}`, signal);
+
+  const segments = id.split("/");
+  if (segments.some((segment) => !segment || segment === "." || segment === ".." || segment.includes("\\"))) {
+    throw new Error("404");
+  }
+  const path = segments.map(encodeURIComponent).join("/");
+  return getJSON(`/replays/${path}/${language}.json`, signal);
 }
 
 export function useReplay(initialRun, caseId) {
@@ -195,7 +211,7 @@ export function useReplay(initialRun, caseId) {
 
     async function poll() {
       try {
-        const cases = await getJSON("/api/cases", signal);
+        const cases = await fetchCases(signal);
         if (signal.aborted) return;
         const activeCase = cases.find((record) => (!caseId || caseId === record.id) &&
           record.matches.some((match) => match.id === chosen)) ?? null;
@@ -205,7 +221,7 @@ export function useReplay(initialRun, caseId) {
           setConnection("missing");
           return;
         }
-        const data = await getJSON("/api/match?run=" + encodeURIComponent(chosen) + (en ? "&lang=en" : ""), signal);
+        const data = await fetchMatch(chosen, signal);
         if (signal.aborted) return;
         if (!data.format && !data.scores) {
           setReplay(emptyReplay);
@@ -238,7 +254,7 @@ export function useReplay(initialRun, caseId) {
           } else setConnection("error");
         }
       } finally {
-        if (!signal.aborted) timeout = setTimeout(poll, 1800);
+        if (!staticBuild && !signal.aborted) timeout = setTimeout(poll, 1800);
       }
     }
 

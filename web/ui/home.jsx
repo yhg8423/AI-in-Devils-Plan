@@ -1,7 +1,7 @@
 import React, {useEffect, useLayoutEffect, useRef, useState} from "react";
 import {caseTitle} from "./cases.js";
 import {drawSet, setHeight, setPoint, setWidth} from "./floor.js";
-import {getJSON} from "./replay.js";
+import {fetchCases} from "./replay.js";
 import {Sprite} from "./scene.jsx";
 import {InfoNav} from "./info-pages.jsx";
 import {gameTitle, href, language, siteTitle, tr} from "./locale.js";
@@ -140,7 +140,7 @@ export function CasePicker({game, onClose}) {
     const controller = new AbortController();
     const {signal} = controller;
     setFailed(false);
-    getJSON("/api/cases", signal).then(setCases, () => { if (!signal.aborted) setFailed(true); });
+    fetchCases(signal).then(setCases, () => { if (!signal.aborted) setFailed(true); });
     return () => controller.abort();
   }, [open]);
 
