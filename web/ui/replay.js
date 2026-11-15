@@ -201,7 +201,7 @@ export function useReplay(initialRun, caseId) {
   const [{id: chosen, fromStart}, select] = useState({id: initialRun, fromStart: true});
   const [replay, setReplay] = useState(emptyReplay);
   const [connection, setConnection] = useState("loading");
-  const [playbackSeconds, setPlaybackSeconds] = useState(2);
+  const [playbackSeconds, setPlaybackSeconds] = useState(1);
   const current = replay.id === chosen ? replay : emptyReplay;
 
   useEffect(() => {
