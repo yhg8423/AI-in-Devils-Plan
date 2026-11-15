@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="README.en.md">English</a> ·
+  <a href="https://ai-in-survival.com">웹사이트</a> ·
   <a href="#로컬에서-시작하기">빠른 시작</a> ·
   <a href="#현재까지-구현한-매치-목록">구현한 매치</a> ·
   <a href="#웹에서-플레이-기록-보기">플레이 기록</a> ·

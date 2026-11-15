@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="README.md">한국어</a> ·
+  <a href="https://ai-in-survival.com">Website</a> ·
   <a href="#run-locally">Quick start</a> ·
   <a href="#implemented-matches">Matches</a> ·
   <a href="#read-play-logs-on-the-website">Play logs</a> ·
