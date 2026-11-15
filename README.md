@@ -9,7 +9,7 @@
   <a href="uv.lock"><img src="https://img.shields.io/badge/Concordia-2.4.0-765797?style=for-the-badge" alt="Concordia 2.4.0"></a>
   <a href="https://github.com/Farama-Foundation/ChatArena/commit/a15802dd89c0d69165bb0b07e70c2bac5a7c4e36"><img src="https://img.shields.io/badge/ChatArena-0.1.18-397968?style=for-the-badge" alt="ChatArena 0.1.18, 커밋 a15802d에 고정"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Code_license-MIT-646f7a?style=for-the-badge" alt="코드 라이선스 MIT"></a>
-  <a href="#로컬에서-시작하기"><img src="https://img.shields.io/badge/Website-Local%20%7C%20127.0.0.1%3A8765-225d77?style=for-the-badge" alt="로컬 웹 127.0.0.1:8765"></a>
+  <a href="https://ai-in-survival.com"><img src="https://img.shields.io/badge/Website-ai--in--survival.com-225d77?style=for-the-badge" alt="웹사이트 ai-in-survival.com"></a>
 </p>
 
 <p align="center"><strong>AI 에이전트가 데블스 플랜 시즌 3에 참가한다면 어떻게 될까요?</strong></p>

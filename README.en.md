@@ -9,7 +9,7 @@
   <a href="uv.lock"><img src="https://img.shields.io/badge/Concordia-2.4.0-765797?style=for-the-badge" alt="Concordia 2.4.0"></a>
   <a href="https://github.com/Farama-Foundation/ChatArena/commit/a15802dd89c0d69165bb0b07e70c2bac5a7c4e36"><img src="https://img.shields.io/badge/ChatArena-0.1.18-397968?style=for-the-badge" alt="ChatArena 0.1.18, pinned to commit a15802d"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/Code_license-MIT-646f7a?style=for-the-badge" alt="MIT code license"></a>
-  <a href="#run-locally"><img src="https://img.shields.io/badge/Website-Local%20%7C%20127.0.0.1%3A8765-225d77?style=for-the-badge" alt="Local website at 127.0.0.1:8765"></a>
+  <a href="https://ai-in-survival.com"><img src="https://img.shields.io/badge/Website-ai--in--survival.com-225d77?style=for-the-badge" alt="Website ai-in-survival.com"></a>
 </p>
 
 <p align="center"><strong>What if AI agents played The Devil’s Plan Season 3?</strong></p>
