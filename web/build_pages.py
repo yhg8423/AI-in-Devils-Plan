@@ -59,8 +59,13 @@ def main() -> None:
             "  X-Content-Type-Options: nosniff\n",
             encoding="utf-8",
         )
-        for url in ASSETS:
-            if url != "/" and not (staged / url[1:]).is_file():
+        for url, (name, _) in ASSETS.items():
+            if url == "/":
+                continue
+            asset = staged / url[1:]
+            if not name.startswith("dist/"):
+                shutil.copyfile(UI / name, asset)
+            if not asset.is_file():
                 raise FileNotFoundError(f"Missing build asset: {url}")
         write_replays(staged / "replays")
         if OUTPUT.exists():

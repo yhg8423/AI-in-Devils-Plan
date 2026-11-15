@@ -21,6 +21,8 @@ ASSETS = {
     "/app.css": ("dist/app.css", "text/css; charset=utf-8"),
     "/app.js": ("dist/app.js", "text/javascript; charset=utf-8"),
     "/Galmuri11-Bold.woff2": ("dist/Galmuri11-Bold.woff2", "font/woff2"),
+    "/favicon.ico": ("assets/favicon.ico", "image/x-icon"),
+    "/og-image.jpg": ("assets/og-image.jpg", "image/jpeg"),
 }
 EVENT_TYPES = {
     "scoreboard", "room_move", "public", "room", "whisper", "grass_plan", "discussion_note", "decision_note",
