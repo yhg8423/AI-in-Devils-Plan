@@ -1,0 +1,8 @@
+.DS_Store
+/_workspace/
+.venv/
+__pycache__/
+.env
+runs/
+web/ui/node_modules/
+web/ui/dist/

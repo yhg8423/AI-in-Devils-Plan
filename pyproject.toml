@@ -1,0 +1,14 @@
+[project]
+name = "devils-plan-ai-agents"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "chatarena @ git+https://github.com/Farama-Foundation/ChatArena.git@a15802dd89c0d69165bb0b07e70c2bac5a7c4e36",
+    "gdm-concordia==2.4.0",
+    "numpy>=1.26",
+    "openai>=3.49.0",
+    # ChatArena imports the built-in chess and tic-tac-toe environments with Arena.
+    "pettingzoo>=1.24.1",
+    "chess>=1.9.4",
+    "pygame>=2.6.1",
+]

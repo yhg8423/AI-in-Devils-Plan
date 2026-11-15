@@ -1,0 +1,512 @@
+{"turn":0,"fields":{"checkpoint":"Continued from the previous match","ratings":{"P15":{"affinity":55,"trust":52,"reason":"They said they would choose personal interests, and the actual voting was also matched. It reflects the consistency of remarks about self-choice."},"P01":{"affinity":50,"trust":52,"reason":"They said they would choose personal interests, and the actual voting was also matched. It reflects the consistency of remarks about self-choice."},"P02":{"affinity":50,"trust":53,"reason":"We have corrected that the additional beneficiaries in the rankings are P12 and P16, and maintained their position that they would not agree before 8 meetings. The actual agreement has not been confirmed."},"P09":{"affinity":50,"trust":52,"reason":"They said they would choose personal interests, and the actual voting was also matched. It reflects the consistency of remarks about self-choice."},"P10":{"affinity":51,"trust":53,"reason":"Even after confirming that there was no benefit directly from the person, he expressed his intention to have one, but it was based on the possibility of establishment. It is not confirmed whether one of the results is a P10 agreement."},"P14":{"affinity":50,"trust":52,"reason":"They said they would choose personal interests, and the actual voting was also matched. It reflects the consistency of remarks about self-choice."}}}}
+{"turn":1,"fields":{"checkpoint":"Continued from the previous match","ratings":{"P14":{"affinity":53,"trust":52,"reason":"After announcing that they would choose personal interests, they actually chose the individual. There is no basis for fulfilling the promises, although the speech and the choices are consistent."},"P15":{"affinity":52,"trust":52,"reason":"After announcing that they would choose personal interests, they actually chose the individual. Remarks and choices are consistent, but direct cooperation with me has not been confirmed."},"P02":{"affinity":51,"trust":54,"reason":"Although candidate tiles and zones were specifically shared and proposed to be coordinated, the fulfillment of the coordination promise was not confirmed."},"P10":{"affinity":50,"trust":54,"reason":"He pointed out that information has no basis for advancing the order of tile selection. Assertion verification is positive for trust, but there was no direct cooperation."}}}}
+{"turn":2,"fields":{"checkpoint":"Continued from the previous match","ratings":{"P01":{"affinity":50,"trust":52,"reason":"They publicly said they would take personal interests, and the actual choices matched. Only a slight reflection of the consistency of this expression of opinion."},"P02":{"affinity":50,"trust":52,"reason":"They said they would choose personal interests, and their actual choices matched. Only a slight reflection of the consistency of this expression of opinion."},"P09":{"affinity":54,"trust":55,"reason":"He said he was unaware of the low score selection that could not be checked, and he shared a zone with candidate number 13 and suggested reconfirmation before placement. No choice or fulfillment of promises has yet been confirmed."},"P10":{"affinity":52,"trust":54,"reason":"He admitted and corrected that the description of the row range was inaccurate, and shared his plan with 13 placeable zones. The actual selection and placement has not yet been confirmed."},"P14":{"affinity":50,"trust":52,"reason":"They said they would choose personal interests, and their actual choices matched. Only a slight reflection of the consistency of this expression of opinion."},"P16":{"affinity":50,"trust":52,"reason":"They said they would choose personal interests, and their actual choices matched. Only a slight reflection of the consistency of this expression of opinion."}}}}
+{"turn":3,"fields":{"checkpoint":"Continued from the previous match","ratings":{"P10":{"affinity":60,"trust":62,"reason":"There was a statement that one would confirm one thing and the expression of conditional intention. Since the identity of the final contractor was not disclosed, it was not determined that it was an actual default, and only the consistency of the speech was slightly reflected."},"P15":{"affinity":55,"trust":60,"reason":"We suggested that we share the territories with the tile candidate and avoid overlapping each other, and the choice is unconfirmed. The implementation has not been confirmed."},"P01":{"affinity":50,"trust":52,"reason":"The public will and the actual vote were in agreement with the intention of taking personal interests."},"P14":{"affinity":50,"trust":52,"reason":"The public will and the actual vote were in agreement with the intention of taking personal interests."},"P16":{"affinity":51,"trust":52,"reason":"At first, they said that they were actually contracting 1, but they were put on hold on the grounds that there was no benefit, and finally 0. Although the position was publicly corrected, the overturn was slightly reflected in the trust."}}}}
+{"turn":4,"fields":{"checkpoint":"Continued from the previous match","ratings":{"P09":{"affinity":53,"trust":60,"reason":"They said there was no public preview, and admitted that they could not confirm the actual selection of the low score range. He said that number 13 was just a candidate."},"P01":{"affinity":50,"trust":49,"reason":"They claimed that information selection accelerates the order of tiles, but the benefits were not confirmed after the point of pointing out that there was no evidence of evidence. There is a possibility of error, and the trust is slightly lowered."},"P02":{"affinity":50,"trust":52,"reason":"The actual choice was confirmed as an individual after it was revealed that he thought of personal interests."},"P14":{"affinity":50,"trust":52,"reason":"After announcing that they would choose personal interests, the actual choice was also confirmed as an individual."},"P15":{"affinity":53,"trust":54,"reason":"He suggested that we check out different spaces by proposes the placement area 13, and stated that the selection and arrangement were not confirmed."},"P16":{"affinity":50,"trust":52,"reason":"After announcing that they would choose personal interests, the actual choice was also confirmed as an individual."}}}}
+{"turn":5,"fields":{"checkpoint":"Continued from the previous match","ratings":{"P01":{"affinity":50,"trust":64,"reason":"The public intention to take personal interests and the actual choices matched."},"P15":{"affinity":54,"trust":61,"reason":"The direct beneficiaries of the reduction were explained according to the corrected rankings, and the final agreement was not determined based solely on remarks."},"P02":{"affinity":50,"trust":54,"reason":"We corrected and explained the subject of the benefit and conditional intention, and the position that we would not agree if the total was not confirmed was consistently maintained."},"P09":{"affinity":50,"trust":52,"reason":"The public intention to take personal interests and the actual choices matched."},"P10":{"affinity":51,"trust":52,"reason":"He said that he would maintain one doctor even after the correction that there was no direct benefit. It is not confirmed whether one of the outcomes is from P10."},"P16":{"affinity":50,"trust":54,"reason":"He corrected his claim that he was the direct beneficiary of the reduction, and withholds one doctor after confirming that there was no benefit."}}}}
+{"turn":6,"fields":{"checkpoint":"Continued from the previous match","ratings":{"P09":{"affinity":49,"trust":52,"reason":"They distinguished the definitive quantity and conditional remarks and stated that they were 0. It is impossible to know whether or not the individual is fulfilled with just one contract."},"P10":{"affinity":51,"trust":51,"reason":"After confirming the expression and possibility of confirming one, the expression of the review was made. A total of 1 contract cannot identify the actual contractor, so trust is slightly adjusted."},"P15":{"affinity":52,"trust":51,"reason":"They expressed their intention to personally choose, and their actual public choices matched individually. Only a slight reflection of the agreement between the doctor and the behavior."},"P01":{"affinity":50,"trust":50,"reason":"It was clearly stated that there was no preview information, and it was corrected to find alternatives except when the candidate area overlapped."},"P14":{"affinity":50,"trust":51,"reason":"They expressed their intention to personally choose, and their actual public choices matched individually. Only a slight reflection of the agreement between the doctor and the behavior."},"P16":{"affinity":51,"trust":52,"reason":"After expressing the intention for the first time, he confirmed that there was no direct benefit and corrected it to 0. The revision of the position has been disclosed, but the actual contractor cannot be identified as a result."}}}}
+{"turn":7,"text":"Heavy 13 · 7 players, 14 rounds\n\n1. Setup\nUse 3 bases: red, green, and blue. Each player receives one rock card of every weight from 0 to 6, 2 red chips, 2 green chips, 2 blue chips, and 1 Rainbow chip. The Prison Wing player with the highest Main Match rank leads the first round. On the show, players choose seats before the game and keep them throughout.\n\n2. Private submissions\nEach round, submit and spend one remaining rock card and one color chip. The card number sets the weight of the cube you place. The color chip sets the base. The broadcast allows 3 minutes to submit. After everyone submits, reveal the chips first and the card numbers second.\n\n3. Placement order and passing\nPlayers who submit a Rainbow chip place first. Within the same priority group, higher card numbers place earlier. If the numbers also tie, use clockwise order from the lead player. A regular chip sets the matching color base. A Rainbow chip lets you choose any of the 3 bases when placing. Each player may pass once per round. Players who passed place after everyone else, with the most recent passer placing first.\n\n4. Penalties and the next round\nWhen a new cube brings a base to 13 or higher, remove all the old cubes on that base. Leave the cube you just placed. The player who placed it receives 1 penalty point for every cube removed, including cubes of weight 0. The last player to incur a penalty leads the next round. At the start of Round 8, refill the original cards and chips. Bases and cumulative penalties carry over.\n\n5. Rewards and elimination\nAfter Round 14, rank players by fewest cumulative penalties. If tied, the player who received their last penalty more recently ranks lower. Players in sixth and seventh place are eliminated. The players with the fewest penalties split 4 Pieces equally, and any remainder is discarded.\n\nSimulation procedure\nThe player list gives seating order clockwise: P16 → P01 → P15 → P09 → P10 → P14 → P02. P16 leads the first round. The simulator collects submissions and reveals them together."}
+{"turn":9,"fields":{"note":"Since it is an empty base, there are no penalty points even if you place 6, and you can choose a pedestal by placing it first as a rainbow. Create a burden of subsequent placement with high weight and see how your opponent actually builds it up."}}
+{"turn":10,"fields":{"action":"6 Rainbow"}}
+{"turn":11,"fields":{"note":"All pedestals are empty, so even if you pay a high number this time, it is difficult to give a penalty point. Place the cube to 0 to preserve the elevated card and save the Rainbow priority."}}
+{"turn":12,"fields":{"action":"0 is red."}}
+{"turn":13,"fields":{"note":"In the first round, the pedestal is empty, which reduces the risk of a penalty point to zero, and saves a Rainbow chip that can be more useful for placement options."}}
+{"turn":14,"fields":{"action":"0 is red."}}
+{"turn":15,"fields":{"note":"In the first round, the pedestal is empty, so the risk of an immediate penalty point is low. Minimize the threat to 0, and save on the Rainbow chip and large number cards for future situations."}}
+{"turn":16,"fields":{"action":"0 is red."}}
+{"turn":17,"fields":{"note":"Because it is an empty base, it does not explode even when placed with 6, and the Rainbow cares for the second half with a more useful choice. There is no difference between colors, so choose red."}}
+{"turn":18,"fields":{"action":"Six red."}}
+{"turn":19,"fields":{"note":"Since the pedestal is empty, there is no risk of being penalized for the first placement. Rainbow is more than 6 for general chip users to increase priorities and save for situations where choices are needed."}}
+{"turn":20,"fields":{"action":"Six red."}}
+{"turn":21,"fields":{"note":"0 does not have an existing cube, so the risk of demerit points is low, and large cards are left for the second round."}}
+{"turn":22,"fields":{"action":"0 Blue"}}
+{"turn":23,"fields":{"P16":"Rainbow","P10":"Red","P14":"Red","P01":"Red","P15":"Red","P09":"Red","P02":"Blue"}}
+{"turn":25,"fields":{"note":"P16 picks up red and tries to safely stack 6 and other red cubes in this round. Observe who explodes it in the next round, but there is still a risk of paying directly."}}
+{"turn":26,"fields":{"action":"Red"}}
+{"turn":27,"fields":{"color":"Red"}}
+{"turn":28,"fields":{"note":"P10 can be placed without penalty points because the sum is 12 even if 6 is placed in red."}}
+{"turn":29,"fields":{"action":"Red"}}
+{"turn":30,"fields":{"color":"Red"}}
+{"turn":31,"fields":{"note":"Red is currently 12, so if you release my 6, only two existing cubes will be lifted, so you have 2 demerit points. If you pass, the 0 weight cube on the back can be accumulated, which can increase the amount of collection, so put it on now."}}
+{"turn":32,"fields":{"action":"Red"}}
+{"turn":33,"fields":{"color":"Red"}}
+{"turn":34,"fields":{"note":"The red base is 6, so even if the weight is 0, the sum is less than 13, so there are no penalty points. There is no reason to pass, so put it in red safely."}}
+{"turn":35,"fields":{"action":"Red"}}
+{"turn":36,"fields":{"color":"Red"}}
+{"turn":37,"fields":{"note":"The sum of the current red base is 6 and my cube is 0, so there is no risk of penalty points even if I put it on now. There is no advantage to gain by passing."}}
+{"turn":38,"fields":{"action":"Red"}}
+{"turn":39,"fields":{"color":"Red"}}
+{"turn":40,"fields":{"note":"The current red sum is 6, and there is no risk of raising it to 13 with the remaining batch. Even if you put 0 now, the risk of penalty points in this round is low."}}
+{"turn":41,"fields":{"action":"Red"}}
+{"turn":42,"fields":{"color":"Red"}}
+{"turn":43,"fields":{"note":"Since the blue pedestal is empty, there is no risk of demerit points even if 0 is set, and there is little information to be obtained from the pass."}}
+{"turn":44,"fields":{"action":"Blue"}}
+{"turn":45,"fields":{"color":"Blue"}}
+{"turn":47,"fields":{"note":"The green pedestal is empty, so there are no penalty points even after placing 5. With a high number, the placement order among regular chip users is accelerated and the rainbow is more than a little."}}
+{"turn":48,"fields":{"action":"5 green"}}
+{"turn":49,"fields":{"note":"Place a low weight on an empty green pedestal to reduce the risk of penalties for this round, and avoid dangerous red pedestals."}}
+{"turn":50,"fields":{"action":"One green."}}
+{"turn":51,"fields":{"note":"We put weight on an empty green pedestal with 5, and 5 preceding the red, which has already accumulated cubes, is added to avoid the risk of being penalized."}}
+{"turn":52,"fields":{"action":"5 green"}}
+{"turn":53,"fields":{"note":"The red pedestal has a lot of cubes, so there is a risk of demerit points if a large number comes out. Place 1 on the empty green and safely save the card."}}
+{"turn":54,"fields":{"action":"One green."}}
+{"turn":55,"fields":{"note":"1 is the lightest of the remaining cards, lowering the risk of demerit points, and avoiding the danger of putting an empty green pedestal on the existing pile."}}
+{"turn":56,"fields":{"action":"One green."}}
+{"turn":57,"fields":{"note":"There are already 6 in the red pile, so if you put a large card on it, you can collect the existing cube and get a penalty point. Place 1 of the smallest cards in the empty green, reduces the risk and leaves a large card."}}
+{"turn":58,"fields":{"action":"One green."}}
+{"turn":59,"fields":{"note":"The green is empty, so there is no risk of being penalized by rolling up the red existing cube."}}
+{"turn":60,"fields":{"action":"5 green"}}
+{"turn":61,"fields":{"P14":"Green","P16":"Green","P10":"Green","P02":"Green","P01":"Green","P15":"Green","P09":"Green"}}
+{"turn":63,"fields":{"note":"The P14 has an empty green pedestal, so there are no demerit points even if you place 5, so place it more safely than the pass."}}
+{"turn":64,"fields":{"action":"Green"}}
+{"turn":65,"fields":{"color":"Green"}}
+{"turn":66,"fields":{"note":"There are 5 on the green pedestal, so even if you add it, it's 10, which is less than 13. Place it safely without any reason to pass."}}
+{"turn":67,"fields":{"action":"Green"}}
+{"turn":68,"fields":{"color":"Green"}}
+{"turn":69,"fields":{"note":"The green already has two weights. If you put it on now, the P10 will receive two demerit points on the existing cube, but if you pass, there is a possibility that the back weight of 1 participant will accumulate and reach the threshold, so you can avoid the penalty points."}}
+{"turn":70,"fields":{"action":"Pass"}}
+{"turn":71,"fields":{"note":"The green pedestal is currently 10, so even if you put a weight of 1, it is less than 13, so it can be safely placed without penalty points."}}
+{"turn":72,"fields":{"action":"Green"}}
+{"turn":73,"fields":{"color":"Green"}}
+{"turn":74,"fields":{"note":"The current sum of the greens is 11, and even if the weight of 1 is added, it can be set without penalty points because it is 12. Passing can change the situation with other batches if you pass, so place it safely now."}}
+{"turn":75,"fields":{"action":"Green"}}
+{"turn":76,"fields":{"color":"Green"}}
+{"turn":77,"fields":{"note":"Since the sum of the greens is already 12, if you put it on now, you will receive 4 demerit points by collecting 4 existing cubes. Pass and see if the other arrangements change first."}}
+{"turn":78,"fields":{"action":"Pass"}}
+{"turn":79,"fields":{"note":"If you put 1 on the sum of the abstracts, 4 existing cubes are collected. But even if I pass now, I'm going into the pass order first, so there's no chance that other participants will empty the pedestal first."}}
+{"turn":80,"fields":{"action":"Green"}}
+{"turn":81,"fields":{"color":"Green"}}
+{"turn":82,"fields":{"color":"Green"}}
+{"turn":83,"fields":{"color":"Green"}}
+{"turn":85,"fields":{"note":"The penalty points are already 4 points the most. Place 2 on the empty blue to reduce the risk of additional penalty points and save large cards and rainbow chips."}}
+{"turn":86,"fields":{"action":"Two blue."}}
+{"turn":87,"fields":{"note":"The blue is empty, so even if you put 4, you won't be penalized. Consumes high cards, but avoids the risk of touching existing cubes."}}
+{"turn":88,"fields":{"action":"Four blue."}}
+{"turn":89,"fields":{"note":"Since the blue pedestal is currently 0 weight, it is safe to place even 4, and the order of the arrangement can be accelerated with a high number. There are 2 demerit points, so this time avoiding additional risks."}}
+{"turn":90,"fields":{"action":"Four blue."}}
+{"turn":91,"fields":{"note":"Keeping a penalty point 0 is the first priority. It is placed first with a rainbow and a low weight is safely placed on the empty blue pedestal."}}
+{"turn":92,"fields":{"action":"Two rainbows."}}
+{"turn":93,"fields":{"note":"Place 4 on the empty blue to lower the risk of penalty points in my arrangement. Red and green are already stacked with cubes, so I can pass them on according to the previous arrangement."}}
+{"turn":94,"fields":{"action":"Four blue."}}
+{"turn":95,"fields":{"note":"The blue pedestal currently has 0 cubes, so it is safer than the existing red and green. Low 2 reduces the risk of penalty points and leaves high cards."}}
+{"turn":96,"fields":{"action":"Two blue."}}
+{"turn":97,"fields":{"note":"Use the lightest remaining card 2, choose an empty blue pedestal, and avoid the danger of putting it on an existing pile."}}
+{"turn":98,"fields":{"action":"Two blue."}}
+{"turn":99,"fields":{"P02":"Rainbow","P10":"Blue","P14":"Blue","P16":"Blue","P09":"Blue","P01":"Blue","P15":"Blue"}}
+{"turn":101,"fields":{"note":"If you put 2 on the blue, you can avoid the penalty points that P09 will receive instead of the participant who gave 4. Red can be placed safely, and there is a large number of cubes, so it can put a greater penalty point burden on the opponent when collecting afterwards."}}
+{"turn":102,"fields":{"action":"Red"}}
+{"turn":103,"fields":{"color":"Red"}}
+{"turn":104,"fields":{"note":"Since the existing weight of the blue pedestal is 0, even if 4 is placed, the sum does not reach 13, so you can avoid a penalty point."}}
+{"turn":105,"fields":{"action":"Blue"}}
+{"turn":106,"fields":{"color":"Blue"}}
+{"turn":107,"fields":{"note":"Even if P14 puts 4 on the blue, the total is less than 13, so it can be safely placed without penalty points."}}
+{"turn":108,"fields":{"action":"Blue"}}
+{"turn":109,"fields":{"color":"Blue"}}
+{"turn":110,"fields":{"note":"The current sum of the blue pedestal is 8, and even if the weight of 4 is added, it is 12, so it can be placed without penalty points."}}
+{"turn":111,"fields":{"action":"Blue"}}
+{"turn":112,"fields":{"color":"Blue"}}
+{"turn":113,"fields":{"note":"If you put 2 on the blue now, you will collect 4 existing cubes and receive 4 demerit points. If you pass, you can avoid demerit points as the remaining participants may be empty of the pedestal first."}}
+{"turn":114,"fields":{"action":"Pass"}}
+{"turn":115,"fields":{"note":"If the blue sum is already 12, you get 4 points by rolling up 4 existing cubes. Pass and wait for the situation to change with the next batch."}}
+{"turn":116,"fields":{"action":"Pass"}}
+{"turn":117,"fields":{"note":"The blue sum is already 12, so if you put a weight of 2, you will collect 4 cubes and receive 4 demerit points. Watch to see if the situation changes in the order in which you pass and follow up."}}
+{"turn":118,"fields":{"action":"Pass"}}
+{"turn":119,"fields":{"color":"Blue"}}
+{"turn":120,"fields":{"color":"Blue"}}
+{"turn":121,"fields":{"color":"Blue"}}
+{"turn":123,"fields":{"note":"You can choose the color after submitting the submission first by placing it with Rainbow first. Currently, any pedestal does not explode immediately even if you add 3, so you can choose the most advantageous place by looking at the other submissions."}}
+{"turn":124,"fields":{"action":"Rainbow three."}}
+{"turn":125,"fields":{"note":"Use the lowest 3 of the remaining cards to reduce the risk that my placement will lead to demerit points, and see the submissions published as Rainbow to ensure the flexibility to choose the appropriate pile."}}
+{"turn":126,"fields":{"action":"Rainbow three."}}
+{"turn":127,"fields":{"note":"Reduce the risk of demerit points by securing your priority with the highest 3 of the remaining cards, and placing it on the blue pedestal with the lowest sum now."}}
+{"turn":128,"fields":{"action":"Three blue."}}
+{"turn":129,"fields":{"note":"If you use 3, the red sum is safely placed at 11, and if someone adds 2 or more, you will be charged with 5 existing cubes. The order is also advanced with a high number."}}
+{"turn":130,"fields":{"action":"Three red."}}
+{"turn":131,"fields":{"note":"3 is a card that lowers the risk of penalty points. Since Blue was flocking to the previous round, it reduces the risk of existing cubes by choosing a relatively less crowded green."}}
+{"turn":132,"fields":{"action":"3 green"}}
+{"turn":133,"fields":{"note":"The current sum is 6, so even if you add 3, it's safe with 9. While keeping the lead without penalty points, avoid the high sum of red."}}
+{"turn":134,"fields":{"action":"Three blue."}}
+{"turn":135,"fields":{"note":"Blue is currently the most relaxed with a sum of 6, and even if 6 is added, the sum can be placed without penalty points. Safely use high cards and leave a Rainbow chip."}}
+{"turn":136,"fields":{"action":"Six is blue."}}
+{"turn":137,"fields":{"P15":"Rainbow","P09":"Rainbow","P01":"Blue","P10":"Blue","P14":"Red","P02":"Green","P16":"Blue"}}
+{"turn":139,"fields":{"note":"Even if you put 3 on red, the sum is 11, so it's safe. There is a high possibility that the P14, which gives 3 to red, will walk the cube on the pedestal."}}
+{"turn":140,"fields":{"action":"Red"}}
+{"turn":141,"fields":{"color":"Red"}}
+{"turn":142,"fields":{"note":"If you put 3 on the blue, the total becomes 9, and there is a high probability that the already revealed blue 6 of the P01 will pass it and walk the existing cube. You can induce penalty points to your opponent without any penalty points."}}
+{"turn":143,"fields":{"action":"Blue"}}
+{"turn":144,"fields":{"color":"Blue"}}
+{"turn":145,"fields":{"note":"If the blue sum is 9 and 6, 4 existing cubes will be lifted and you will receive 4 demerit points. Let's take a look at the situation again after passing the other placement."}}
+{"turn":146,"fields":{"action":"Pass"}}
+{"turn":147,"fields":{"note":"The current sum of blue is 9, and even if the weight of 3 is added, it can be set without penalty points because it is 12."}}
+{"turn":148,"fields":{"action":"Blue"}}
+{"turn":149,"fields":{"color":"Blue"}}
+{"turn":150,"fields":{"note":"If you put 3 in red, you roll up 6 existing cubes and get 6 demerit points, but even if you pass, you have to put them back, so it's difficult to avoid penalty points. If I procrastinate after P01's blue batch, I can become the last penalty point and get the next round line."}}
+{"turn":151,"fields":{"action":"Pass"}}
+{"turn":152,"fields":{"note":"Since the current sum of the green pedestals is 7, even if the weight of 3 is added, it can be set without penalty points because it is less than 13."}}
+{"turn":153,"fields":{"action":"Green"}}
+{"turn":154,"fields":{"color":"Green"}}
+{"turn":155,"fields":{"note":"If the P16 is placed directly in the blue, the total is 15, and the 5 existing cubes are penalized. It is safe to wait as there is a possibility that the P01, which will give you a blue 6 if you pass, will break the pedestal first."}}
+{"turn":156,"fields":{"action":"Pass"}}
+{"turn":157,"fields":{"color":"Blue"}}
+{"turn":158,"fields":{"color":"Red"}}
+{"turn":159,"fields":{"color":"Blue"}}
+{"turn":161,"fields":{"note":"0 Rainbow can reduce the risk of demerit points by first securing the placement order and placing it on the current low sum of red pedestals. Heavy cards are preserved."}}
+{"turn":162,"fields":{"action":"0 Rainbow"}}
+{"turn":163,"fields":{"note":"Red is safe even if you add 4 because the sum is currently 3, and the sum of blue is 9, so even if you put 40,000, you can collect the existing cube and receive a penalty point. Choose red to keep the penalty point 0."}}
+{"turn":164,"fields":{"action":"Four red."}}
+{"turn":165,"fields":{"note":"The sum of the abstracts is 10, so even if you add 2, it's safe at 12. If the weight of the next amount comes to the green, you can put pressure on the opponent because you can walk the existing cube and cause demerit points."}}
+{"turn":166,"fields":{"action":"Two green."}}
+{"turn":167,"fields":{"note":"As the priority of Rainbow's pre-placement, choose red, which is 3, and safely place 5, and avoid the risk of penalty points on other pedestals with a sum of 9-10."}}
+{"turn":168,"fields":{"action":"5 Rainbow"}}
+{"turn":169,"fields":{"note":"Red is currently 3, so it's safe to put 6 on. Place it first with the heaviest card, overcoming the risk of someone else bursting the pedestal."}}
+{"turn":170,"fields":{"action":"Six red."}}
+{"turn":171,"fields":{"note":"Red is currently 3, so even if you add 6, you're safe at 9 in total. On the other hand, green and blue are already 10 and 9, so there is a high risk of additional penalty points. Raise the red by 9 to induce the opponent to collect it if the successor over it passes over it."}}
+{"turn":172,"fields":{"action":"Six red."}}
+{"turn":173,"fields":{"note":"Select the remaining cards 2 and the red chip. Red is currently the lowest at 3, so the risk of penalty points is lower than that of 10 green or 9 blue."}}
+{"turn":174,"fields":{"action":"Two red."}}
+{"turn":175,"fields":{"P01":"Rainbow","P14":"Rainbow","P15":"Red","P09":"Red","P02":"Red","P16":"Green","P10":"Red"}}
+{"turn":177,"fields":{"note":"Red is currently 3, so even if you add 5 weight, you can set it with 8 without penalty points. Green and blue respectively walk the existing cubes, so there is a risk of demerit points."}}
+{"turn":178,"fields":{"action":"Red"}}
+{"turn":179,"fields":{"color":"Red"}}
+{"turn":180,"fields":{"note":"Even if you put 0 in red, it's safe right now, and there's a good chance that the P15's 6 will make a total of 13 or more, so it's more likely to walk the existing cube. Then the cube to be collected by the P15 is increased by one without my penalty points."}}
+{"turn":181,"fields":{"action":"Red"}}
+{"turn":182,"fields":{"color":"Red"}}
+{"turn":183,"fields":{"note":"If you put 6 on red now, you will get 3 demerit points by rolling up 3 existing cubes. If you pass, there is a possibility that the red 6 batch on the back will empty the pile first, so it is advantageous to wait."}}
+{"turn":184,"fields":{"action":"Pass"}}
+{"turn":185,"fields":{"note":"If you put 6 on red now, you will collect 3 existing cubes, and you will have 3 demerit points. If you pass, you can avoid my penalty points as there is a possibility that the red layout on the back will pass the pedestal."}}
+{"turn":186,"fields":{"action":"Pass"}}
+{"turn":187,"fields":{"note":"Since the sum of the red pedestal is currently 8, even if the weight of 4 is added, it is 12, so it can be placed safely without collection."}}
+{"turn":188,"fields":{"action":"Red"}}
+{"turn":189,"fields":{"color":"Red"}}
+{"turn":190,"fields":{"note":"Since the current sum of the green is 10, even if the weight is added by 2, there is no penalty point with 12. It's better to put it safely now than to pass."}}
+{"turn":191,"fields":{"action":"Green"}}
+{"turn":192,"fields":{"color":"Green"}}
+{"turn":193,"fields":{"note":"The current sum of red is 12, so if you put it on now, you will get 4 demerit points by rolling up 4 existing cubes. Pass and see the possibility that the pedestal will be empty first with a different placement."}}
+{"turn":194,"fields":{"action":"Pass"}}
+{"turn":195,"fields":{"color":"Red"}}
+{"turn":196,"fields":{"color":"Red"}}
+{"turn":197,"fields":{"color":"Red"}}
+{"turn":199,"fields":{"note":"The current sum is 9, so if you place 4, you will have 2 demerit points by rolling up 2 existing cubes. Pick 4 and leave the same blue heavier placement first, leaving the possibility of emptying the pile first."}}
+{"turn":200,"fields":{"action":"Four blue."}}
+{"turn":201,"fields":{"note":"Blue has a weight of 9, so there is a risk of penalty points, but there are fewer cubes to collect than green. If you pay 4, it is placed later than 5, so there is a possibility that the other participant will first empty the pedestal."}}
+{"turn":202,"fields":{"action":"Four blue."}}
+{"turn":203,"fields":{"note":"The green is 12, so if you put 1 on it, you will get 5 demerit points by rolling up the existing cube. You can choose red or blue by placing it first with Rainbow, and secure the priority with 1 higher of the remaining cards."}}
+{"turn":204,"fields":{"action":"1 Rainbow"}}
+{"turn":205,"fields":{"note":"Since the green is 12, you will get 5 demerit points by rolling up 5 existing cubes for any choice. Blue is safe with a total of 11 even if you place 2, and after that, if other participants set 2 or more, you can put a burden on the collection."}}
+{"turn":206,"fields":{"action":"Two blue."}}
+{"turn":207,"fields":{"note":"Red is currently 6, so even if you add 6, it is safe because it does not reach 13. By increasing the likelihood of placement with 6 first, I avoid my penalty points and make the opponent burden the collection after that."}}
+{"turn":208,"fields":{"action":"Six red."}}
+{"turn":209,"fields":{"note":"The P16 adds 1 to the red and puts it safely, and the next time 6 comes in, the opponent will break down the pedestal."}}
+{"turn":210,"fields":{"action":"One red."}}
+{"turn":211,"fields":{"note":"If the sum of the green is 12, the 5 existing cubes will be removed, so there is a high risk of demerit points. The sum of red is 6, so it's safe to add 4, and 3 is left for the back round."}}
+{"turn":212,"fields":{"action":"Four red."}}
+{"turn":213,"fields":{"P10":"Rainbow","P02":"Red","P15":"Blue","P09":"Blue","P01":"Red","P14":"Blue","P16":"Red"}}
+{"turn":215,"fields":{"note":"Red will be 7 in total without penalty points even if you add 1 to 1 in total. The green has 5 existing cubes, and the total is 10, which increases the risk."}}
+{"turn":216,"fields":{"action":"Red"}}
+{"turn":217,"fields":{"color":"Red"}}
+{"turn":218,"fields":{"note":"If you put it on now, the red sum is 13, collecting 3 existing cubes and receiving 3 demerit points. If you pass and check the layout behind it, there is a possibility that the red will be empty first, so you can avoid demerit points."}}
+{"turn":219,"fields":{"action":"Pass"}}
+{"turn":220,"fields":{"note":"If you place 4 on the blue, you will receive 2 demerit points by collecting 2 existing cubes. Pass and wait for the other participants to be vacated first."}}
+{"turn":221,"fields":{"action":"Pass"}}
+{"turn":222,"fields":{"note":"If you place 4 on the blue, the sum is 13, collecting 2 existing cubes and receiving 2 demerit points. If you pass, you can avoid demerit points as there is a possibility that the other deployer will empty the pedestal first."}}
+{"turn":223,"fields":{"action":"Pass"}}
+{"turn":224,"fields":{"note":"P01 adds 4 to red, so you can put it safely without penalty points because the sum is 11."}}
+{"turn":225,"fields":{"action":"Red"}}
+{"turn":226,"fields":{"color":"Red"}}
+{"turn":227,"fields":{"note":"If you put 2 on the blue, the total is 11 to less than 13, so you can place it safely without penalty points."}}
+{"turn":228,"fields":{"action":"Blue"}}
+{"turn":229,"fields":{"color":"Blue"}}
+{"turn":230,"fields":{"note":"P16 is safe at 12 in total even if you put 1 on red. It's better to make sure without any penalty points than pass."}}
+{"turn":231,"fields":{"action":"Red"}}
+{"turn":232,"fields":{"color":"Red"}}
+{"turn":233,"fields":{"color":"Blue"}}
+{"turn":234,"fields":{"color":"Blue"}}
+{"turn":235,"fields":{"color":"Red"}}
+{"turn":237,"fields":{"note":"The suggested options are only 5 blue. Since the current blue sum is 8, if you add 5, there is a risk of collecting 2 existing cubes and getting 2 points."}}
+{"turn":238,"fields":{"action":"Five blue."}}
+{"turn":239,"fields":{"note":"Red is currently 6, so it is safe without penalty points even if 0 is set. You can safely add cubes among the presented options."}}
+{"turn":240,"fields":{"action":"0 is red."}}
+{"turn":241,"fields":{"note":"There are only 3 green options. Since the sum of the abstracts is 12, there is a risk of 5 demerit points if you place it yourself, but I will pass in the placement order and aim for the situation where the other participants are empty first."}}
+{"turn":242,"fields":{"action":"3 green"}}
+{"turn":243,"fields":{"note":"Select the action presented as the current submission option as it is."}}
+{"turn":244,"fields":{"action":"5 green"}}
+{"turn":245,"fields":{"note":"Submit the remaining cards and the selected choices for chip conditions. The green pedestal is currently 12, so there is a high risk of penalty points, but there is only one option."}}
+{"turn":246,"fields":{"action":"5 green"}}
+{"turn":247,"fields":{"note":"The abstract is currently 12, so even if you release 0, it will remain without penalty points. Consumes low cards in the new round."}}
+{"turn":248,"fields":{"action":"0 green"}}
+{"turn":249,"fields":{"note":"The only options presented are 1 abstract. The green ranges from 12 to 13, walks 5 existing cubes, and receives 5 demerit points, but there are no other options."}}
+{"turn":250,"fields":{"action":"One green."}}
+{"turn":251,"fields":{"P02":"Blue","P15":"Green","P09":"Green","P01":"Green","P14":"Green","P16":"Red","P10":"Green"}}
+{"turn":253,"fields":{"note":"If you put 5 on the blue, you will get 2 demerit points by rolling up 2 existing cubes, but there is no possibility that the placement of other participants will empty the blue pedestal. Even if you pass, you will be given the same penalty later, so let go now."}}
+{"turn":254,"fields":{"action":"Blue"}}
+{"turn":255,"fields":{"color":"Blue"}}
+{"turn":256,"fields":{"note":"If you put 5 in the green now, you will get 5 demerit points by rolling up 5 existing cubes. If you pass, it is more advantageous to wait as the green arrangement in the back may empty the pedestal first."}}
+{"turn":257,"fields":{"action":"Pass"}}
+{"turn":258,"fields":{"note":"The green pedestal is 12, so if you put it on now, you will collect 5 cubes and receive 5 demerit points. Pass the pass and wait for the other batters to be empty first."}}
+{"turn":259,"fields":{"action":"Pass"}}
+{"turn":260,"fields":{"note":"If you add 3 to the green, 5 existing cubes will be lifted, resulting in 5 demerit points. One pass and waits for the other participant to empty the green first."}}
+{"turn":261,"fields":{"action":"Pass"}}
+{"turn":262,"fields":{"note":"Green is currently 12, so if you place 1, you will receive 5 demerit points by collecting 5 existing cubes. Even if you pass, there is no basis to avoid this danger, so let's put it on now."}}
+{"turn":263,"fields":{"action":"Green"}}
+{"turn":264,"fields":{"color":"Green"}}
+{"turn":265,"fields":{"note":"The P16 has no penalty points because the total is 6 even if the weight is set to 0 red. There is no reason to pass."}}
+{"turn":266,"fields":{"action":"Red"}}
+{"turn":267,"fields":{"color":"Red"}}
+{"turn":268,"fields":{"note":"Even if you put 0 in the abstract, the total is 1, so there are no penalty points, and the advantages of passing the pass are not clear."}}
+{"turn":269,"fields":{"action":"Green"}}
+{"turn":270,"fields":{"color":"Green"}}
+{"turn":271,"fields":{"color":"Green"}}
+{"turn":272,"fields":{"color":"Green"}}
+{"turn":273,"fields":{"color":"Green"}}
+{"turn":275,"fields":{"note":"With the Rainbow Priority Placement, you can place 6 before the other participants grow the red first. Red is currently 6, so it's safe at 12 in total, and my penalty points are avoided."}}
+{"turn":276,"fields":{"action":"6 Rainbow"}}
+{"turn":277,"fields":{"note":"It is currently in the 5th place with 7 points of penalty, so it is important to avoid additional penalty points. After viewing the open choices first with Rainbow, you can choose a pedestal, so the response is the largest."}}
+{"turn":278,"fields":{"action":"6 Rainbow"}}
+{"turn":279,"fields":{"note":"If you pay 6, you won't be penalized immediately on any pedestal at the moment. Blue is currently only 5 with one cube, so the risk of penalty points is lower than in red."}}
+{"turn":280,"fields":{"action":"Six is blue."}}
+{"turn":281,"fields":{"note":"The current base total is 6 red, green and blue 5, so 0 is safe wherever you place it. Get your choices with Rainbow, and if necessary, look at the situation after passing and place it."}}
+{"turn":282,"fields":{"action":"0 Rainbow"}}
+{"turn":283,"fields":{"note":"The priority is to avoid additional penalty points in this round in order to survive with 6 demerit points. 0 currently does not immediately collect any pedestals, and the red has two existing cubes, so if there is a later collection, it can be a bigger burden on the opponent."}}
+{"turn":284,"fields":{"action":"0 is red."}}
+{"turn":285,"fields":{"note":"Red is currently 6 in total, and in the last round, only I chose me, so the congestion was low. Reduce the risk of penalties by placing it safely at 0."}}
+{"turn":286,"fields":{"action":"0 is red."}}
+{"turn":287,"fields":{"note":"Since the lead with a penalty point of 0, keeping the score is the first priority. You can keep the sum of red or blue below 13 by placing it first with a rainbow."}}
+{"turn":288,"fields":{"action":"6 Rainbow"}}
+{"turn":289,"fields":{"P15":"Rainbow","P09":"Rainbow","P01":"Rainbow","P14":"Rainbow","P10":"Blue","P02":"Red","P16":"Red"}}
+{"turn":291,"fields":{"note":"Red is 6, but the sum is 12, so it's safe. Since there are two existing cubes, the opponent's subsequent deployments can lead to greater demerit points on the opponent."}}
+{"turn":292,"fields":{"action":"Red"}}
+{"turn":293,"fields":{"color":"Red"}}
+{"turn":294,"fields":{"note":"When placed in blue, it is safe, with a total of 11, and when the P10, which gives blue 6, empty the pedestal, P10 will have a penalty point, which is advantageous for my ranking."}}
+{"turn":295,"fields":{"action":"Blue"}}
+{"turn":296,"fields":{"color":"Blue"}}
+{"turn":297,"fields":{"note":"Since p01 is the lead with 0 demerit points, avoid the risk of demerit points. Abstract is safe with a total of 11."}}
+{"turn":298,"fields":{"action":"Green"}}
+{"turn":299,"fields":{"color":"Green"}}
+{"turn":300,"fields":{"note":"Even if you put 0 on red, it's safe at 12 in total. After that, if more than 1 is placed, four existing cubes will be collected, which puts a greater burden on other participants."}}
+{"turn":301,"fields":{"action":"Red"}}
+{"turn":302,"fields":{"color":"Red"}}
+{"turn":303,"fields":{"note":"If you put 6 on the blue, you will get 2 demerit points by rolling up 2 existing cubes. Since the remaining two participants are also placed in red, the penalty points for the blue collection do not change even if they pass."}}
+{"turn":304,"fields":{"action":"Blue"}}
+{"turn":305,"fields":{"color":"Blue"}}
+{"turn":306,"fields":{"note":"The sum of red is 12, so even if we put 0 weight, there is no collection. Even if you pass, the same cube will only be placed later, so place it now."}}
+{"turn":307,"fields":{"action":"Red"}}
+{"turn":308,"fields":{"color":"Red"}}
+{"turn":309,"fields":{"note":"The current sum of red is 12, and even with 0 weight, it does not reach 13, so it can be set without penalty points."}}
+{"turn":310,"fields":{"action":"Red"}}
+{"turn":311,"fields":{"color":"Red"}}
+{"turn":313,"fields":{"note":"If it is 0, any pedestal will not be immediately penalized. The green is 11, so even if you add 0, it will not be collected, and the rainbow chip is saved."}}
+{"turn":314,"fields":{"action":"0 green"}}
+{"turn":315,"fields":{"note":"Survival is already at stake with 13 demerit points. Red is 12 in total, so even if you put only a positive number, you get a penalty point, and the green is 11, so it is dangerous depending on the previous arrangement. Put 1 on a blue with a total of 6, giving priority to the possibility of directly avoiding penalty points."}}
+{"turn":316,"fields":{"action":"One blue."}}
+{"turn":317,"fields":{"note":"Currently, the priority is to avoid additional penalty points with 6 points. Rainbow ensures placement priority and color choice flexibility, and chooses a pedestal that is safe when placing."}}
+{"turn":318,"fields":{"action":"6 Rainbow"}}
+{"turn":319,"fields":{"note":"P16 adds 6 to the blue and sets a total of 12 without penalty points, and the remaining low cards are used later. Red is already 12, so avoid it."}}
+{"turn":320,"fields":{"action":"Six is blue."}}
+{"turn":321,"fields":{"note":"It is the lead with a penalty point of 0. Even if you add 5 to the blue, the current sum is 11, and the higher weight can be accelerated."}}
+{"turn":322,"fields":{"action":"Five blue."}}
+{"turn":323,"fields":{"note":"The current sum is 6, so it's safe to add 5, and the sum is raised to 11, so that the other participant will get a penalty point when passing it over. The sum of red and green is already dangerous with 12 and 11."}}
+{"turn":324,"fields":{"action":"Five blue."}}
+{"turn":325,"fields":{"note":"Red is currently 12, so even if you put 0, there are no penalty points. If the other participants empty first, there can be a big penalty point on that side, which is advantageous for survival."}}
+{"turn":326,"fields":{"action":"0 is red."}}
+{"turn":327,"fields":{"P02":"Rainbow","P16":"Blue","P01":"Blue","P15":"Blue","P14":"Blue","P10":"Green","P09":"Red"}}
+{"turn":329,"fields":{"note":"The sum of blue is currently 6, so even if the weight is 6, the sum is 12, so there is no collection. Red or green collects the existing cubes and receives a large penalty point, so choose blue."}}
+{"turn":330,"fields":{"action":"Blue"}}
+{"turn":331,"fields":{"color":"Blue"}}
+{"turn":332,"fields":{"note":"If you put the blue now, it ends with 2 demerit points equivalent to 2 existing cubes. If you pass, you're more likely to get 3 demerit points by rolling up 3 cubes that will accumulate behind you."}}
+{"turn":333,"fields":{"action":"Blue"}}
+{"turn":334,"fields":{"color":"Blue"}}
+{"turn":335,"fields":{"note":"Even if you put 5 on the blue, the sum is 11, so you can place it safely without a penalty point."}}
+{"turn":336,"fields":{"action":"Blue"}}
+{"turn":337,"fields":{"color":"Blue"}}
+{"turn":338,"fields":{"note":"If you put it right in the blue, you will receive 2 demerit points by collecting 2 existing cubes. Pass and wait for the other participants to first empty the pedestal."}}
+{"turn":339,"fields":{"action":"Pass"}}
+{"turn":340,"fields":{"note":"Blue is currently 11 in total, so even with 1 weight, it is safe at 12. There is no reason to pass."}}
+{"turn":341,"fields":{"action":"Blue"}}
+{"turn":342,"fields":{"color":"Blue"}}
+{"turn":343,"fields":{"note":"Green is currently 11, so there are no penalty points even if you put 0 weight on it. If you drop it now, you can increase the number of cubes when someone collects the green."}}
+{"turn":344,"fields":{"action":"Green"}}
+{"turn":345,"fields":{"color":"Green"}}
+{"turn":346,"fields":{"note":"The current total of red is 12, so even if you put 0 weight on it, it is not collected. If you add a cube, you're more likely to get a penalty point when another participant emptys the red."}}
+{"turn":347,"fields":{"action":"Red"}}
+{"turn":348,"fields":{"color":"Red"}}
+{"turn":349,"fields":{"color":"Blue"}}
+{"turn":351,"fields":{"note":"The current sum is 5, so even if you put 4, it's safe with 9. Red and green have a high risk of being penalized by rolling up the old cube if you place a heavy card."}}
+{"turn":352,"fields":{"action":"Four blue."}}
+{"turn":353,"fields":{"note":"The current blue sum is 5, so even if you place 5, it will not be collected. Higher numbers of the same color are placed first, so they are more likely to be safe, and avoid the risk of immediate collection of red and green."}}
+{"turn":354,"fields":{"action":"Five blue."}}
+{"turn":355,"fields":{"note":"If you put 1 on the blue, the total is currently 6, so there are no penalty points immediately, and there is no risk of collecting other pedestals."}}
+{"turn":356,"fields":{"action":"One blue."}}
+{"turn":357,"fields":{"note":"Red is currently 12, and 7 existing cubes are walked, and green is also 11, so from 2, we walk 3 existing cubes. Blue is 11 in total, even if you place 6, so you avoid demerit points and preserve other color chips."}}
+{"turn":358,"fields":{"action":"Six is blue."}}
+{"turn":359,"fields":{"note":"Blue is currently 5, so even if you put 5, the sum is safe at 10. Red is already 12 and green is 11, so it's dangerous."}}
+{"turn":360,"fields":{"action":"Five blue."}}
+{"turn":361,"fields":{"note":"Blue is currently 5, so even if you add 5, it's safe at 10. Red will immediately walk the existing cube except for the big penalty point risk, except for the green road 1."}}
+{"turn":362,"fields":{"action":"Five blue."}}
+{"turn":363,"fields":{"note":"Even if 0 is released, the sum of the pedestals does not reach 13, so you can avoid demerit points. Red is already in total 12, so there is a possibility that the opponent will organize after that."}}
+{"turn":364,"fields":{"action":"0 is red."}}
+{"turn":365,"fields":{"P14":"Blue","P09":"Blue","P02":"Blue","P16":"Blue","P15":"Blue","P10":"Blue","P01":"Red"}}
+{"turn":367,"fields":{"note":"P14 puts 6 on the blue, so the total is 11, so you don't get a penalty point. Green and red will collect the existing cubes, so choose blue."}}
+{"turn":368,"fields":{"action":"Blue"}}
+{"turn":369,"fields":{"color":"Blue"}}
+{"turn":370,"fields":{"note":"If you put it in the blue now, you will only collect 2 existing cubes, and you will get 2 points. If you pass, there is a risk of collecting larger piles after the placement of other participants, so they are put on immediately."}}
+{"turn":371,"fields":{"action":"Blue"}}
+{"turn":372,"fields":{"color":"Blue"}}
+{"turn":373,"fields":{"note":"There are currently 5 only left in the blue, so even if the weight is added by 5, the sum is 10, so the collection does not occur. Put it in the blue for no reason to pass."}}
+{"turn":374,"fields":{"action":"Blue"}}
+{"turn":375,"fields":{"color":"Blue"}}
+{"turn":376,"fields":{"note":"It's more advantageous to roll up two existing cubes from Blue and finish them with 2 points, and collect even cubes that can accumulate after passing."}}
+{"turn":377,"fields":{"action":"Blue"}}
+{"turn":378,"fields":{"color":"Blue"}}
+{"turn":379,"fields":{"note":"There are currently 5 only in blue, so even if you put a weight of 4, you will not be penalized with a total of 9."}}
+{"turn":380,"fields":{"action":"Blue"}}
+{"turn":381,"fields":{"color":"Blue"}}
+{"turn":382,"fields":{"note":"Even if you put 1 on the blue, the total is 10, so there is no penalty point immediately. The advantages to pass are not clear, and even with cubes, there is a low risk that is against the current ranking competition."}}
+{"turn":383,"fields":{"action":"Blue"}}
+{"turn":384,"fields":{"color":"Blue"}}
+{"turn":385,"fields":{"note":"Red is currently 12, so even if you put 0 weight, there are no penalty points. Place it safely and leave your chance to pass this round."}}
+{"turn":386,"fields":{"action":"Red"}}
+{"turn":387,"fields":{"color":"Red"}}
+{"turn":389,"fields":{"note":"The sum of the abstracts is 11, so even if you put 1, it's safe at 12. Red is overflowing with only 1, and the blue chips are not left."}}
+{"turn":390,"fields":{"action":"One green."}}
+{"turn":391,"fields":{"note":"Putting 2 on the blue is safe with a total of 12, and after that, it puts a risk of organizing the pedestals for the participant who adds 1 or more. Red is already 12, so I avoid it."}}
+{"turn":392,"fields":{"action":"Two blue."}}
+{"turn":393,"fields":{"note":"The sum of the currents is 11, so even if you put 1, you can safely turn 12. After the next participant exceeds the total, the existing cube can be collected."}}
+{"turn":394,"fields":{"action":"One green."}}
+{"turn":395,"fields":{"note":"If you put 1 in the green, you can make 4 collection piles when the next participant places more than 1 weight while avoiding this penalty with a total of 12. Red causes any card to be picked up immediately."}}
+{"turn":396,"fields":{"action":"One green."}}
+{"turn":397,"fields":{"note":"8 of the existing red is collected with only 2, and 3 greens are collected with 2. You can choose a blue with the remaining rainbow chip, so you can put 2 on it and place it safely without any penalty points."}}
+{"turn":398,"fields":{"action":"Two rainbows."}}
+{"turn":399,"fields":{"note":"The green is currently 11, so if you put 2 first, you get 3 demerit points for 3 existing cubes. The larger numbers are the same loss, and the low cards are placed late, leaving room to avoid demerit points if the previous participant emptys the green."}}
+{"turn":400,"fields":{"action":"Two green."}}
+{"turn":401,"fields":{"note":"The priority is to avoid additional penalty points with 6 demerit points. Blue is currently 10, so even if you add 1, 11 has the greatest safety margin."}}
+{"turn":402,"fields":{"action":"One blue."}}
+{"turn":403,"fields":{"P10":"Rainbow","P01":"Blue","P14":"Green","P16":"Green","P15":"Green","P09":"Green","P02":"Blue"}}
+{"turn":405,"fields":{"note":"Even if blue adds 2, the total is 12, so it will not be collected immediately. Red and green are collected, and the number of existing cubes is as high as possible."}}
+{"turn":406,"fields":{"action":"Blue"}}
+{"turn":407,"fields":{"color":"Blue"}}
+{"turn":408,"fields":{"note":"If you put it in blue, you will get 4 points for rolling up 4 existing cubes. Pass it first, let P01 handle it first, and then aim for an opportunity to place it safely."}}
+{"turn":409,"fields":{"action":"Pass"}}
+{"turn":410,"fields":{"note":"If you put it right in the green, you will get 3 demerit points by rolling up 3 existing cubes. Pass and place behind, leaving the possibility that the green will be empty before that."}}
+{"turn":411,"fields":{"action":"Pass"}}
+{"turn":412,"fields":{"note":"The sum of the greens is 11, so even if you add 1 weight, you are safe at 12. There is no reason to pass."}}
+{"turn":413,"fields":{"action":"Green"}}
+{"turn":414,"fields":{"color":"Green"}}
+{"turn":415,"fields":{"note":"If you put it in the green now, you will get 4 demerit points by rolling up 4 existing cubes. Pass and wait for the other participants to first empty the green."}}
+{"turn":416,"fields":{"action":"Pass"}}
+{"turn":417,"fields":{"note":"The green is 12 in total, so if you put it on now, you will collect 4 existing cubes and you will receive 4 points. Pass by passing, aiming for the possibility that other participants will handle it first."}}
+{"turn":418,"fields":{"action":"Pass"}}
+{"turn":419,"fields":{"note":"The blue sum is already 12, so if you put a weight of 1, you will receive a penalty point for collecting 4 existing cubes. Even if I pass now, the situation doesn't get better because I put it back first."}}
+{"turn":420,"fields":{"action":"Blue"}}
+{"turn":421,"fields":{"color":"Blue"}}
+{"turn":422,"fields":{"color":"Green"}}
+{"turn":423,"fields":{"color":"Green"}}
+{"turn":424,"fields":{"color":"Green"}}
+{"turn":425,"fields":{"color":"Blue"}}
+{"turn":427,"fields":{"note":"Red has a huge penalty of penalty points by collecting 8 existing cubes with any positive card. The Blue Chip has already been used twice this cycle, and the Green 4 avoids this penalty point by raising the total to 8."}}
+{"turn":428,"fields":{"action":"Four green."}}
+{"turn":429,"fields":{"note":"Red has 8 existing cubes, so if you collect them, you will have a large penalty point. If you put 3 on the green, the total is currently 7, so you can save more cards without being immediately collected."}}
+{"turn":430,"fields":{"action":"3 green"}}
+{"turn":431,"fields":{"note":"If you put red at 12 in total, you will collect 8 existing cubes. The green is 4 in total, so it's safe to add 5, and it's a big card, so you can advance the placement order."}}
+{"turn":432,"fields":{"action":"5 green"}}
+{"turn":433,"fields":{"note":"Red is currently at the risk of a huge penalty point as soon as the sum is now 12. The sum is 4, so even if you add 4, you can advance the placement order with a high card."}}
+{"turn":434,"fields":{"action":"Four green."}}
+{"turn":435,"fields":{"note":"It can be placed first with a rainbow, so it is safe to choose a blue and raise the total from 3 to 7. Red is already 12, so it's avoided, and the green congestion is not increased."}}
+{"turn":436,"fields":{"action":"Four Rainbows."}}
+{"turn":437,"fields":{"note":"Red is 12, so if you place more than 1, the existing cube will be removed and you will be subjected to a large penalty point. Since the abstract is 4 in total, it is safe to add 4, and after that, it leaves a burden on the opponent."}}
+{"turn":438,"fields":{"action":"Four green."}}
+{"turn":439,"fields":{"note":"Red is 12 in total, so it is safe without any penalty points even if you place 0, and if there is someone who emptys the pedestal, you will be penalized as many as the number of existing cubes."}}
+{"turn":440,"fields":{"action":"0 is red."}}
+{"turn":441,"fields":{"P16":"Rainbow","P14":"Green","P09":"Green","P02":"Green","P01":"Green","P10":"Green","P15":"Red"}}
+{"turn":443,"fields":{"note":"If you put it in the green, the total becomes 8, and when the P14 with the green color is set to 5 weight, the existing 4 cubes will be walked. You can induce penalty points to your opponent without any penalty points."}}
+{"turn":444,"fields":{"action":"Green"}}
+{"turn":445,"fields":{"color":"Green"}}
+{"turn":446,"fields":{"note":"The total abstract is 8, so if you put it on now, you will get 4 demerit points by rolling up 4 existing cubes. Passing can reduce losses as there is a possibility that the existing cubes may be partially organized by the placement of other participants."}}
+{"turn":447,"fields":{"action":"Pass"}}
+{"turn":448,"fields":{"note":"If you put it in the green now, there is a high chance that P02 will collect it and receive 5 demerit points. Passing by is more likely to be collected first, it is advantageous in narrowing the gap with the leader, and my placement may be safe after that."}}
+{"turn":449,"fields":{"action":"Pass"}}
+{"turn":450,"fields":{"note":"Since the current sum of the green is 8, even if the weight of 4 is added, the collection does not occur at 12. Put it in the green more safely than the pass."}}
+{"turn":451,"fields":{"action":"Green"}}
+{"turn":452,"fields":{"color":"Green"}}
+{"turn":453,"fields":{"note":"Since the sum of the abstracts is already 12, if you put it on now, you will have a huge penalty for collecting 5 existing cubes. First pass and see if the pedestal is organized by other arrangement."}}
+{"turn":454,"fields":{"action":"Pass"}}
+{"turn":455,"fields":{"note":"Green will collect 5 existing cubes and receive 5 demerit points if the total is currently 12 or 3. Waiting for the risk of collection diminishing."}}
+{"turn":456,"fields":{"action":"Pass"}}
+{"turn":457,"fields":{"note":"Since the total of red is 12, it is safe even if you put 0 weight on it, and you will not be penalized."}}
+{"turn":458,"fields":{"action":"Red"}}
+{"turn":459,"fields":{"color":"Red"}}
+{"turn":460,"fields":{"color":"Green"}}
+{"turn":461,"fields":{"color":"Green"}}
+{"turn":462,"fields":{"color":"Green"}}
+{"turn":463,"fields":{"color":"Green"}}
+{"turn":465,"fields":{"note":"Red is 12, and 9 existing cubes are collected. If you choose 3 and slow down the layout, you can leave a little more chance of emptying the red first."}}
+{"turn":466,"fields":{"action":"Three red."}}
+{"turn":467,"fields":{"note":"The green is currently 5, so even if you add 3, the weight is 8, and the placement order can be accelerated. Red has many existing cubes, so there is a risk of a huge penalty point when collecting."}}
+{"turn":468,"fields":{"action":"3 green"}}
+{"turn":469,"fields":{"note":"The green is currently 5, so even if you add 3, it's safe at 8. There is a high possibility that it will be placed before 2, and if the red is 12 in total, the existing cube will be collected."}}
+{"turn":470,"fields":{"action":"3 green"}}
+{"turn":471,"fields":{"note":"Red is 12 in total, so you'll have a huge penalty point right away. Putting 1 in the green is now safe with a total of 6, and even if the previous batch is added, the risk of cleanup can be lower than 3."}}
+{"turn":472,"fields":{"action":"One green."}}
+{"turn":473,"fields":{"note":"The green is currently 5, so even if you put 3, it is safe at 8 in total. Red will receive a big penalty for putting a lot of existing cubes."}}
+{"turn":474,"fields":{"action":"3 green"}}
+{"turn":475,"fields":{"note":"If the red is 12 in total, a large pile will be collected. The blue can be placed safely, and 3 is added to increase the likelihood that the next participant will collect."}}
+{"turn":476,"fields":{"action":"Three blue."}}
+{"turn":477,"fields":{"note":"The total of red is 12, so if either side is placed first, 9 existing cubes will be collected. If you pay 4, you'll be placed later than 5, so you're more likely to pick up the red first."}}
+{"turn":478,"fields":{"action":"Four red."}}
+{"turn":479,"fields":{"P10":"Red","P14":"Red","P02":"Green","P16":"Green","P15":"Green","P09":"Blue","P01":"Green"}}
+{"turn":481,"fields":{"note":"If you put it in red now, you will collect 9 existing cubes and receive 9 demerit points. If you pass, there is a possibility that the P14 will pick up the red, which can avoid danger."}}
+{"turn":482,"fields":{"action":"Pass"}}
+{"turn":483,"fields":{"note":"If you put it in red, you will get 9 points for 9 points by rolling up 9 existing cubes. Passing by, the other participants will first leave the possibility of emptying the red."}}
+{"turn":484,"fields":{"action":"Pass"}}
+{"turn":485,"fields":{"note":"The green is currently 5, so even if the weight of 3 is added, the collection will not occur at 8. Place it safely and avoid additional penalty points."}}
+{"turn":486,"fields":{"action":"Green"}}
+{"turn":487,"fields":{"color":"Green"}}
+{"turn":488,"fields":{"note":"Since the sum of the abstracts is 11, if I put it on now, I will collect 3 existing cubes and receive 3 demerit points. If you pass, the 3 on the back can explode first, so you can avoid my penalty points."}}
+{"turn":489,"fields":{"action":"Pass"}}
+{"turn":490,"fields":{"note":"Since the current sum of the green is 8, even if we put 3 weight, it is safe at 11 in total. There is no benefit to pass."}}
+{"turn":491,"fields":{"action":"Green"}}
+{"turn":492,"fields":{"color":"Green"}}
+{"turn":493,"fields":{"note":"Blue is currently 3, so even if you put a weight of 3, you avoid demerit points. Place more securely than pass."}}
+{"turn":494,"fields":{"action":"Blue"}}
+{"turn":495,"fields":{"color":"Blue"}}
+{"turn":496,"fields":{"note":"The green is currently 11, so even if you add 1 weight, it's safe at 12. It's better to place a definite place than the gain to pass and wait."}}
+{"turn":497,"fields":{"action":"Green"}}
+{"turn":498,"fields":{"color":"Green"}}
+{"turn":499,"fields":{"color":"Green"}}
+{"turn":500,"fields":{"color":"Red"}}
+{"turn":501,"fields":{"color":"Red"}}
+{"turn":503,"fields":{"note":"Red is currently 7, so even dropping 4 will not cause any penalty points. Securely place the remaining submission options."}}
+{"turn":504,"fields":{"action":"Four red."}}
+{"turn":505,"fields":{"note":"Red is currently 7, so even if you add 2, there is no risk of collecting at 9. Avoid penalty points in the last round."}}
+{"turn":506,"fields":{"action":"Two red."}}
+{"turn":507,"fields":{"note":"Since the sum of red is 7, it is safe with no penalty points even if you add 2 weight. In the last round, they are currently tied with 13 points."}}
+{"turn":508,"fields":{"action":"Two red."}}
+{"turn":509,"fields":{"note":"Red is currently 7, so it's safe to put 3 weight on it."}}
+{"turn":510,"fields":{"action":"Three red."}}
+{"turn":511,"fields":{"note":"He is currently close to the lower ranks with a penalty point of 13. Red is a total of 7, so it's safe to put 2 on, and you can immediately avoid demerit points."}}
+{"turn":512,"fields":{"action":"Two red."}}
+{"turn":513,"fields":{"note":"Red is currently 7, so even dropping 2 does not cause a collection. It is a choice that does not increase the current penalty points."}}
+{"turn":514,"fields":{"action":"Two red."}}
+{"turn":515,"fields":{"note":"5 is the remaining card, and a red chip can be used. The red total is 12, leaving the risk of follow-up collection immediately without being penalized."}}
+{"turn":516,"fields":{"action":"Five red."}}
+{"turn":517,"fields":{"P10":"Red","P14":"Red","P01":"Red","P02":"Red","P16":"Red","P15":"Red","P09":"Red"}}
+{"turn":519,"fields":{"note":"The current red total is 7, and even if you put 5, you can place it without penalty points because it is 12. If you pass, the flow is uncertain, so put it safely now."}}
+{"turn":520,"fields":{"action":"Red"}}
+{"turn":521,"fields":{"color":"Red"}}
+{"turn":522,"fields":{"note":"If you put it in red now, you will get 3 demerit points by rolling up 3 existing cubes. If you pass, the possibility of placing another cube at the end after accumulating is greater, and the loss can be greater."}}
+{"turn":523,"fields":{"action":"Red"}}
+{"turn":524,"fields":{"color":"Red"}}
+{"turn":525,"fields":{"note":"Even if you put 3 on red, it is safe at 7, and you can increase the number of cubes that will be organized later, so you can clear more points from your opponent."}}
+{"turn":526,"fields":{"action":"Red"}}
+{"turn":527,"fields":{"color":"Red"}}
+{"turn":528,"fields":{"note":"Red is currently 7, so even if you add 2 weight, it will not be collected at 9. Place it safely for no reason to pass."}}
+{"turn":529,"fields":{"action":"Red"}}
+{"turn":530,"fields":{"color":"Red"}}
+{"turn":531,"fields":{"note":"The current sum of red is 9, and even if the weight of 2 is added, it is 11, so it can be set without penalty points. It's better to have an immediate placement that is safer than a pass."}}
+{"turn":532,"fields":{"action":"Red"}}
+{"turn":533,"fields":{"color":"Red"}}
+{"turn":534,"fields":{"note":"Red is a total of 11, so if you put it on now, you will get 4 demerit points by rolling up 4 existing cubes. Pass the P09 first, and aim for the possibility that the pedestal will be empty."}}
+{"turn":535,"fields":{"action":"Pass"}}
+{"turn":536,"fields":{"note":"Even if you place it in red or pass, the P09 will be placed before the P15 in the pass order, so the existing four cubes are collected. It's hard to change the ranks and the results are the same, so place them right away."}}
+{"turn":537,"fields":{"action":"Red"}}
+{"turn":538,"fields":{"color":"Red"}}
+{"turn":539,"fields":{"color":"Red"}}

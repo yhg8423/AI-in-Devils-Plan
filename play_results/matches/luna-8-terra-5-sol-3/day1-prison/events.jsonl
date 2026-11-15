@@ -1,0 +1,545 @@
+{"type":"match","game":"1일차 감옥 매치 · 무거운 13","players":["P16","P13","P04","P14","P03","P09","P15"],"seed":1,"pieces":{"P16":3,"P13":2,"P04":2,"P14":2,"P03":2,"P09":5,"P15":2},"model":"gpt-6-luna","effort":"high","provider":"codex","model_players":["P16","P13","P04","P14","P03","P09","P15"],"model_overrides":{"P09":{"model":"gpt-6.1-sol","effort":"low"},"P16":{"model":"gpt-6.1-sol","effort":"low"},"P14":{"model":"gpt-6.1-terra","effort":"low"}},"image_model_overrides":{"P13":"gpt-6.1-terra","P04":"gpt-6.1-terra","P03":"gpt-6.1-terra","P15":"gpt-6.1-terra"},"allow_review":true,"model_turn_limit":2000,"from_main":"matches/luna-8-terra-5-sol-3/day1-main/events.jsonl"}
+{"type":"event","turn":0,"msg_type":"relationship_update","agent_name":"P16","content":"{\"checkpoint\":\"이전 매치에서 이어받음\",\"ratings\":{\"P13\":{\"affinity\":53,\"trust\":53,\"reason\":\"개인의 이익을 선택하겠다고 반복해서 밝혔고 실제 투표도 일치했다. 이번 선택의 일치는 확인했지만 협력 이행은 아직 관측되지 않았다.\"},\"P03\":{\"affinity\":50,\"trust\":53,\"reason\":\"생존을 위해 개인의 이익을 선택하겠다고 반복해서 밝혔고 공개 결과와 일치했다.\"},\"P04\":{\"affinity\":50,\"trust\":53,\"reason\":\"개인의 이익을 선택하겠다는 발언이 실제 투표와 일치했다. 팀의 희생 결정만으로 개인의 약속 이행을 추정하지 않는다.\"},\"P09\":{\"affinity\":50,\"trust\":51,\"reason\":\"본인 2개 부담 의향을 밝혔다가 확인된 보유량은 1개라며 정정했다. 스스로 바로잡은 점은 반영하되, 부담 가능 수량을 확인하기 전 제시한 정보의 정확성은 낮게 평가한다.\"},\"P14\":{\"affinity\":50,\"trust\":52,\"reason\":\"공공 선택 의향이 9명 이상이면 재판단하겠다고 했고, 기록상 그 조건이 확인되지 않은 상황에서 기존 개인 선택 의향을 따랐다.\"},\"P15\":{\"affinity\":50,\"trust\":53,\"reason\":\"순위와 생존을 위해 개인의 이익을 고르겠다고 밝혔고 실제 투표와 일치했다. 팀의 희생 결정으로 개인 성향을 단정하지 않는다.\"}}}","visible_to":["P16"]}
+{"type":"event","turn":1,"msg_type":"relationship_update","agent_name":"P13","content":"{\"checkpoint\":\"이전 매치에서 이어받음\",\"ratings\":{\"P03\":{\"affinity\":51,\"trust\":54,\"reason\":\"타일 정보를 공유해 달라고 요청하고 배치 가능성을 확인하겠다고 밝혔습니다. 협력 의향은 보였지만 실제 확인이나 공유는 기록에서 확인되지 않았습니다.\"},\"P04\":{\"affinity\":50,\"trust\":54,\"reason\":\"승점 5점을 위해 개인을 택하겠다고 밝힌 뒤 실제로 개인을 선택했습니다. 발언과 선택의 일치는 확인되지만 친밀도 변화 근거는 없습니다.\"},\"P09\":{\"affinity\":53,\"trust\":55,\"reason\":\"보유량을 확인한 뒤 2개 부담 의향이 가능하다는 말을 1개로 정정했고, P15와 규칙 정보 교환도 제안했습니다. 모금 결과는 개인별 납부를 확인해 주지 않습니다.\"},\"P14\":{\"affinity\":52,\"trust\":54,\"reason\":\"P12在第7项选择中明确选择与P14相生，显示了合作意愿；记录没有显示该选择带来实际帮助。\"},\"P15\":{\"affinity\":52,\"trust\":54,\"reason\":\"다음 경기 풀이 검산과 팀 구성 우선 협의를 제안하면서 상호 선택이 필요해 확정은 보장할 수 없다고 밝혔습니다. 실제 약정이나 협력 이행은 확인되지 않았습니다.\"},\"P16\":{\"affinity\":50,\"trust\":54,\"reason\":\"생존을 위해 개인을 택할 계획이라고 한 뒤 실제로 개인을 선택했습니다. 발언과 선택의 일치는 확인되지만 친밀도 변화 근거는 없습니다.\"}}}","visible_to":["P13"]}
+{"type":"event","turn":2,"msg_type":"relationship_update","agent_name":"P04","content":"{\"checkpoint\":\"이전 매치에서 이어받음\",\"ratings\":{\"P15\":{\"affinity\":61,\"trust\":60,\"reason\":\"부족분 지원자에게 다음 네모세기 검산과 팀 우선 협의를 제안했습니다. 팀 선택은 상호 동의가 필요하다고 밝혀 약속 이행으로 보지는 않았습니다.\"},\"P03\":{\"affinity\":52,\"trust\":50,\"reason\":\"타일 후보를 함께 검산하겠다고 제안했지만 실제 검산은 확인되지 않았습니다.\"},\"P09\":{\"affinity\":50,\"trust\":55,\"reason\":\"2개 부담 의향을 밝혔다가 보유량이 1개임을 확인하고 1개로 정정했습니다. 오류를 바로잡은 점을 신뢰에 반영했습니다.\"}}}","visible_to":["P04"]}
+{"type":"event","turn":3,"msg_type":"relationship_update","agent_name":"P14","content":"{\"checkpoint\":\"이전 매치에서 이어받음\",\"ratings\":{\"P03\":{\"affinity\":57,\"trust\":54,\"reason\":\"정보 공유를 요청하고 배치 가능성을 확인하겠다고 밝혔습니다. 실제 확인 결과는 보이지 않습니다.\"},\"P09\":{\"affinity\":50,\"trust\":53,\"reason\":\"2개 부담 가능성을 보유량 확인 후 정정하고 1개 의향으로 계산해 달라고 밝혔습니다.\"},\"P13\":{\"affinity\":53,\"trust\":51,\"reason\":\"부담을 유보하다 1개 실제 약정을 밝히며 생존 이득을 이유로 들었습니다. 개인별 약정은 확인되지 않습니다.\"},\"P04\":{\"affinity\":51,\"trust\":52,\"reason\":\"정보의 이득과 검산 조건을 공개적으로 따져 보고 현재는 점수를 선택하겠다고 밝혔습니다. 실제 선택은 아직 확인되지 않았습니다.\"},\"P15\":{\"affinity\":54,\"trust\":52,\"reason\":\"질문에 다음 경기 검산과 규칙 정보 교환을 제안하고 팀 선택의 불확실성을 밝혔습니다. 이행은 아직 확인되지 않았습니다.\"},\"P16\":{\"affinity\":50,\"trust\":52,\"reason\":\"개인의 이익을 택할 계획이라고 밝혔고 실제 투표에서도 개인을 선택했습니다.\"}}}","visible_to":["P14"]}
+{"type":"event","turn":4,"msg_type":"relationship_update","agent_name":"P03","content":"{\"checkpoint\":\"이전 매치에서 이어받음\",\"ratings\":{\"P04\":{\"affinity\":52,\"trust\":53,\"reason\":\"개인 선택 의향을 밝혔고 실제 선택도 일치했어요.\"},\"P15\":{\"affinity\":52,\"trust\":53,\"reason\":\"개인 선택 의향을 밝혔고 실제 선택도 일치했어요.\"},\"P09\":{\"affinity\":52,\"trust\":52,\"reason\":\"잔디 배치에서 타일 11을 놓지 못해 -4점을 얻었어요. 이전 협력 제안의 이행 여부는 확인되지 않아 신뢰도만 소폭 조정했어요.\"},\"P14\":{\"affinity\":51,\"trust\":53,\"reason\":\"개인 선택 의향을 밝혔고 실제 선택도 일치했어요.\"},\"P13\":{\"affinity\":53,\"trust\":51,\"reason\":\"P13은 1개를 실제 약정하겠다고 밝혔고, 최종 결과는 약정 8개와 탈락 1명으로 모금 성공을 확인했어요. 개인별 납부는 확인되지 않아 신뢰도는 소폭만 조정했어요.\"},\"P16\":{\"affinity\":51,\"trust\":50,\"reason\":\"규칙 공유 시 타일 배치 후보를 검산하겠다고 제안했어요. 아직 실제 협력은 확인되지 않았어요.\"}}}","visible_to":["P03"]}
+{"type":"event","turn":5,"msg_type":"relationship_update","agent_name":"P09","content":"{\"checkpoint\":\"이전 매치에서 이어받음\",\"ratings\":{\"P03\":{\"affinity\":62,\"trust\":61,\"reason\":\"논의했던 9번 타일을 실제로 선택해 절단 후 배치하고 10점을 얻었다. 다만 내 배치는 실패했으며 그 원인이 상대의 조언인지는 확인되지 않았다.\"},\"P04\":{\"affinity\":52,\"trust\":55,\"reason\":\"내 2개 부담의 의미와 보유량 확인을 요구하고, 자신의 1개가 기존 합계에 포함됨을 바로잡아 중복 계산을 막았다. 실제 약정은 확인되지 않았다.\"},\"P13\":{\"affinity\":51,\"trust\":53,\"reason\":\"개인 선택을 밝히면서 공공 의향의 새 소식을 확인했다. 최종 선택은 밝힌 의향과 일치했다.\"},\"P14\":{\"affinity\":50,\"trust\":53,\"reason\":\"공공 의향 9명 이상이 확인되면 재판단하겠다고 했다. 기록상 그 조건이 확인되지 않았고 개인 우선 의향대로 투표했다.\"},\"P15\":{\"affinity\":56,\"trust\":54,\"reason\":\"귓속말로 생존 후 첫 팀 구성 때 우선 협의하고 확인한 규칙 정보를 교환하기로 합의했다. 협력 의향은 확인했지만 실제 약정과 향후 약속 이행은 아직 확인되지 않았다.\"},\"P16\":{\"affinity\":50,\"trust\":55,\"reason\":\"자신의 배정에는 변화가 없고 제안된 협력의 이득도 부족하다며 부담 유보 이유를 명확히 설명했다. 의향과 실제 약정을 구분했으며 개인별 약정은 확인되지 않았다.\"}}}","visible_to":["P09"]}
+{"type":"event","turn":6,"msg_type":"relationship_update","agent_name":"P15","content":"{\"checkpoint\":\"이전 매치에서 이어받음\",\"ratings\":{\"P03\":{\"affinity\":55,\"trust\":52,\"reason\":\"정보를 고른 사람이 있으면 타일 규칙이나 배치에 유용한 내용을 공유해 달라고 했고, 본인은 배치 가능성을 확인하겠다고 제안했어요. 실제 협력은 아직 확인되지 않았어요.\"},\"P04\":{\"affinity\":56,\"trust\":57,\"reason\":\"개인의 이익을 택하겠다고 밝혔고, 공개 결과에서 실제 선택도 개인으로 확인됐어요.\"},\"P09\":{\"affinity\":50,\"trust\":52,\"reason\":\"개인의 이익을 택할 계획이라고 밝혔고, 공개 결과에서 실제 선택도 개인으로 확인됐어요.\"},\"P13\":{\"affinity\":52,\"trust\":55,\"reason\":\"직접 생존 이득을 고려해 1개를 실제 약정하겠다고 밝혔어요. 모금 결과는 성공했지만 개인별 납부 여부는 확인되지 않았어요.\"},\"P14\":{\"affinity\":50,\"trust\":52,\"reason\":\"개인의 이익을 우선한다고 밝혔고, 공개 결과에서 실제 선택도 개인으로 확인됐어요.\"},\"P16\":{\"affinity\":50,\"trust\":52,\"reason\":\"개인의 이익을 택할 계획이라고 밝혔고, 공개 결과에서 실제 선택도 개인으로 확인됐어요.\"}}}","visible_to":["P15"]}
+{"type":"event","turn":7,"msg_type":"rules","agent_name":"System","content":"무거운 13 · 참가자 7명, 총 14라운드\n\n1. 준비\n빨강·초록·파랑 받침대 세 개를 사용합니다. 각 참가자는 0~6 바위 카드 한 장씩, 빨강·초록·파랑 칩 두 개씩, 레인보우 칩 한 개를 받습니다. 감옥동 참가자 중 메인 매치 순위가 가장 높은 사람이 첫 라운드의 선입니다. 방송에서는 시작 전에 자리를 고르고 게임 도중에는 그 자리를 유지합니다.\n\n2. 비공개 제출\n매 라운드에 남은 바위 카드 한 장과 색 칩 한 개를 제출해 소모합니다. 카드 숫자는 이번에 놓을 큐브의 무게이고, 색 칩은 놓을 받침대를 정합니다. 방송의 제출 제한 시간은 3분입니다. 모두 제출하면 칩을 먼저 공개하고 카드 숫자를 공개합니다.\n\n3. 배치 순서와 패스\n레인보우 칩을 낸 사람이 먼저 놓습니다. 같은 우선순위에서는 카드 숫자가 큰 사람이 먼저 놓고, 숫자까지 같으면 선 플레이어부터 시계 방향으로 순서를 정합니다. 일반 칩은 같은 색 받침대에 놓고, 레인보우 칩은 배치할 때 받침대 세 곳 중 하나를 고릅니다. 각 참가자는 라운드마다 배치 차례에 한 번 패스할 수 있습니다. 패스한 사람은 나머지 배치가 끝난 뒤 나중에 패스한 사람부터 놓습니다.\n\n4. 벌점과 다음 라운드\n새 큐브를 놓아 합이 13 이상이 되면 그 받침대에 있던 기존 큐브를 모두 걷습니다. 방금 놓은 큐브는 남고, 배치한 사람이 수거한 큐브 한 개당 벌점 1점을 받습니다. 무게 0인 큐브도 수거할 때 한 개로 셉니다. 그 라운드의 마지막 벌점자가 다음 라운드의 선입니다. 8라운드 시작 때 처음과 같은 카드와 칩을 받으며, 받침대와 누적 벌점은 이어집니다.\n\n5. 보상과 탈락\n14라운드가 끝나면 누적 벌점이 적은 순으로 순위를 정합니다. 벌점이 같으면 마지막 벌점을 더 최근에 받은 쪽이 낮은 순위에 놓입니다. 6위와 7위는 탈락합니다. 최소 벌점 참가자들은 피스 4개를 똑같이 나누고, 나누고 남은 피스는 버립니다.\n\n시뮬레이션 진행\n실행 명단 순서가 시계 방향 자리입니다. P16 → P13 → P04 → P14 → P03 → P09 → P15. 첫 선은 P16입니다. 시뮬레이터는 각 참가자의 제출을 받아 일괄 공개합니다.","visible_to":"all"}
+{"type":"event","turn":8,"msg_type":"round","agent_name":"System","content":"{\"round\":1,\"leader\":\"P16\",\"stacks\":{\"빨강\":[],\"초록\":[],\"파랑\":[]},\"penalties\":{\"P16\":0,\"P13\":0,\"P04\":0,\"P14\":0,\"P03\":0,\"P09\":0,\"P15\":0}}","visible_to":"all"}
+{"type":"event","turn":9,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 빈 받침대에서 높은 카드를 먼저 소모한다. 일반 칩의 6끼리는 선인 P16이 먼저 배치한다. 다만 레인보우가 앞서 놓이면 벌점 위험이 생기며, 색별 선택 패턴은 아직 확인되지 않았다.\"}","visible_to":["P16"]}
+{"type":"event","turn":10,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"6 파랑\"}","visible_to":["P16"]}
+{"type":"event","turn":11,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"빈 받침대에 먼저 무게 6을 놓아 이후 같은 받침대에 무게가 더해질 때 다른 참가자가 수거 벌점을 받을 가능성을 만듭니다. 레인보우 우선권으로 받침대도 고를 수 있습니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":12,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"6 레인보우\"}","visible_to":["P13"]}
+{"type":"event","turn":13,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"받침대가 비어 있어 색 선택은 현재 차이를 만들지 않는다. 6으로 높은 합을 만들어 후속 배치에 압박을 주고, 레인보우 우선권으로 놓을 곳을 고른다.\"}","visible_to":["P04"]}
+{"type":"event","turn":14,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"6 레인보우\"}","visible_to":["P04"]}
+{"type":"event","turn":15,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"빈 받침대에서 큰 카드를 먼저 써 소진하고, 레인보우는 이후 위험한 상황을 위해 남긴다. 색별 상대 제출은 알 수 없다.\"}","visible_to":["P14"]}
+{"type":"event","turn":16,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"6 초록\"}","visible_to":["P14"]}
+{"type":"event","turn":17,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"첫 라운드엔 받침대가 비어 있어 큰 카드를 쓸 이유가 적습니다. 0으로 누적 무게를 낮게 유지하고 레인보우와 높은 카드는 남깁니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":18,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"0 빨강\"}","visible_to":["P03"]}
+{"type":"event","turn":19,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 높은 숫자를 초반에 소모하고 낮은 카드를 후반에 남긴다. 레인보우의 우선 배치와 받침대 선택권으로 첫 라운드 벌점 위험을 줄인다.\"}","visible_to":["P09"]}
+{"type":"event","turn":20,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"6 레인보우\"}","visible_to":["P09"]}
+{"type":"event","turn":21,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"높은 무게로 초반에 받침대에 부담을 주고, 레인보우 칩은 후반 선택권을 위해 남깁니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":22,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"6 빨강\"}","visible_to":["P15"]}
+{"type":"event","turn":23,"msg_type":"colors","agent_name":"System","content":"{\"P13\":\"레인보우\",\"P04\":\"레인보우\",\"P09\":\"레인보우\",\"P16\":\"파랑\",\"P14\":\"초록\",\"P15\":\"빨강\",\"P03\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":24,"msg_type":"weights","agent_name":"System","content":"{\"P13\":6,\"P04\":6,\"P09\":6,\"P16\":6,\"P14\":6,\"P15\":6,\"P03\":0}","visible_to":"all"}
+{"type":"event","turn":25,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"빨강은 일반 칩을 낸 참가자가 둘이라 이후 큐브가 모일 가능성이 가장 높다. 먼저 6을 놓아 다른 참가자의 수거 벌점 가능성을 만든다.\"}","visible_to":["P13"]}
+{"type":"event","turn":26,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":27,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"빨강\",\"weight\":6,\"stack\":[6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":28,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"빨강에 6을 더하면 합이 12라 당장 벌점은 없고, 이후 빨강에 1 이상 놓는 참가자가 기존 큐브 두 개를 수거해 벌점을 받게 된다. 그 압박을 이용한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":29,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":30,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"빨강\",\"weight\":6,\"stack\":[6,6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":31,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 빨강에 놓으면 즉시 벌점 2점을 받으므로 빈 초록을 고른다. 뒤이어 초록의 6이 놓여도 합계 12로 이번 라운드 벌점을 피할 수 있다.\"}","visible_to":["P09"]}
+{"type":"event","turn":32,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":33,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"초록\",\"weight\":6,\"stack\":[6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":34,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 빈 파랑 받침대에 6을 놓으면 벌점 없이 배치를 마친다. 패스로 순서를 늦춰도 추가 이득이 없어 바로 놓는다.\"}","visible_to":["P16"]}
+{"type":"event","turn":35,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":36,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"파랑\",\"weight\":6,\"stack\":[6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":37,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"초록에 6을 놓으면 합이 12여서 즉시 벌점이 없다. 패스하면 뒤에 놓일 큐브로 상황이 바뀔 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":38,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":39,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"초록\",\"weight\":6,\"stack\":[6,6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":40,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"빨강에 놓으면 기존 큐브 두 개를 걷어 벌점 2점을 받습니다. 패스하면 0 무게 큐브가 더해져 나중에 더 큰 벌점을 받을 수 있어 지금 놓습니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":41,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":42,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"빨강\",\"weight\":6,\"stack\":[6],\"penalty\":2}","visible_to":"all"}
+{"type":"event","turn":43,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"지금 빨강에 놓으면 뒤에 놓는 사람의 수거 큐브가 하나 늘어 벌점을 키울 수 있습니다. 한 번 패스해 다른 배치 뒤에 놓겠습니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":44,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":45,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"빨강\",\"weight\":0,\"stack\":[6,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":46,"msg_type":"round","agent_name":"System","content":"{\"round\":2,\"leader\":\"P15\",\"stacks\":{\"빨강\":[6,0],\"초록\":[6,6],\"파랑\":[6]},\"penalties\":{\"P16\":0,\"P13\":0,\"P04\":0,\"P14\":0,\"P03\":0,\"P09\":0,\"P15\":2}}","visible_to":"all"}
+{"type":"event","turn":47,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"0 레인보우를 내면 먼저 초록에 0을 놓아 12를 유지할 수 있습니다. 이후 누군가 초록에 양수를 놓으면 기존 큐브 3개를 걷게 되어 상대 벌점 부담이 커집니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":48,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"0 레인보우\"}","visible_to":["P15"]}
+{"type":"event","turn":49,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 공동 최소 벌점이다. 레인보우로 일반 칩보다 먼저 배치하며, 공개된 배치에 따라 받침대를 골라 무게 5를 안전하게 소모할 가능성을 높인다. 상대의 색 선택 패턴은 아직 불확실하다.\"}","visible_to":["P16"]}
+{"type":"event","turn":50,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"5 레인보우\"}","visible_to":["P16"]}
+{"type":"event","turn":51,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"초록 받침대는 현재 합이 12라 0을 놓아도 즉시 벌점이 없습니다. 이후 다른 참가자가 1 이상을 더하면 기존 큐브 3개를 수거할 수 있어 상대에게 위험을 남깁니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":52,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P13"]}
+{"type":"event","turn":53,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"P04는 0 초록을 골라 벌점을 피하면서 합계 12인 받침대를 유지한다. 다른 참가자가 먼저 양수를 놓으면 기존 큐브 2개를 수거해 벌점을 받는다.\"}","visible_to":["P04"]}
+{"type":"event","turn":54,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P04"]}
+{"type":"event","turn":55,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"파랑은 현재 합이 6이라 5를 놓아도 안전하며, 큰 카드를 소진한다. 다른 참가자의 제출에 따라 배치 전 상황은 바뀔 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":56,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"5 파랑\"}","visible_to":["P14"]}
+{"type":"event","turn":57,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"초록 받침대는 이미 12라 무게 1로도 놓는 즉시 기존 큐브 두 개를 수거해 벌점 2점을 받습니다. 낮은 카드로 늦게 놓고 안전한 파랑을 택합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":58,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"1 파랑\"}","visible_to":["P03"]}
+{"type":"event","turn":59,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 높은 카드를 먼저 소모하고 낮은 카드를 후반에 남긴다. 파랑은 현재 합이 6이고 큐브가 한 개라, 배치 전 상태가 유지되면 벌점 없이 5를 놓을 수 있고 넘치더라도 수거 부담이 비교적 작다.\"}","visible_to":["P09"]}
+{"type":"event","turn":60,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"5 파랑\"}","visible_to":["P09"]}
+{"type":"event","turn":61,"msg_type":"colors","agent_name":"System","content":"{\"P16\":\"레인보우\",\"P15\":\"레인보우\",\"P14\":\"파랑\",\"P09\":\"파랑\",\"P03\":\"파랑\",\"P13\":\"초록\",\"P04\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":62,"msg_type":"weights","agent_name":"System","content":"{\"P16\":5,\"P15\":0,\"P14\":5,\"P09\":5,\"P03\":1,\"P13\":0,\"P04\":0}","visible_to":"all"}
+{"type":"event","turn":63,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 빨강에 5를 놓으면 합계 11로 벌점을 피한다. 파랑의 연속 배치는 다른 참가자의 수거를 유발하므로, 파랑의 여유를 직접 소모하지 않고 현재 공동 최소 벌점을 지킨다.\"}","visible_to":["P16"]}
+{"type":"event","turn":64,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":65,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"빨강\",\"weight\":5,\"stack\":[6,0,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":66,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"초록은 이미 합계 12라 0을 더해도 안전하고, 이후 누군가 양수를 놓으면 기존 큐브 3개를 걷어 벌점을 받게 할 수 있습니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":67,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":68,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"초록\",\"weight\":0,\"stack\":[6,6,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":69,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"파랑에 5를 놓으면 합이 11로 벌점이 없다. 패스하면 뒤따르는 파랑 큐브로 합이 13 이상이 될 위험이 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":70,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":71,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"파랑\",\"weight\":5,\"stack\":[6,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":72,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 지금 파랑에 놓으면 벌점 2점이지만, 패스 후 P03의 1이 먼저 놓이면 벌점이 3점으로 늘어난다. 즉시 배치해 확정 부담을 줄인다.\"}","visible_to":["P09"]}
+{"type":"event","turn":73,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":74,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"파랑\",\"weight\":5,\"stack\":[5],\"penalty\":2}","visible_to":"all"}
+{"type":"event","turn":75,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"파랑 받침대는 현재 무게가 5라 무게 1을 더해도 13에 못 미칩니다. 벌점 없이 놓을 수 있으므로 파랑을 선택합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":76,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":77,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"파랑\",\"weight\":1,\"stack\":[5,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":78,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"초록은 현재 합이 12라 0을 놓아도 벌점이 없습니다. 큐브를 하나 더 남겨 이후 다른 참가자가 받침대를 넘길 때 수거 부담을 늘립니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":79,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":80,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"초록\",\"weight\":0,\"stack\":[6,6,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":81,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"초록 합계가 12라 0을 놓아도 받침대가 무너지지 않는다. 이미 배치 순서상 마지막이라 패스로 미뤄도 이득이 없다.\"}","visible_to":["P04"]}
+{"type":"event","turn":82,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":83,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"초록\",\"weight\":0,\"stack\":[6,6,0,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":84,"msg_type":"round","agent_name":"System","content":"{\"round\":3,\"leader\":\"P09\",\"stacks\":{\"빨강\":[6,0,5],\"초록\":[6,6,0,0,0],\"파랑\":[5,1]},\"penalties\":{\"P16\":0,\"P13\":0,\"P04\":0,\"P14\":0,\"P03\":0,\"P09\":2,\"P15\":2}}","visible_to":"all"}
+{"type":"event","turn":85,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 현재 공동 최하위권이므로 추가 벌점을 피한다. 0은 어느 배치 순서에도 합을 13 이상으로 만들지 않으며, 합이 12인 초록에서 안전하게 칩을 소모할 수 있다.\"}","visible_to":["P09"]}
+{"type":"event","turn":86,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P09"]}
+{"type":"event","turn":87,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"파랑은 현재 합계가 6이라 1을 더해도 안전합니다. 가장 낮은 무게로 기존 큐브를 걷을 위험을 줄입니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":88,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"1 파랑\"}","visible_to":["P15"]}
+{"type":"event","turn":89,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 합계 6인 파랑에 4를 내 높은 카드를 소모한다. 빨강 11·초록 12보다 여유가 크다. 레인보우가 먼저 놓일 수 있으므로 공개 후 배치 상황과 패스 이득을 다시 판단한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":90,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"4 파랑\"}","visible_to":["P16"]}
+{"type":"event","turn":91,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"초록은 1만 더해도 기존 큐브 5개를 걷어 벌점 5점을 받으므로 피합니다. 파랑에 5를 놓아도 합은 11이라 당장 수거하지 않고, 다음에 넘기는 참가자에게 부담을 남깁니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":92,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"5 파랑\"}","visible_to":["P13"]}
+{"type":"event","turn":93,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"P04는 초록의 12에 놓으면 기존 큐브 5개를 수거해 벌점이 생기므로 피한다. 빨강에 1을 더하면 합이 12로 안전하고, 이후 다른 참가자가 빨강에 놓을 때 부담을 줄 수 있다.\"}","visible_to":["P04"]}
+{"type":"event","turn":94,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"1 빨강\"}","visible_to":["P04"]}
+{"type":"event","turn":95,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"현재 파랑은 합이 6이라 4를 안전하게 놓을 수 있다. 레인보우로 먼저 배치하고, 앞선 배치로 파랑이 막히면 다른 받침대를 살핀다.\"}","visible_to":["P14"]}
+{"type":"event","turn":96,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"4 레인보우\"}","visible_to":["P14"]}
+{"type":"event","turn":97,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"파랑은 현재 합계가 6이라 무게 2를 놓아도 벌점 없이 안전합니다. 낮은 카드를 써서 벌점 위험을 피하고 높은 카드는 남깁니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":98,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"2 파랑\"}","visible_to":["P03"]}
+{"type":"event","turn":99,"msg_type":"colors","agent_name":"System","content":"{\"P14\":\"레인보우\",\"P13\":\"파랑\",\"P16\":\"파랑\",\"P03\":\"파랑\",\"P15\":\"파랑\",\"P04\":\"빨강\",\"P09\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":100,"msg_type":"weights","agent_name":"System","content":"{\"P14\":4,\"P13\":5,\"P16\":4,\"P03\":2,\"P15\":1,\"P04\":1,\"P09\":0}","visible_to":"all"}
+{"type":"event","turn":101,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"파랑에 4를 놓으면 합이 10이라 벌점이 없다. 패스하면 다른 참가자들의 배치로 상황이 바뀔 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":102,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":103,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"파랑\",\"weight\":4,\"stack\":[5,1,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":104,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"파랑에 바로 놓으면 합이 15가 되어 기존 큐브 3개를 수거하고 벌점 3점을 받는다. 패스하면 먼저 놓는 P16의 파랑 4가 받침대를 넘길 가능성이 있어, 내 벌점을 피할 수 있다.\"}","visible_to":["P13"]}
+{"type":"event","turn":105,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":106,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 지금 파랑에 놓으면 기존 큐브 3개를 수거해 벌점 3점을 받는다. 패스하면 뒤의 2·1 또는 먼저 패스한 P13의 5가 받침대를 비울 수 있어 무벌점 선두를 지킬 가능성이 높다.\"}","visible_to":["P16"]}
+{"type":"event","turn":107,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":108,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"파랑은 현재 합계 10이라 무게 2를 더해도 13에 못 미쳐 벌점 없이 놓을 수 있습니다. 빨강과 초록은 수거가 발생하므로 파랑을 고릅니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":109,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":110,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"파랑\",\"weight\":2,\"stack\":[5,1,4,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":111,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"지금 파랑에 놓으면 기존 큐브 4개를 걷어 벌점 4점을 받습니다. 패스하면 먼저 기다리는 P16의 파랑 4가 받침대를 넘치게 할 수 있어, 이후 내 1은 새 받침대에 안전하게 놓일 가능성이 있습니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":112,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":113,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"빨강은 현재 합이 11이라 1을 놓으면 12로, 13 미만이어서 벌점 없이 배치할 수 있다. 지금 놓아 받침대를 안전하게 유지한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":114,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":115,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"빨강\",\"weight\":1,\"stack\":[6,0,5,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":116,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 초록에 0을 놓아도 합계가 12라 벌점을 받지 않는다. 패스로 얻을 이익이 없으므로 즉시 배치한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":117,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":118,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"초록\",\"weight\":0,\"stack\":[6,6,0,0,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":119,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"파랑\",\"weight\":1,\"stack\":[1],\"penalty\":4}","visible_to":"all"}
+{"type":"event","turn":120,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"파랑\",\"weight\":4,\"stack\":[1,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":121,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"파랑\",\"weight\":5,\"stack\":[1,4,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":122,"msg_type":"round","agent_name":"System","content":"{\"round\":4,\"leader\":\"P15\",\"stacks\":{\"빨강\":[6,0,5,1],\"초록\":[6,6,0,0,0,0],\"파랑\":[1,4,5]},\"penalties\":{\"P16\":0,\"P13\":0,\"P04\":0,\"P14\":0,\"P03\":0,\"P09\":2,\"P15\":6}}","visible_to":"all"}
+{"type":"event","turn":123,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"빨강과 초록은 이미 합계 12라 어떤 선택도 기존 큐브를 걷어 벌점을 받습니다. 파랑은 합계가 10이므로 2를 놓아도 안전하고, 가장 낮은 카드로 벌점 위험을 줄입니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":124,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"2 파랑\"}","visible_to":["P15"]}
+{"type":"event","turn":125,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 0으로 공동 선두다. 초록은 합계 12여도 0을 놓으면 수거하지 않으며, 앞선 배치로 받침대가 바뀌어도 0은 벌점을 만들지 않는다. 확실한 무벌점 선택으로 우위를 지킨다.\"}","visible_to":["P16"]}
+{"type":"event","turn":126,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P16"]}
+{"type":"event","turn":127,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"파랑은 현재 합이 10이라 2를 놓아도 12로 벌점 없이 안전합니다. 빨강과 초록은 기존 합이 이미 12라 피합니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":128,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"2 파랑\"}","visible_to":["P13"]}
+{"type":"event","turn":129,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"P04는 2 파랑을 선택한다. 파랑 합계가 10이라 2를 더해도 12로 안전하고, 빨강·초록은 이미 12라 양수를 놓으면 기존 큐브 수만큼 벌점을 받는다.\"}","visible_to":["P04"]}
+{"type":"event","turn":130,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"2 파랑\"}","visible_to":["P04"]}
+{"type":"event","turn":131,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"P14는 벌점 0점 공동 선두다. 빨강과 초록은 합이 12라 0만 안전하고, 파랑은 합이 10이라 2까지 안전하다. 파랑 칩을 한 번 더 쓸 수 있어 2를 소진하되, 다른 참가자의 선행 배치에 따라 벌점 위험이 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":132,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"2 파랑\"}","visible_to":["P14"]}
+{"type":"event","turn":133,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"P03은 파랑 칩을 다 썼고, 빨강·초록은 현재 합계가 12라 바로 놓으면 큐브 여러 개를 수거하게 된다. 레인보우로 내고 배치 때 상황을 본다.\"}","visible_to":["P03"]}
+{"type":"event","turn":134,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"3 레인보우\"}","visible_to":["P03"]}
+{"type":"event","turn":135,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 현재 6위로 탈락선에 있다. 합계 12인 빨강·초록은 양수 카드로 즉시 넘치지만, 합계 10인 파랑에는 1을 안전하게 놓을 여지가 있다. 가장 낮은 남은 카드로 추가 벌점 위험을 줄인다.\"}","visible_to":["P09"]}
+{"type":"event","turn":136,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"1 파랑\"}","visible_to":["P09"]}
+{"type":"event","turn":137,"msg_type":"colors","agent_name":"System","content":"{\"P03\":\"레인보우\",\"P15\":\"파랑\",\"P13\":\"파랑\",\"P04\":\"파랑\",\"P14\":\"파랑\",\"P09\":\"파랑\",\"P16\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":138,"msg_type":"weights","agent_name":"System","content":"{\"P03\":3,\"P15\":2,\"P13\":2,\"P04\":2,\"P14\":2,\"P09\":1,\"P16\":0}","visible_to":"all"}
+{"type":"event","turn":139,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"파랑에 무게 3을 놓으면 기존 큐브 3개를 수거해 벌점 3점입니다. 빨강은 4개, 초록은 6개를 수거하므로 파랑이 손실이 가장 적습니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":140,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":141,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"파랑\",\"weight\":3,\"stack\":[3],\"penalty\":3}","visible_to":"all"}
+{"type":"event","turn":142,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"파랑 받침대는 현재 무게 3이므로 2를 더해도 13에 못 미친다. 벌점 없이 놓을 수 있다.\"}","visible_to":["P15"]}
+{"type":"event","turn":143,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":144,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"파랑\",\"weight\":2,\"stack\":[3,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":145,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"파랑은 현재 합이 5라 무게 2를 더해도 7로 13 미만입니다. 지금 놓아도 벌점이 없습니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":146,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":147,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"파랑\",\"weight\":2,\"stack\":[3,2,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":148,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"현재 파랑 합계는 7이고, 무게 2를 더해도 9라 벌점 없이 놓을 수 있다. 기다려도 안전성이 나아질 이유가 없어 지금 배치한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":149,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":150,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"파랑\",\"weight\":2,\"stack\":[3,2,2,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":151,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"파랑의 현재 합은 9이므로 무게 2를 놓아도 벌점이 없다. 패스하면 뒤의 배치로 상황이 달라질 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":152,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":153,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"파랑\",\"weight\":2,\"stack\":[3,2,2,2,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":154,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 파랑에 1을 놓으면 합계 12로 벌점 없이 배치할 수 있다. 남은 P16의 초록 0은 파랑에 영향을 주지 않으므로 즉시 배치한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":155,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":156,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"파랑\",\"weight\":1,\"stack\":[3,2,2,2,2,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":157,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 초록에 0을 놓아도 합계가 12라 벌점이 없다. 패스로 얻을 이점이 없으므로 바로 배치해 벌점 0의 공동 선두를 유지한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":158,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":159,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"초록\",\"weight\":0,\"stack\":[6,6,0,0,0,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":160,"msg_type":"round","agent_name":"System","content":"{\"round\":5,\"leader\":\"P03\",\"stacks\":{\"빨강\":[6,0,5,1],\"초록\":[6,6,0,0,0,0,0],\"파랑\":[3,2,2,2,2,1]},\"penalties\":{\"P16\":0,\"P13\":0,\"P04\":0,\"P14\":0,\"P03\":3,\"P09\":2,\"P15\":6}}","visible_to":"all"}
+{"type":"event","turn":161,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"빨강은 기존 큐브가 4개라 수거 벌점이 4점이고, 초록은 7점입니다. 무게 4로 최소한의 카드만 소모합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":162,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"4 빨강\"}","visible_to":["P03"]}
+{"type":"event","turn":163,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 현재 5위다. 모든 받침대의 합이 12라 먼저 놓는 사람이 벌점을 받는다. 2로 배치 순서를 늦춰 앞선 참가자의 수거 뒤 안전하게 놓을 가능성을 높이고, 직접 수거하더라도 큐브 4개인 빨강이 초록 7개보다 부담이 작다.\"}","visible_to":["P09"]}
+{"type":"event","turn":164,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"2 빨강\"}","visible_to":["P09"]}
+{"type":"event","turn":165,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"빨강은 기존 큐브가 4개라 초록(7개)보다 벌점 부담이 작습니다. 낮은 3을 골라 배치 순서를 늦추면 다른 사람이 먼저 빨강을 비울 가능성도 높일 수 있습니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":166,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"3 빨강\"}","visible_to":["P15"]}
+{"type":"event","turn":167,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 0의 공동 선두다. 모든 받침대가 합계 12이므로 양수 배치는 수거를 유발한다. 초록은 큐브 7개, 빨강은 4개라 빨강의 부담이 작다. 3을 내 배치 차례를 앞당기고, 공개 후 패스로 다른 참가자가 먼저 비울 가능성을 살핀다.\"}","visible_to":["P16"]}
+{"type":"event","turn":168,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"3 빨강\"}","visible_to":["P16"]}
+{"type":"event","turn":169,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"빨강은 기존 큐브가 4개라 먼저 넘겨도 벌점이 초록의 7개보다 적습니다. 1로 우선순위를 낮춰 앞선 배치에서 받침대가 비워질 가능성도 남깁니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":170,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"1 빨강\"}","visible_to":["P13"]}
+{"type":"event","turn":171,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"P04는 빨강에 3을 낸다. 현재 빨강 합계가 12라 벌점은 불가피하지만, 빨강 큐브는 4개로 초록 7개·파랑 6개보다 적어 예상 벌점이 가장 낮다.\"}","visible_to":["P04"]}
+{"type":"event","turn":172,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"3 빨강\"}","visible_to":["P04"]}
+{"type":"event","turn":173,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"두 받침대 모두 합이 12이므로 0은 현재 벌점 없이 놓을 수 있다. 초록은 기존 큐브가 7개라 다른 참가자가 넘기면 부담이 크지만, 그 뒤에 0을 놓아도 안전하다.\"}","visible_to":["P14"]}
+{"type":"event","turn":174,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P14"]}
+{"type":"event","turn":175,"msg_type":"colors","agent_name":"System","content":"{\"P03\":\"빨강\",\"P15\":\"빨강\",\"P16\":\"빨강\",\"P04\":\"빨강\",\"P09\":\"빨강\",\"P13\":\"빨강\",\"P14\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":176,"msg_type":"weights","agent_name":"System","content":"{\"P03\":4,\"P15\":3,\"P16\":3,\"P04\":3,\"P09\":2,\"P13\":1,\"P14\":0}","visible_to":"all"}
+{"type":"event","turn":177,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"빨강에는 기존 큐브가 4개 있고, 지금 놓으면 4점 벌점입니다. 패스하면 다른 참가자의 배치 뒤에 더 많은 큐브를 수거할 수 있어 바로 놓습니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":178,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":179,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"빨강\",\"weight\":4,\"stack\":[4],\"penalty\":4}","visible_to":"all"}
+{"type":"event","turn":180,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"지금 빨강에 놓으면 당장은 안전하지만, 뒤이어 놓을 사람 때문에 받침대가 넘칠 수 있습니다. 패스해 다른 배치가 끝난 뒤 놓으면 벌점을 피할 가능성이 더 큽니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":181,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":182,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 지금 빨강에 3을 놓으면 합계 7로 벌점이 없다. 패스하면 뒤 참가자들의 배치로 합계가 10까지 올라 수거를 떠안을 수 있으므로 즉시 놓아 공동 최소 벌점을 지킨다.\"}","visible_to":["P16"]}
+{"type":"event","turn":183,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":184,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"빨강\",\"weight\":3,\"stack\":[4,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":185,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"빨강 합계는 7이고 무게 3을 더해도 10이라 벌점 없이 놓을 수 있다. 패스해 기다릴 이유가 없어 지금 배치한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":186,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":187,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"빨강\",\"weight\":3,\"stack\":[4,3,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":188,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 지금 빨강에 2를 놓으면 합계 12로 벌점을 피한다. 패스하면 P13과 P15의 후속 선택에 따라 수거 부담이 생길 수 있으므로 안전한 배치를 확정한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":189,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":190,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"빨강\",\"weight\":2,\"stack\":[4,3,3,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":191,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"빨강에 1을 놓으면 합이 13이 되어 기존 큐브 4개를 걷고 벌점 4점을 받습니다. 패스해도 남은 배치에서 빨강이 바뀔 가능성이 없어 같은 벌점이 예상되므로 지금 놓습니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":192,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":193,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"빨강\",\"weight\":1,\"stack\":[1],\"penalty\":4}","visible_to":"all"}
+{"type":"event","turn":194,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"초록의 합은 12이므로 0을 놓아도 벌점이 없다. 지금 배치해 안전하게 마친다.\"}","visible_to":["P14"]}
+{"type":"event","turn":195,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":196,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"초록\",\"weight\":0,\"stack\":[6,6,0,0,0,0,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":197,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"빨강\",\"weight\":3,\"stack\":[1,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":198,"msg_type":"round","agent_name":"System","content":"{\"round\":6,\"leader\":\"P13\",\"stacks\":{\"빨강\":[1,3],\"초록\":[6,6,0,0,0,0,0,0],\"파랑\":[3,2,2,2,2,1]},\"penalties\":{\"P16\":0,\"P13\":4,\"P04\":0,\"P14\":0,\"P03\":7,\"P09\":2,\"P15\":6}}","visible_to":"all"}
+{"type":"event","turn":199,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"빨강은 현재 합이 4라 4를 놓아도 합 8로 안전합니다. 초록은 합이 12이고 큐브가 8개라 벌점 위험이 큽니다. 빨강에 큐브를 더해 다음 수거 부담도 높입니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":200,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"4 빨강\"}","visible_to":["P13"]}
+{"type":"event","turn":201,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"파랑과 초록 모두 합이 12라 먼저 놓으면 벌점이 생깁니다. 기존 큐브가 더 적은 파랑을 고르고, 4로 우선순위를 낮춰 다른 참가자가 먼저 파랑을 비울 가능성을 남깁니다.\"}","visible_to":["P04"]}
+{"type":"event","turn":202,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"4 파랑\"}","visible_to":["P04"]}
+{"type":"event","turn":203,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"빨강의 합은 4이므로 어느 카드를 내도 현재 벌점이 없다. 무거운 3을 먼저 소진하고 1을 다음 라운드에 남긴다. 앞선 배치로 상황이 바뀌면 패스를 고려한다.\"}","visible_to":["P14"]}
+{"type":"event","turn":204,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"3 빨강\"}","visible_to":["P14"]}
+{"type":"event","turn":205,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"P03은 7점으로 현재 최하위라 추가 벌점을 피해야 한다. 초록은 먼저 놓는 사람이 기존 큐브 10개를 수거한다. 5를 내면 다른 참가자의 6 초록이 먼저 수거할 가능성을 남기고, 카드 6도 보존한다.\"}","visible_to":["P03"]}
+{"type":"event","turn":206,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"5 초록\"}","visible_to":["P03"]}
+{"type":"event","turn":207,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 벌점 2점으로 현재 4위다. 초록은 합계 12에 큐브 8개가 있어 수거 위험이 크다. 합계 4인 빨강에 3을 제출해 배치 순서를 늦추고, 앞선 배치 뒤에도 합계 12 이하로 놓을 여지를 확보한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":208,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"3 빨강\"}","visible_to":["P09"]}
+{"type":"event","turn":209,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"초록 받침대는 현재 합계 12라 어느 쪽이든 넘치면 기존 큐브 8개를 걷게 됩니다. 4를 내면 같은 초록 칩 중 배치가 늦어져 다른 사람이 먼저 받침대를 비울 가능성을 높입니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":210,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"4 초록\"}","visible_to":["P15"]}
+{"type":"event","turn":211,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 0의 공동 선두다. 합계 4인 빨강에 2를 내 배치 순서를 앞당긴다. 합계 12에 큐브 8개가 쌓인 초록은 부담이 크다. 공개 후 빨강의 합계와 패스 순서를 다시 판단한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":212,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"2 빨강\"}","visible_to":["P16"]}
+{"type":"event","turn":213,"msg_type":"colors","agent_name":"System","content":"{\"P03\":\"초록\",\"P13\":\"빨강\",\"P04\":\"파랑\",\"P15\":\"초록\",\"P14\":\"빨강\",\"P09\":\"빨강\",\"P16\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":214,"msg_type":"weights","agent_name":"System","content":"{\"P03\":5,\"P13\":4,\"P04\":4,\"P15\":4,\"P14\":3,\"P09\":3,\"P16\":2}","visible_to":"all"}
+{"type":"event","turn":215,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"P03이 먼저 초록에 놓으면 기존 큐브 8개를 수거합니다. 패스하면 뒤의 P15가 초록을 비울 수 있어 벌점을 피할 가능성이 큽니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":216,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":217,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"빨강은 현재 합이 4라 무게 4를 놓아도 합 8로 안전하다. 지금 놓아 벌점을 피한다.\"}","visible_to":["P13"]}
+{"type":"event","turn":218,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":219,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"빨강\",\"weight\":4,\"stack\":[1,3,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":220,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"지금 파랑을 놓아도 기존 6개 큐브 때문에 벌점 6점은 같습니다. 패스하면 다른 배치 뒤에 같은 벌점을 받고 다음 라운드 선을 얻을 수 있습니다.\"}","visible_to":["P04"]}
+{"type":"event","turn":221,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":222,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"초록은 합계 12라 놓으면 기존 큐브 8개를 수거해 벌점 8점을 받는다. 지금 패스해도 이미 패스한 사람보다 먼저 다시 놓게 되어 같은 부담이 예상되므로 바로 놓는다.\"}","visible_to":["P15"]}
+{"type":"event","turn":223,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":224,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"초록\",\"weight\":4,\"stack\":[4],\"penalty\":8}","visible_to":"all"}
+{"type":"event","turn":225,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"빨강의 합은 8이므로 무게 3을 지금 놓으면 벌점이 없다. 패스하면 뒤 참가자의 배치로 위험해질 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":226,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":227,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"빨강\",\"weight\":3,\"stack\":[1,3,4,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":228,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09가 지금 빨강에 놓으면 큐브 4개를 수거한다. 패스하면 남은 P16의 빨강 2가 먼저 합계 13을 만들어 받침대를 비우므로, P09는 이후 벌점 없이 놓을 수 있다.\"}","visible_to":["P09"]}
+{"type":"event","turn":229,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":230,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 빨강 합계 11에 2를 놓으면 벌점 4점을 받는다. 지금 패스해도 패스한 사람 중 가장 먼저 배치하므로 같은 벌점이 발생한다. 바로 배치한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":231,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":232,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"빨강\",\"weight\":2,\"stack\":[2],\"penalty\":4}","visible_to":"all"}
+{"type":"event","turn":233,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"빨강\",\"weight\":3,\"stack\":[2,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":234,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"파랑\",\"weight\":4,\"stack\":[4],\"penalty\":6}","visible_to":"all"}
+{"type":"event","turn":235,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"초록\",\"weight\":5,\"stack\":[4,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":236,"msg_type":"round","agent_name":"System","content":"{\"round\":7,\"leader\":\"P04\",\"stacks\":{\"빨강\":[2,3],\"초록\":[4,5],\"파랑\":[4]},\"penalties\":{\"P16\":4,\"P13\":4,\"P04\":6,\"P14\":0,\"P03\":7,\"P09\":2,\"P15\":14}}","visible_to":"all"}
+{"type":"event","turn":237,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"제출 가능한 선택지가 ‘5 초록’ 하나뿐이므로 이를 선택한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":238,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"5 초록\"}","visible_to":["P04"]}
+{"type":"event","turn":239,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"남은 제출 선택지는 1 빨강이다. 현재 빨강 합은 5이므로 선행 배치가 없으면 벌점 없이 놓을 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":240,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"1 빨강\"}","visible_to":["P14"]}
+{"type":"event","turn":241,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"초록에 6을 놓으면 기존 큐브 2개만 수거해 벌점 2점으로 정리할 수 있습니다. 현재 벌점이 높아 초록의 누적을 끊는 편이 유리합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":242,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"6 초록\"}","visible_to":["P03"]}
+{"type":"event","turn":243,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 벌점 2점으로 현재 2위다. 남은 카드와 칩은 4와 초록뿐이므로 이를 제출하고, 공개 후 배치 순서와 패스 가능성을 살펴 추가 벌점을 줄인다.\"}","visible_to":["P09"]}
+{"type":"event","turn":244,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"4 초록\"}","visible_to":["P09"]}
+{"type":"event","turn":245,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"현재 선택지에 맞춰 5 초록을 제출한다. 초록 합계가 9라 배치 시 기존 큐브 2개가 걷혀 벌점 2점이 예상되지만, 초록 받침대는 비워진다.\"}","visible_to":["P15"]}
+{"type":"event","turn":246,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"5 초록\"}","visible_to":["P15"]}
+{"type":"event","turn":247,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16의 남은 제출은 1 초록뿐이다. 현재 초록 합계는 9로, 앞선 배치에 따른 변화와 패스 여부는 공개 후 판단한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":248,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"1 초록\"}","visible_to":["P16"]}
+{"type":"event","turn":249,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"초록은 합 9라 3을 더해도 12로 벌점 없이 놓을 수 있고, 받침대의 기존 큐브 수를 늘립니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":250,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"3 초록\"}","visible_to":["P13"]}
+{"type":"event","turn":251,"msg_type":"colors","agent_name":"System","content":"{\"P03\":\"초록\",\"P04\":\"초록\",\"P15\":\"초록\",\"P09\":\"초록\",\"P13\":\"초록\",\"P14\":\"빨강\",\"P16\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":252,"msg_type":"weights","agent_name":"System","content":"{\"P03\":6,\"P04\":5,\"P15\":5,\"P09\":4,\"P13\":3,\"P14\":1,\"P16\":1}","visible_to":"all"}
+{"type":"event","turn":253,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"초록에 지금 놓으면 기존 큐브 2개를 수거해 벌점 2점입니다. 패스하면 뒤에 놓을 때 더 많은 큐브를 걷을 위험이 있어 바로 놓습니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":254,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":255,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"초록\",\"weight\":6,\"stack\":[6],\"penalty\":2}","visible_to":"all"}
+{"type":"event","turn":256,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"초록 합계는 6이고 무게 5를 더해도 11이라 벌점 없이 놓을 수 있다. 패스해 기다릴 이유가 없어 지금 배치한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":257,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":258,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"초록\",\"weight\":5,\"stack\":[6,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":259,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"초록에 지금 놓으면 기존 큐브 2개를 수거해 벌점 2점을 받는다. 패스하면 뒤에 놓을 P09의 초록 4가 받침대를 비울 수 있어 벌점을 피할 가능성이 있다.\"}","visible_to":["P15"]}
+{"type":"event","turn":260,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":261,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09가 지금 놓으면 벌점 2점을 받는다. 패스하면 P13의 초록 3이 먼저 받침대를 비우고 P16의 1이 놓인 뒤에도 안전하게 배치할 수 있어 현재 2위를 지키는 데 유리하다.\"}","visible_to":["P09"]}
+{"type":"event","turn":262,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":263,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"초록은 현재 합 11이라 무게 3을 놓으면 기존 큐브 2개를 걷어 벌점 2점을 받습니다. 한 번 패스해 뒤에 놓을 기회를 남깁니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":264,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":265,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"빨강의 합은 5이므로 무게 1을 지금 놓으면 벌점이 없다. 패스하면 뒤의 배치로 상황이 바뀔 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":266,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":267,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"빨강\",\"weight\":1,\"stack\":[2,3,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":268,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 초록 합계 11에 무게 1을 놓으면 벌점 없이 배치할 수 있다. 패스해도 가장 나중에 패스한 자신이 먼저 놓으므로 이득이 없어 바로 배치한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":269,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":270,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"초록\",\"weight\":1,\"stack\":[6,5,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":271,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"초록\",\"weight\":3,\"stack\":[3],\"penalty\":3}","visible_to":"all"}
+{"type":"event","turn":272,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"초록\",\"weight\":4,\"stack\":[3,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":273,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"초록\",\"weight\":5,\"stack\":[3,4,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":274,"msg_type":"round","agent_name":"System","content":"{\"round\":8,\"leader\":\"P13\",\"stacks\":{\"빨강\":[2,3,1],\"초록\":[3,4,5],\"파랑\":[4]},\"penalties\":{\"P16\":4,\"P13\":7,\"P04\":6,\"P14\":0,\"P03\":9,\"P09\":2,\"P15\":14}}","visible_to":"all"}
+{"type":"event","turn":275,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"초록은 합 12라 0을 놓아도 벌점 없이 기존 큐브 수를 늘릴 수 있습니다. 이후 양수가 놓이면 수거 부담이 커져 상대가 벌점을 받을 가능성이 있습니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":276,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P13"]}
+{"type":"event","turn":277,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"6 빨강을 내면 현재 합계 6에 더해 12로 안전하게 놓으면서, 뒤에 빨강을 고른 사람이 받침대의 기존 큐브를 걷게 될 압박을 만들 수 있다. 큰 숫자로 먼저 배치할 가능성도 높인다.\"}","visible_to":["P04"]}
+{"type":"event","turn":278,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"6 빨강\"}","visible_to":["P04"]}
+{"type":"event","turn":279,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"파랑의 합은 4이므로 6을 놓아도 현재 벌점이 없다. 높은 숫자를 먼저 소진하고 레인보우는 더 위험한 상황을 위해 남긴다. 앞선 배치로 합이 바뀌면 패스를 검토한다.\"}","visible_to":["P14"]}
+{"type":"event","turn":280,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"6 파랑\"}","visible_to":["P14"]}
+{"type":"event","turn":281,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"초록은 현재 무게 12라 0을 놓아도 수거가 발생하지 않습니다. 다른 사람이 무게를 더해 받침대를 비우게 두면서 이번 벌점을 피합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":282,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P03"]}
+{"type":"event","turn":283,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 벌점 2점으로 현재 2위다. 레인보우의 우선 배치와 받침대 선택권을 활용하면 무게 6을 안전하게 소모할 가능성이 높다. 현재 빨강과 파랑에는 6을 놓아도 합계가 12 이하다.\"}","visible_to":["P09"]}
+{"type":"event","turn":284,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"6 레인보우\"}","visible_to":["P09"]}
+{"type":"event","turn":285,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"초록은 합계 12라 양수 큐브를 놓으면 기존 3개를 걷어 벌점 3점을 받습니다. 0은 벌점 없이 놓을 수 있고, 다른 사람이 먼저 비우면 안전하게 새 받침대에 놓입니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":286,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P15"]}
+{"type":"event","turn":287,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 4로 현재 3위다. 파랑은 합계 4에 큐브 1개라 6을 일찍 배치하면 벌점 없이 처리할 수 있고, 앞선 배치로 넘치더라도 현재 수거 부담이 가장 작다. 공개 후 패스 여부를 재판단한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":288,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"6 파랑\"}","visible_to":["P16"]}
+{"type":"event","turn":289,"msg_type":"colors","agent_name":"System","content":"{\"P09\":\"레인보우\",\"P04\":\"빨강\",\"P14\":\"파랑\",\"P16\":\"파랑\",\"P13\":\"초록\",\"P03\":\"초록\",\"P15\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":290,"msg_type":"weights","agent_name":"System","content":"{\"P09\":6,\"P04\":6,\"P14\":6,\"P16\":6,\"P13\":0,\"P03\":0,\"P15\":0}","visible_to":"all"}
+{"type":"event","turn":291,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 빨강에 6을 놓아 벌점 없이 합계 12를 만든다. 뒤따르는 P04는 빨강 큐브 4개를 수거하고, 파랑의 두 6 중 하나는 선두 P14에게 벌점 2점을 안겨 현재 격차를 줄인다.\"}","visible_to":["P09"]}
+{"type":"event","turn":292,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":293,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"빨강\",\"weight\":6,\"stack\":[2,3,1,6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":294,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"빨강에 6을 더하면 기존 큐브 4개를 걷어 벌점 4점을 받는다. 남은 참가자는 빨강을 내지 않아 패스해도 벌점이 줄지 않으므로 지금 놓는다.\"}","visible_to":["P04"]}
+{"type":"event","turn":295,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":296,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"빨강\",\"weight\":6,\"stack\":[6],\"penalty\":4}","visible_to":"all"}
+{"type":"event","turn":297,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"파랑의 현재 합은 4이므로 무게 6을 놓아도 벌점이 없다. 지금 배치해 선두를 유지한다.\"}","visible_to":["P14"]}
+{"type":"event","turn":298,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":299,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"파랑\",\"weight\":6,\"stack\":[4,6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":300,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 파랑에 6을 놓으면 기존 큐브 2개를 수거해 벌점이 6이 된다. 남은 참가자는 모두 초록 0이므로 패스해도 파랑은 바뀌지 않아 바로 배치한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":301,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":302,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"파랑\",\"weight\":6,\"stack\":[6],\"penalty\":2}","visible_to":"all"}
+{"type":"event","turn":303,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"초록은 합이 12라 무게 0을 놓아도 벌점이 없습니다. 큐브 수를 늘려 이후 누군가 수거를 일으킬 때 상대의 벌점 부담을 키웁니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":304,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":305,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"초록\",\"weight\":0,\"stack\":[3,4,5,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":306,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"초록은 현재 무게가 12라 0을 놓아도 수거가 발생하지 않습니다. 지금 놓아 이번 벌점을 피합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":307,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":308,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"초록\",\"weight\":0,\"stack\":[3,4,5,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":309,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"초록 합계는 12이고 무게 0을 놓아도 받침대를 넘치게 하지 않는다. 패스해도 다른 초록 배치가 남아 있지 않아 이득이 없으므로 지금 놓는다.\"}","visible_to":["P15"]}
+{"type":"event","turn":310,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":311,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"초록\",\"weight\":0,\"stack\":[3,4,5,0,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":312,"msg_type":"round","agent_name":"System","content":"{\"round\":9,\"leader\":\"P16\",\"stacks\":{\"빨강\":[6],\"초록\":[3,4,5,0,0,0],\"파랑\":[6]},\"penalties\":{\"P16\":6,\"P13\":7,\"P04\":10,\"P14\":0,\"P03\":9,\"P09\":2,\"P15\":14}}","visible_to":"all"}
+{"type":"event","turn":313,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 6으로 3위다. 빨강은 합계 6에 큐브 1개라 5를 놓아도 안전하다. 선이므로 일반 칩의 같은 숫자보다 먼저 배치한다. 레인보우의 선행 배치가 있으면 공개 후 패스 여부를 판단한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":314,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"5 빨강\"}","visible_to":["P16"]}
+{"type":"event","turn":315,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"초록은 합이 12라 피합니다. 빨강에 5를 놓으면 합 11로 안전하고, 뒤에 2 이상을 놓는 참가자가 기존 큐브를 수거하게 됩니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":316,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"5 빨강\"}","visible_to":["P13"]}
+{"type":"event","turn":317,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"현재 초록 합이 12라 0을 놓으면 벌점 없이 큐브를 더할 수 있다. 낮은 우선순위로 다른 참가자의 초록 배치를 먼저 보게 해 벌점 부담을 피한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":318,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P04"]}
+{"type":"event","turn":319,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"P14는 벌점 0점으로 선두다. 파랑의 합이 6이므로 5를 놓아도 현재 안전하며, 무거운 카드를 소진할 수 있다. 앞선 배치로 위험해지면 패스를 검토한다.\"}","visible_to":["P14"]}
+{"type":"event","turn":320,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"5 파랑\"}","visible_to":["P14"]}
+{"type":"event","turn":321,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"초록은 무게 12라 1을 놓으면 큐브 6개를 수거해 벌점이 큽니다. 빨강과 파랑은 각각 무게 6이므로 1을 놓아도 수거가 없고, 낮은 카드를 써서 벌점을 피합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":322,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"1 파랑\"}","visible_to":["P03"]}
+{"type":"event","turn":323,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 벌점 2점으로 2위이며 탈락권과 8점 차이다. 파랑은 합계 6, 큐브 1개여서 5를 안전하게 놓을 여지가 크다. 큰 카드를 먼저 소모하고, 공개된 배치 순서에 따라 패스로 위험을 조절한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":324,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"5 파랑\"}","visible_to":["P09"]}
+{"type":"event","turn":325,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"빨강과 파랑은 현재 합계가 6이라 1을 놓아도 벌점 없이 유지됩니다. 초록은 이미 합계 12, 큐브 6개라 놓으면 큰 벌점 위험이 있어 피합니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":326,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"1 빨강\"}","visible_to":["P15"]}
+{"type":"event","turn":327,"msg_type":"colors","agent_name":"System","content":"{\"P16\":\"빨강\",\"P13\":\"빨강\",\"P14\":\"파랑\",\"P09\":\"파랑\",\"P03\":\"파랑\",\"P15\":\"빨강\",\"P04\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":328,"msg_type":"weights","agent_name":"System","content":"{\"P16\":5,\"P13\":5,\"P14\":5,\"P09\":5,\"P03\":1,\"P15\":1,\"P04\":0}","visible_to":"all"}
+{"type":"event","turn":329,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 빨강에 5를 놓아 합계 11로 벌점 없이 배치할 수 있다. 패스하면 뒤의 빨강 배치로 상태가 바뀔 수 있으므로 지금 안전한 배치를 확정해 3위를 지킨다.\"}","visible_to":["P16"]}
+{"type":"event","turn":330,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":331,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"빨강\",\"weight\":5,\"stack\":[6,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":332,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"빨강에 5를 놓으면 기존 큐브 2개를 걷어 벌점 2점을 받는다. 패스하면 뒤에 무게 1이 추가된 뒤 수거해 벌점 3점이 될 수 있어 지금 놓는다.\"}","visible_to":["P13"]}
+{"type":"event","turn":333,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":334,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"빨강\",\"weight\":5,\"stack\":[5],\"penalty\":2}","visible_to":"all"}
+{"type":"event","turn":335,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"파랑의 현재 합은 6이므로 무게 5를 지금 놓으면 벌점이 없다. 패스하면 뒤에 파랑을 낼 참가자 때문에 벌점을 받을 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":336,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":337,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"파랑\",\"weight\":5,\"stack\":[6,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":338,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09가 지금 놓으면 벌점 2점이다. 패스하면 P03의 1이 먼저 놓여 수거할 큐브가 3개로 늘어나므로, 지금 배치해 2위를 유지한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":339,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":340,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"파랑\",\"weight\":5,\"stack\":[5],\"penalty\":2}","visible_to":"all"}
+{"type":"event","turn":341,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"파랑 받침대는 현재 무게 5라 1을 놓아도 수거가 발생하지 않습니다. 패스하면 다른 참가자의 배치로 상황이 바뀔 수 있어 지금 놓습니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":342,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":343,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"파랑\",\"weight\":1,\"stack\":[5,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":344,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"빨강에 1을 놓으면 합계가 6이라 벌점 없이 안전하게 배치할 수 있다. 패스할 이득이 없다.\"}","visible_to":["P15"]}
+{"type":"event","turn":345,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":346,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"빨강\",\"weight\":1,\"stack\":[5,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":347,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"P04가 초록에 0을 놓아도 합계는 12라 기존 큐브가 걷히지 않는다. 패스로 얻을 이득이 없어 지금 배치한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":348,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":349,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"초록\",\"weight\":0,\"stack\":[3,4,5,0,0,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":350,"msg_type":"round","agent_name":"System","content":"{\"round\":10,\"leader\":\"P09\",\"stacks\":{\"빨강\":[5,1],\"초록\":[3,4,5,0,0,0,0],\"파랑\":[5,1]},\"penalties\":{\"P16\":6,\"P13\":9,\"P04\":10,\"P14\":0,\"P03\":9,\"P09\":4,\"P15\":14}}","visible_to":"all"}
+{"type":"event","turn":351,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 벌점 4점으로 2위다. 파랑은 합계 6이라 4를 안전하게 놓을 수 있고, 동률이면 선인 P09가 먼저 배치한다. 합계 12에 큐브 7개가 쌓인 초록은 피하고 큰 카드를 소모한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":352,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"4 파랑\"}","visible_to":["P09"]}
+{"type":"event","turn":353,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"현재 벌점 14점으로 최하위라 추가 벌점을 피하는 게 우선이다. 초록은 합계 12에 큐브가 7개라 피하고, 빨강·파랑 중 낮은 무게로 안전성을 택했다.\"}","visible_to":["P15"]}
+{"type":"event","turn":354,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"2 빨강\"}","visible_to":["P15"]}
+{"type":"event","turn":355,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 6으로 3위다. 초록 합계는 12여서 0은 앞선 배치와 관계없이 벌점 없이 놓을 수 있다. 위험한 초록 칩을 소모하고 레인보우를 남겨 이후 선택권과 생존 여유를 지킨다.\"}","visible_to":["P16"]}
+{"type":"event","turn":356,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P16"]}
+{"type":"event","turn":357,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"빨강·파랑은 현재 합 6이라 6을 놓아도 안전하게 12가 됩니다. 레인보우로 먼저 배치해 이후 같은 받침대에 놓는 사람이 수거할 위험을 높입니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":358,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"6 레인보우\"}","visible_to":["P13"]}
+{"type":"event","turn":359,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"현재 벌점 10점으로 탈락선에 가까워 안전 배치를 택한다. 파랑 합계 6에 5를 더해도 11이라 기존 큐브를 걷지 않는다.\"}","visible_to":["P04"]}
+{"type":"event","turn":360,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"5 파랑\"}","visible_to":["P04"]}
+{"type":"event","turn":361,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"P14는 벌점 0점으로 선두다. 빨강 합이 6이어서 4를 바로 놓으면 안전하며, 초록은 합이 12이고 기존 큐브가 7개라 위험하다. 앞선 배치로 빨강 합이 변하면 패스를 검토한다.\"}","visible_to":["P14"]}
+{"type":"event","turn":362,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"4 빨강\"}","visible_to":["P14"]}
+{"type":"event","turn":363,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"초록은 무게 12라 피하고, 2 레인보우로 먼저 놓아 빨강이나 파랑을 골라 벌점을 피합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":364,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"2 레인보우\"}","visible_to":["P03"]}
+{"type":"event","turn":365,"msg_type":"colors","agent_name":"System","content":"{\"P13\":\"레인보우\",\"P03\":\"레인보우\",\"P04\":\"파랑\",\"P09\":\"파랑\",\"P14\":\"빨강\",\"P15\":\"빨강\",\"P16\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":366,"msg_type":"weights","agent_name":"System","content":"{\"P13\":6,\"P03\":2,\"P04\":5,\"P09\":4,\"P14\":4,\"P15\":2,\"P16\":0}","visible_to":"all"}
+{"type":"event","turn":367,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"파랑은 합이 12라 내 6은 안전하게 놓입니다. 이후 파랑을 낸 P04의 무게 5가 수거를 일으킬 가능성을 고려합니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":368,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":369,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"파랑\",\"weight\":6,\"stack\":[5,1,6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":370,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"P03는 빨강에 2를 놓아도 합이 8이라 수거를 피할 수 있다. 초록과 파랑은 합이 12라 놓으면 기존 큐브를 걷게 된다.\"}","visible_to":["P03"]}
+{"type":"event","turn":371,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":372,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"빨강\",\"weight\":2,\"stack\":[5,1,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":373,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"파랑에 5를 놓으면 합이 17이 되어 기존 큐브 3개를 걷고 벌점 3점을 받는다. 한 번 패스해 뒤 순서에서 받침대가 비워질 가능성을 본다.\"}","visible_to":["P04"]}
+{"type":"event","turn":374,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":375,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 지금 파랑에 놓으면 벌점 3점을 받는다. P04가 먼저 패스했으므로 P09도 패스하면 역순으로 먼저 놓아 같은 벌점을 받는다. 바로 배치해 누적 7점으로 탈락권과의 간격을 유지한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":376,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":377,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"파랑\",\"weight\":4,\"stack\":[4],\"penalty\":3}","visible_to":"all"}
+{"type":"event","turn":378,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"P14는 빨강에 무게 4를 놓아도 합이 12라 벌점이 없다고 판단한다. 패스하면 뒤의 빨강 2가 먼저 놓여 벌점을 받을 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":379,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":380,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"빨강\",\"weight\":4,\"stack\":[5,1,2,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":381,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"빨강에 무게 2를 놓으면 기존 큐브 4개가 걷혀 벌점 4점이 예상된다. 패스해도 남은 배치가 빨강을 비우지 않아 결국 같은 벌점을 받으므로 지금 놓는다.\"}","visible_to":["P15"]}
+{"type":"event","turn":382,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":383,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"빨강\",\"weight\":2,\"stack\":[2],\"penalty\":4}","visible_to":"all"}
+{"type":"event","turn":384,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 초록에 0을 놓아도 합계가 12라 벌점이 없다. 바로 배치해 벌점 6과 현재 2위를 지킨다.\"}","visible_to":["P16"]}
+{"type":"event","turn":385,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":386,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"초록\",\"weight\":0,\"stack\":[3,4,5,0,0,0,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":387,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"파랑\",\"weight\":5,\"stack\":[4,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":388,"msg_type":"round","agent_name":"System","content":"{\"round\":11,\"leader\":\"P15\",\"stacks\":{\"빨강\":[2],\"초록\":[3,4,5,0,0,0,0,0],\"파랑\":[4,5]},\"penalties\":{\"P16\":6,\"P13\":9,\"P04\":10,\"P14\":0,\"P03\":9,\"P09\":7,\"P15\":18}}","visible_to":"all"}
+{"type":"event","turn":389,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"6 레인보우를 내면 우선 배치해 현재 합계 2인 빨강을 고를 수 있어 벌점을 피할 가능성이 가장 높다. 초록은 기존 큐브가 많고, 파랑은 4 이상이면 넘친다.\"}","visible_to":["P15"]}
+{"type":"event","turn":390,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"6 레인보우\"}","visible_to":["P15"]}
+{"type":"event","turn":391,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 6으로 2위다. 레인보우 우선 배치로 합계 2인 빨강을 활용하면 4를 벌점 없이 처리할 가능성이 높다. 다른 레인보우의 선행 배치가 있으면 공개된 받침대 상태를 보고 선택한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":392,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"4 레인보우\"}","visible_to":["P16"]}
+{"type":"event","turn":393,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"빨강은 현재 합이 2라 4를 놓아도 합 6으로 안전합니다. 초록은 수거 큐브가 많고, 파랑에 4를 놓으면 합 13으로 벌점 2점이 생깁니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":394,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"4 빨강\"}","visible_to":["P13"]}
+{"type":"event","turn":395,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"P04는 4 레인보우를 제출한다. 레인보우 우선 배치로 다른 참가자의 공개 제출을 확인한 뒤 받침대를 고를 수 있고, 현재 합계가 낮은 빨강을 택하면 벌점을 피할 가능성이 높다.\"}","visible_to":["P04"]}
+{"type":"event","turn":396,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"4 레인보우\"}","visible_to":["P04"]}
+{"type":"event","turn":397,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"빨강의 합은 2이고 남은 카드의 최댓값은 3이므로 지금 놓으면 안전하다. 3을 소진하고 레인보우는 이후 위험한 배치를 위해 남긴다.\"}","visible_to":["P14"]}
+{"type":"event","turn":398,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"3 빨강\"}","visible_to":["P14"]}
+{"type":"event","turn":399,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"빨강에 6을 놓아도 무게가 8이라 수거되지 않습니다. 높은 카드로 빨강 배치 순서를 앞당기고, 초록의 무더기 수거와 파랑의 즉시 수거를 피합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":400,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"6 빨강\"}","visible_to":["P03"]}
+{"type":"event","turn":401,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 벌점 7점으로 4위다. 빨강은 합계 2라 무게 3을 놓을 여유가 크고, 남은 카드 중 가장 커 일반 칩 배치에서도 앞설 수 있다. 합계 12에 큐브 8개가 쌓인 초록은 피한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":402,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"3 빨강\"}","visible_to":["P09"]}
+{"type":"event","turn":403,"msg_type":"colors","agent_name":"System","content":"{\"P15\":\"레인보우\",\"P16\":\"레인보우\",\"P04\":\"레인보우\",\"P03\":\"빨강\",\"P13\":\"빨강\",\"P14\":\"빨강\",\"P09\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":404,"msg_type":"weights","agent_name":"System","content":"{\"P15\":6,\"P16\":4,\"P04\":4,\"P03\":6,\"P13\":4,\"P14\":3,\"P09\":3}","visible_to":"all"}
+{"type":"event","turn":405,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"빨강은 2에 6을 더해도 합계 8이라 벌점을 피한다. 초록과 파랑은 13을 넘겨 각각 기존 큐브 8개와 2개를 걷게 된다.\"}","visible_to":["P15"]}
+{"type":"event","turn":406,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":407,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"빨강\",\"weight\":6,\"stack\":[2,6],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":408,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 빨강에 4를 놓으면 합계 12로 벌점 없이 배치할 수 있다. 현재 벌점 6으로 2위이므로 안전한 배치를 확정해 순위와 생존 여유를 지킨다.\"}","visible_to":["P16"]}
+{"type":"event","turn":409,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":410,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"빨강\",\"weight\":4,\"stack\":[2,6,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":411,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"지금 빨강에 놓으면 기존 큐브 3개를 걷어 벌점 3점, 파랑은 2점을 받는다. 패스하면 뒤의 빨강 배치로 받침대가 비워질 가능성이 있어, 마지막에 놓아 벌점을 피할 기회를 남긴다.\"}","visible_to":["P04"]}
+{"type":"event","turn":412,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":413,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"지금 빨강에 놓으면 기존 큐브 3개를 수거해 벌점 3점을 받습니다. 패스해 뒤에 놓으면 앞선 배치가 빨강 받침대를 비울 가능성이 있어 수거량을 줄일 수 있습니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":414,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":415,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"빨강에 지금 놓으면 기존 큐브 3개를 수거해 벌점 3점을 받습니다. 패스해 뒤 순서의 배치를 보고 수거 부담을 줄일 기회를 노립니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":416,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":417,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"빨강에 지금 놓으면 기존 큐브 3개를 수거한다. 패스하면 뒤에 놓을 빨강 참가자나 이미 패스한 참가자가 먼저 받침대를 비울 가능성이 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":418,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":419,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 지금 빨강에 놓으면 벌점 3점을 받아 누적 10점이 된다. 앞선 네 명이 모두 패스했으므로 P09도 패스하면 역순으로 가장 먼저 놓아 같은 벌점을 받는다. 바로 배치한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":420,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":421,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"빨강\",\"weight\":3,\"stack\":[3],\"penalty\":3}","visible_to":"all"}
+{"type":"event","turn":422,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"빨강\",\"weight\":3,\"stack\":[3,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":423,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"빨강\",\"weight\":4,\"stack\":[3,3,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":424,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"빨강\",\"weight\":6,\"stack\":[6],\"penalty\":3}","visible_to":"all"}
+{"type":"event","turn":425,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"P04는 빨강에 4를 놓으면 합이 10이라 벌점이 없다. 파랑은 13이 되어 기존 큐브 2개, 초록은 16이 되어 8개를 걷으므로 빨강을 고른다.\"}","visible_to":["P04"]}
+{"type":"event","turn":426,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":427,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"빨강\",\"weight\":4,\"stack\":[6,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":428,"msg_type":"round","agent_name":"System","content":"{\"round\":12,\"leader\":\"P03\",\"stacks\":{\"빨강\":[6,4],\"초록\":[3,4,5,0,0,0,0,0],\"파랑\":[4,5]},\"penalties\":{\"P16\":6,\"P13\":9,\"P04\":10,\"P14\":0,\"P03\":12,\"P09\":10,\"P15\":18}}","visible_to":"all"}
+{"type":"event","turn":429,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"3 파랑을 선택합니다. 파랑은 현재 무게 9라 3을 놓아도 12로 기존 큐브를 수거하지 않습니다. 초록은 이미 12이고 빨강은 3을 놓으면 수거가 발생해 벌점 위험이 큽니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":430,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"3 파랑\"}","visible_to":["P03"]}
+{"type":"event","turn":431,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 벌점 10점으로 5위이며 6위와 2점 차이다. 무게 0은 초록의 합계가 12여도 벌점을 유발하지 않는다. 이번 벌점을 확실히 피하고 남은 두 라운드의 공개 상태에 따라 대응한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":432,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P09"]}
+{"type":"event","turn":433,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"파랑은 현재 합계 9라 3을 놓으면 합계 12로 벌점 없이 안전합니다. 초록은 합계 12에 큐브가 8개라 어떤 선택도 8점 벌점 위험이 있어 피합니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":434,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"3 파랑\"}","visible_to":["P15"]}
+{"type":"event","turn":435,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 6으로 2위다. 파랑은 합계 9라 3을 바로 놓으면 벌점이 없고, 일반 칩 중 작은 숫자보다 먼저 배치한다. 남은 최대 숫자를 처리하되, 레인보우 선행 배치로 상태가 달라지면 패스 여부를 재판단한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":436,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"3 파랑\"}","visible_to":["P16"]}
+{"type":"event","turn":437,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"초록은 어떤 선택도 기존 큐브 11개를 수거해 큰 벌점을 받습니다. 파랑은 3을 놓아도 합이 12로 안전하고, 이후 파랑에 놓는 참가자에게 수거 부담을 줄 수 있습니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":438,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"3 파랑\"}","visible_to":["P13"]}
+{"type":"event","turn":439,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"파랑은 현재 합계 9라 3을 더해도 12로 벌점 없이 놓을 수 있다. 벌점을 피하면서 남은 큰 카드를 사용한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":440,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"3 파랑\"}","visible_to":["P04"]}
+{"type":"event","turn":441,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"P14는 벌점 0점으로 선두다. 레인보우로 먼저 배치하면 현재 빨강과 파랑 어디에 놓아도 안전하며, 이후 초록을 써야 하는 두 라운드에는 0과 1을 남기는 편이 유리하다.\"}","visible_to":["P14"]}
+{"type":"event","turn":442,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"2 레인보우\"}","visible_to":["P14"]}
+{"type":"event","turn":443,"msg_type":"colors","agent_name":"System","content":"{\"P14\":\"레인보우\",\"P03\":\"파랑\",\"P15\":\"파랑\",\"P16\":\"파랑\",\"P13\":\"파랑\",\"P04\":\"파랑\",\"P09\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":444,"msg_type":"weights","agent_name":"System","content":"{\"P14\":2,\"P03\":3,\"P15\":3,\"P16\":3,\"P13\":3,\"P04\":3,\"P09\":0}","visible_to":"all"}
+{"type":"event","turn":445,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"빨강에 놓으면 합이 12로 벌점이 없고, 뒤의 파랑 제출자들에게 안전한 선택지를 남긴다. 현재 1위이므로 확보된 무벌점 배치를 택한다.\"}","visible_to":["P14"]}
+{"type":"event","turn":446,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":447,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"빨강\",\"weight\":2,\"stack\":[6,4,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":448,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"파랑은 현재 9라 3을 놓아도 합이 12로 벌점을 받지 않는다. 패스하면 뒤의 배치에 따라 상황이 바뀔 수 있어 지금 놓는다.\"}","visible_to":["P03"]}
+{"type":"event","turn":449,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"파랑\"}","visible_to":"all"}
+{"type":"event","turn":450,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"파랑\",\"weight\":3,\"stack\":[4,5,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":451,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"파랑은 합계 12라 지금 놓으면 큐브 3개를 걷어 벌점 3점을 받는다. 패스해 다른 참가자가 먼저 파랑을 비울 가능성을 남긴다.\"}","visible_to":["P15"]}
+{"type":"event","turn":452,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":453,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16이 지금 놓으면 파랑 합계가 15가 되어 벌점 3점을 받는다. 패스하면 뒤의 파랑 제출자 중 누군가 받침대를 비운 뒤 배치할 수 있어 현재 2위를 지키는 데 유리하다.\"}","visible_to":["P16"]}
+{"type":"event","turn":454,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":455,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"파랑에 지금 놓으면 기존 큐브 3개를 수거해 벌점 3점을 받습니다. 패스해 다른 배치가 끝난 뒤 부담을 다시 살핍니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":456,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":457,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"파랑 합계가 12라 3을 놓으면 기존 큐브 3개를 걷어 벌점 3점을 받는다. 한 번 패스해 다른 배치로 파랑이 비워질 가능성을 본다.\"}","visible_to":["P04"]}
+{"type":"event","turn":458,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":459,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09는 초록에 무게 0을 놓아도 합계가 12로 유지돼 벌점이 없다. 바로 배치해 누적 10점을 유지한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":460,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":461,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"초록\",\"weight\":0,\"stack\":[3,4,5,0,0,0,0,0,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":462,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"파랑\",\"weight\":3,\"stack\":[3],\"penalty\":3}","visible_to":"all"}
+{"type":"event","turn":463,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"파랑\",\"weight\":3,\"stack\":[3,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":464,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"파랑\",\"weight\":3,\"stack\":[3,3,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":465,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"파랑\",\"weight\":3,\"stack\":[3,3,3,3],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":466,"msg_type":"round","agent_name":"System","content":"{\"round\":13,\"leader\":\"P04\",\"stacks\":{\"빨강\":[6,4,2],\"초록\":[3,4,5,0,0,0,0,0,0],\"파랑\":[3,3,3,3]},\"penalties\":{\"P16\":6,\"P13\":9,\"P04\":13,\"P14\":0,\"P03\":12,\"P09\":10,\"P15\":18}}","visible_to":"all"}
+{"type":"event","turn":467,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"빨강은 합계 12라 기존 큐브 3개만 걷혀 벌점 3점이다. 초록은 9개를 걷어야 한다. 2는 1보다 먼저 배치되어 빨강을 먼저 비울 수 있다.\"}","visible_to":["P04"]}
+{"type":"event","turn":468,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"2 빨강\"}","visible_to":["P04"]}
+{"type":"event","turn":469,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"초록 합이 12이므로 0은 현재 안전하고 1은 기존 큐브 9개를 수거한다. 0을 먼저 써 무벌점 기회를 확보한다.\"}","visible_to":["P14"]}
+{"type":"event","turn":470,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"0 초록\"}","visible_to":["P14"]}
+{"type":"event","turn":471,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"빨강은 기존 큐브가 3개라 수거돼도 벌점 3점입니다. 4를 내면 더 높은 카드나 선순위 동점자가 먼저 빨강을 비워 줄 가능성도 남깁니다. 초록은 9개를 수거할 위험이 커 피합니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":472,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"4 빨강\"}","visible_to":["P03"]}
+{"type":"event","turn":473,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09는 4위로 탈락권인 P04보다 벌점이 3점 적다. 두 받침대 모두 합계 12지만 빨강의 기존 큐브는 3개로 초록의 9개보다 부담이 작다. 2를 내 배치 순서와 패스 대응의 여지를 확보하고, 마지막 라운드에 1을 남긴다.\"}","visible_to":["P09"]}
+{"type":"event","turn":474,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"2 빨강\"}","visible_to":["P09"]}
+{"type":"event","turn":475,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"현재 파랑과 초록 모두 합계 12지만, 파랑 큐브는 4개라 초록의 9개보다 벌점 위험이 작다. 4를 내면 같은 색에서 높은 숫자 참가자보다 뒤에 배치될 수 있어 먼저 비워질 가능성도 남긴다.\"}","visible_to":["P15"]}
+{"type":"event","turn":476,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"4 파랑\"}","visible_to":["P15"]}
+{"type":"event","turn":477,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 6으로 2위다. 残은 초록은 기존 큐브가 9개라 위험하다. 2를 내면 1보다 먼저 패스할 기회를 얻어 다른 초록 제출자의 선행 정리를 기다릴 수 있다. 다만 다른 초록 제출자가 없으면 벌점 9점은 피할 수 없다.\"}","visible_to":["P16"]}
+{"type":"event","turn":478,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"2 초록\"}","visible_to":["P16"]}
+{"type":"event","turn":479,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"파랑은 기존 큐브가 4개라 초록보다 수거 부담이 작습니다. 1을 내면 같은 색에서 배치가 늦어져 먼저 수거가 일어날 가능성을 남기고, 새 받침대에서도 무게를 낮게 유지합니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":480,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"1 파랑\"}","visible_to":["P13"]}
+{"type":"event","turn":481,"msg_type":"colors","agent_name":"System","content":"{\"P03\":\"빨강\",\"P15\":\"파랑\",\"P04\":\"빨강\",\"P09\":\"빨강\",\"P16\":\"초록\",\"P13\":\"파랑\",\"P14\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":482,"msg_type":"weights","agent_name":"System","content":"{\"P03\":4,\"P15\":4,\"P04\":2,\"P09\":2,\"P16\":2,\"P13\":1,\"P14\":0}","visible_to":"all"}
+{"type":"event","turn":483,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"빨강은 현재 무게가 12라 바로 놓으면 기존 큐브 3개를 수거해 벌점 3점을 받는다. 패스하면 다른 빨강 배치가 먼저 받침대를 비울 수 있어 수거 위험을 줄일 수 있다.\"}","visible_to":["P03"]}
+{"type":"event","turn":484,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":485,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"파랑에 놓으면 기존 큐브 4개를 걷어 벌점 4점을 받는다. 패스하면 뒤에 놓는 참가자가 먼저 파랑을 비울 가능성이 있다.\"}","visible_to":["P15"]}
+{"type":"event","turn":486,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":487,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"현재 6위라 빨강에 놓아 벌점 3점을 더 받으면 탈락 위험이 커진다. 패스해 다른 배치로 빨강이 비워질 기회를 본다.\"}","visible_to":["P04"]}
+{"type":"event","turn":488,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":489,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09가 패스해도 빨강을 낸 P04와 P03보다 먼저 되돌아와 배치하므로 기존 큐브 3개의 벌점을 피할 수 없다. 바로 배치해 누적 13점을 감수하고 마지막 라운드의 생존 경쟁에 대비한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":490,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":491,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"빨강\",\"weight\":2,\"stack\":[2],\"penalty\":3}","visible_to":"all"}
+{"type":"event","turn":492,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16이 지금 초록에 놓으면 벌점 9점이지만, 패스하면 P14의 무게 0 큐브가 먼저 추가되어 벌점이 10점으로 늘어난다. 지금 배치해 손실을 줄인다.\"}","visible_to":["P16"]}
+{"type":"event","turn":493,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":494,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"초록\",\"weight\":2,\"stack\":[2],\"penalty\":9}","visible_to":"all"}
+{"type":"event","turn":495,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"파랑은 현재 합이 12라 지금 놓으면 기존 큐브 4개를 수거해 벌점 4점입니다. 패스하면 앞서 패스한 P15의 파랑 4가 먼저 놓여 받침대가 비워질 가능성이 있습니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":496,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":497,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"초록 받침대의 합은 2이므로 무게 0을 지금 놓으면 벌점이 없다. 선두를 유지할 수 있는 확정적인 선택이다.\"}","visible_to":["P14"]}
+{"type":"event","turn":498,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":499,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"초록\",\"weight\":0,\"stack\":[2,0],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":500,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"파랑\",\"weight\":1,\"stack\":[1],\"penalty\":4}","visible_to":"all"}
+{"type":"event","turn":501,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"빨강\",\"weight\":2,\"stack\":[2,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":502,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"파랑\",\"weight\":4,\"stack\":[1,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":503,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"빨강\",\"weight\":4,\"stack\":[2,2,4],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":504,"msg_type":"round","agent_name":"System","content":"{\"round\":14,\"leader\":\"P13\",\"stacks\":{\"빨강\":[2,2,4],\"초록\":[2,0],\"파랑\":[1,4]},\"penalties\":{\"P16\":15,\"P13\":13,\"P04\":13,\"P14\":0,\"P03\":12,\"P09\":13,\"P15\":18}}","visible_to":"all"}
+{"type":"event","turn":505,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"submit\",\"note\":\"초록은 현재 큐브가 2개뿐이라 2를 놓아도 수거가 없어 벌점을 피합니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":506,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"submit\",\"action\":\"2 초록\"}","visible_to":["P13"]}
+{"type":"event","turn":507,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"submit\",\"note\":\"남은 카드 1과 초록 칩을 제출한다. 초록 받침대는 현재 합계 2라 안전하게 놓을 수 있어 벌점을 피한다.\"}","visible_to":["P04"]}
+{"type":"event","turn":508,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"submit\",\"action\":\"1 초록\"}","visible_to":["P04"]}
+{"type":"event","turn":509,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"submit\",\"note\":\"남은 선택지는 1 초록뿐이다. 현재 초록 합은 2이므로 다른 배치가 없으면 벌점 없이 놓는다.\"}","visible_to":["P14"]}
+{"type":"event","turn":510,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"submit\",\"action\":\"1 초록\"}","visible_to":["P14"]}
+{"type":"event","turn":511,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"submit\",\"note\":\"초록에 5를 놓아도 합이 7이라 벌점 없이 라운드를 마칠 수 있습니다. 현재 벌점 12점으로 생존권에 있어 안전한 선택입니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":512,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"submit\",\"action\":\"5 초록\"}","visible_to":["P03"]}
+{"type":"event","turn":513,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"submit\",\"note\":\"P09의 남은 선택은 1 초록뿐이다. 초록의 현재 합은 2여서 배치 여유가 가장 크며, 벌점 없이 마치면 현재 15점인 P16과 18점인 P15보다 앞서 생존한다.\"}","visible_to":["P09"]}
+{"type":"event","turn":514,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"submit\",\"action\":\"1 초록\"}","visible_to":["P09"]}
+{"type":"event","turn":515,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"submit\",\"note\":\"초록은 현재 합계 2라 5를 놓아도 7로 안전합니다. 벌점을 피하면서 제출할 수 있는 선택입니다.\"}","visible_to":["P15"]}
+{"type":"event","turn":516,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"submit\",\"action\":\"5 초록\"}","visible_to":["P15"]}
+{"type":"event","turn":517,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"submit\",\"note\":\"P16은 벌점 15점으로 현재 6위다. 마지막 남은 선택은 1 빨강이며, 현재 빨강 합계는 8이다. 생존 여부는 다른 참가자의 제출과 배치 결과에 달려 있다.\"}","visible_to":["P16"]}
+{"type":"event","turn":518,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"submit\",\"action\":\"1 빨강\"}","visible_to":["P16"]}
+{"type":"event","turn":519,"msg_type":"colors","agent_name":"System","content":"{\"P03\":\"초록\",\"P15\":\"초록\",\"P13\":\"초록\",\"P04\":\"초록\",\"P14\":\"초록\",\"P09\":\"초록\",\"P16\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":520,"msg_type":"weights","agent_name":"System","content":"{\"P03\":5,\"P15\":5,\"P13\":2,\"P04\":1,\"P14\":1,\"P09\":1,\"P16\":1}","visible_to":"all"}
+{"type":"event","turn":521,"msg_type":"decision_note","agent_name":"P03","content":"{\"phase\":\"place\",\"note\":\"초록은 현재 무게가 2라 5를 놓아도 합이 7로 벌점이 없습니다.\"}","visible_to":["P03"]}
+{"type":"event","turn":522,"msg_type":"action","agent_name":"P03","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":523,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P03\",\"color\":\"초록\",\"weight\":5,\"stack\":[2,0,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":524,"msg_type":"decision_note","agent_name":"P15","content":"{\"phase\":\"place\",\"note\":\"초록의 현재 합은 7이고 무게 5를 더해도 12라 벌점이 없다. 패스할 이유가 없어 초록에 놓는다.\"}","visible_to":["P15"]}
+{"type":"event","turn":525,"msg_type":"action","agent_name":"P15","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":526,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P15\",\"color\":\"초록\",\"weight\":5,\"stack\":[2,0,5,5],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":527,"msg_type":"decision_note","agent_name":"P13","content":"{\"phase\":\"place\",\"note\":\"초록은 합이 12라 지금 놓으면 기존 큐브 4개를 수거해 벌점 4점을 받습니다. 뒤에 초록 1을 낼 참가자가 있어 먼저 수거가 일어날 가능성을 보고 패스합니다.\"}","visible_to":["P13"]}
+{"type":"event","turn":528,"msg_type":"action","agent_name":"P13","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":529,"msg_type":"decision_note","agent_name":"P04","content":"{\"phase\":\"place\",\"note\":\"초록에 놓으면 합이 13이 되어 기존 큐브 4개를 수거하고 벌점 4점을 받는다. 뒤에 초록을 놓을 참가자가 있으니 패스해 벌점을 피할 기회를 남긴다.\"}","visible_to":["P04"]}
+{"type":"event","turn":530,"msg_type":"action","agent_name":"P04","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":531,"msg_type":"decision_note","agent_name":"P14","content":"{\"phase\":\"place\",\"note\":\"지금 놓으면 초록 큐브 4개를 수거한다. 패스하면 아직 배치하지 않은 P09가 먼저 초록에 놓아 받침대를 비우므로 벌점을 피할 수 있다.\"}","visible_to":["P14"]}
+{"type":"event","turn":532,"msg_type":"action","agent_name":"P14","content":"{\"phase\":\"place\",\"action\":\"패스\"}","visible_to":"all"}
+{"type":"event","turn":533,"msg_type":"decision_note","agent_name":"P09","content":"{\"phase\":\"place\",\"note\":\"P09가 패스해도 앞서 패스한 세 명보다 먼저 초록에 놓게 되어 벌점 4점을 피할 수 없다. 즉시 배치하며 누적 17점으로 P16보다 뒤처져 탈락하게 된다.\"}","visible_to":["P09"]}
+{"type":"event","turn":534,"msg_type":"action","agent_name":"P09","content":"{\"phase\":\"place\",\"action\":\"초록\"}","visible_to":"all"}
+{"type":"event","turn":535,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P09\",\"color\":\"초록\",\"weight\":1,\"stack\":[1],\"penalty\":4}","visible_to":"all"}
+{"type":"event","turn":536,"msg_type":"decision_note","agent_name":"P16","content":"{\"phase\":\"place\",\"note\":\"P16은 빨강에 1을 놓아도 합계 9로 벌점이 없다. 다른 참가자는 모두 초록이므로 패스로 순위를 바꿀 여지가 없어 바로 배치한다.\"}","visible_to":["P16"]}
+{"type":"event","turn":537,"msg_type":"action","agent_name":"P16","content":"{\"phase\":\"place\",\"action\":\"빨강\"}","visible_to":"all"}
+{"type":"event","turn":538,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P16\",\"color\":\"빨강\",\"weight\":1,\"stack\":[2,2,4,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":539,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P14\",\"color\":\"초록\",\"weight\":1,\"stack\":[1,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":540,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P04\",\"color\":\"초록\",\"weight\":1,\"stack\":[1,1,1],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":541,"msg_type":"placement","agent_name":"System","content":"{\"player\":\"P13\",\"color\":\"초록\",\"weight\":2,\"stack\":[1,1,1,2],\"penalty\":0}","visible_to":"all"}
+{"type":"event","turn":542,"msg_type":"relationship_update","agent_name":"P03","content":"{\"checkpoint\":\"매치 종료\",\"ratings\":{\"P14\":{\"affinity\":52,\"trust\":53,\"reason\":\"공개 배치에서 확인된 여섯 수 모두 벌점이 없었어요. 협력 적합성에 대한 인상만 소폭 높였고, 약속 이행 근거는 없어요.\"},\"P16\":{\"affinity\":50,\"trust\":50,\"reason\":\"공개 배치에서 여러 수는 무벌점이었지만 초록 배치에서 벌점 9점을 받았어요. 배치 성과만으로 신뢰도는 바꾸지 않았어요.\"},\"P13\":{\"affinity\":52,\"trust\":51,\"reason\":\"공개 배치에서 일부 수는 무벌점이었고 빨강·파랑 배치에서 각각 2점과 4점 벌점을 받았어요. 약속 이행 근거는 추가되지 않았어요.\"},\"P04\":{\"affinity\":51,\"trust\":53,\"reason\":\"공개 배치에서 무벌점 수와 3·4점 벌점 수가 함께 확인됐어요. 이전 선택 일치 외에 신뢰도를 조정할 근거는 없어요.\"},\"P09\":{\"affinity\":50,\"trust\":52,\"reason\":\"공개 배치에서 여러 색에 걸쳐 2~4점 벌점이 확인됐어요. 이는 배치 결과일 뿐 약속 이행 여부를 보여주진 않아요.\"},\"P15\":{\"affinity\":52,\"trust\":53,\"reason\":\"공개 배치에서 대부분 무벌점이었고 초반 빨강 배치에서 4점 벌점이 있었어요. 이전 선택 일치 외의 약속 이행 근거는 없어요.\"}}}","visible_to":["P03"]}
+{"type":"result","ranking":["P14","P03","P04","P13","P16","P09","P15"],"eliminated":["P09","P15"],"pieces":{"P16":3,"P13":2,"P04":2,"P14":6,"P03":2,"P09":5,"P15":2},"penalties":{"P16":15,"P13":13,"P04":13,"P14":0,"P03":12,"P09":17,"P15":18},"pieces_awarded":{"P14":4},"model_calls":211}
