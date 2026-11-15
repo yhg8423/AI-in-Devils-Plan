@@ -91,6 +91,7 @@ export function Mast({currentPage, replayPosition, children}) {
           <a href={href(page, "en")} hrefLang="en" lang="en" aria-label="English" aria-current={language === "en" ? "true" : undefined}>EN</a>
         </nav>
         <a className="github-link" href="https://github.com/yhg8423/AI-in-Devils-Plan"
+          target="_blank" rel="noopener"
           aria-label={tr("GitHub 저장소", "GitHub repository")}>
           {/* GitHub mark from Primer Octicons. */}
           <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="currentColor">
