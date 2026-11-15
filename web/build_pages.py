@@ -1,5 +1,6 @@
 """Build the static spectator site and replay files for Cloudflare Pages."""
 
+from hashlib import sha256
 import json
 import os
 from pathlib import Path
@@ -44,9 +45,14 @@ def main() -> None:
             check=True,
         )
         index, _ = ASSETS["/"]
-        shutil.copyfile(UI / index, staged / index)
+        html = (UI / index).read_text(encoding="utf-8")
+        # Browsers may cache JS and CSS across Pages deployments.
+        for name in ("app.css", "app.js"):
+            version = sha256((staged / name).read_bytes()).hexdigest()[:12]
+            html = html.replace(f'="/{name}"', f'="/{name}?v={version}"')
+        (staged / index).write_text(html, encoding="utf-8")
         # A root 404 disables the SPA fallback for unknown replay JSON paths.
-        shutil.copyfile(UI / index, staged / "404.html")
+        (staged / "404.html").write_text(html, encoding="utf-8")
         (staged / "_headers").write_text(
             "/*\n"
             "  Content-Security-Policy: default-src 'self'; img-src 'self' data:; frame-ancestors 'none'; object-src 'none'\n"
