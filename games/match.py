@@ -388,13 +388,17 @@ def parse_player_model(value: str) -> tuple[str, str | None, str, str]:
     return player, provider[0] if provider else None, model, effort
 
 
-def parse_group_image_model(value: str) -> tuple[str | None, str, str, str]:
+def parse_group_image_model(value: str) -> tuple[str | None, str, str, str, str | None]:
     parts = value.split(":")
-    if (len(parts) not in (3, 4) or not all(parts) or parts[-2] not in EFFORTS
-            or (len(parts) == 4 and parts[0] not in DEFAULT_MODELS) or any(char.isspace() for char in value)):
-        raise argparse.ArgumentTypeError("모델:effort:이미지모델 또는 제공자:모델:effort:이미지모델 형식으로 지정하세요.")
-    *provider, model, effort, image_model = parts
-    return provider[0] if provider else None, model, effort, image_model
+    provider = parts.pop(0) if len(parts) > 3 else None
+    if (len(parts) not in (3, 4) or not all(parts) or parts[1] not in EFFORTS
+            or (provider is not None and provider not in DEFAULT_MODELS)
+            or (len(parts) == 4 and parts[3] not in EFFORTS) or any(char.isspace() for char in value)):
+        raise argparse.ArgumentTypeError(
+            "모델:effort:이미지모델 또는 제공자:모델:effort:이미지모델[:이미지effort] 형식으로 지정하세요."
+        )
+    model, effort, image_model = parts[:3]
+    return provider, model, effort, image_model, parts[3] if len(parts) == 4 else None
 
 
 def run_cli(play, *, title: str, seats: int | tuple[int, ...],
@@ -414,7 +418,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
     parser.add_argument("--model", help="참가자에게 사용할 모델")
     parser.add_argument("--image-model", help="기본 제공자의 이미지 요청에 사용할 모델")
     parser.add_argument("--image-model-for", action="append", type=parse_group_image_model, default=[],
-                        metavar="[PROVIDER:]MODEL:EFFORT:IMAGE_MODEL", help="제공자, 모델, effort별 이미지용 모델")
+                        metavar="[PROVIDER:]MODEL:EFFORT:IMAGE_MODEL[:IMAGE_EFFORT]",
+                        help="제공자, 모델, effort별 이미지용 모델. 이미지 effort를 지정할 때는 제공자도 써야 합니다.")
     parser.add_argument("--provider", choices=DEFAULT_MODELS, help="매치의 기본 모델 제공자 (기본값: codex)")
     parser.add_argument("--effort", choices=EFFORTS)
     parser.add_argument("--model-player", action="append", help="모델 참가자 ID. 반복 지정 가능. 기본값은 전원")
@@ -494,8 +499,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
                 parser.error(f"--player-model은 모델 참가자 {name}에게 한 번만 지정할 수 있습니다.")
             overrides[name] = (player_provider or provider, model, player_effort)
 
-        group_image_models = {(image_provider or provider, model, level): image_model
-                              for image_provider, model, level, image_model in args.image_model_for}
+        group_image_models = {(image_provider or provider, model, level): (image_model, image_effort)
+                              for image_provider, model, level, image_model, image_effort in args.image_model_for}
         if len(group_image_models) != len(args.image_model_for):
             parser.error("--image-model-for은 같은 제공자, 모델, effort에 한 번만 지정할 수 있습니다.")
 
@@ -503,25 +508,33 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         settings = {name: overrides.get(name, default) for name in live_players} if model_name else {}
         if not main_path and group_image_models.keys() - set(settings.values()):
             parser.error("--image-model-for에 지정한 제공자, 모델, effort를 쓰는 참가자가 없습니다.")
-        image_overrides = {name: group_image_models[config] for name, config in settings.items()
-                           if config in group_image_models}
+        image_settings = {name: group_image_models[config] for name, config in settings.items()
+                          if config in group_image_models}
+        image_overrides = {name: model for name, (model, _) in image_settings.items()}
+        image_efforts = {name: level for name, (_, level) in image_settings.items() if level is not None}
         if saved is not None:
-            if group_image_models and image_overrides != saved.get("image_model_overrides", {}):
+            saved_images = saved.get("image_model_overrides", {})
+            saved_efforts = saved.get("image_effort_overrides", {})
+            if (not isinstance(saved_images, dict) or not isinstance(saved_efforts, dict)
+                    or any(name not in saved_images or level not in EFFORTS for name, level in saved_efforts.items())):
+                parser.error("저장된 이미지 effort 설정이 올바르지 않습니다.")
+            if group_image_models and (image_overrides != saved_images or image_efforts != saved_efforts):
                 parser.error("--image-model-for이 저장된 설정과 일치하지 않습니다.")
-            image_overrides = saved.get("image_model_overrides", {})
+            image_overrides, image_efforts = saved_images, saved_efforts
 
-        opened_models: dict[tuple[str, str, str, str | None], ActionLanguageModel] = {}
+        opened_models: dict[tuple[str, str, str, str | None, str | None], ActionLanguageModel] = {}
         models = {}
         if settings and model_turns:
             assignments = {}
             for name, (player_provider, model, player_effort) in settings.items():
                 default_image = args.image_model if player_provider == provider else None
-                assignments[name] = (player_provider, model, player_effort, image_overrides.get(name, default_image))
+                assignments[name] = (player_provider, model, player_effort,
+                                     image_overrides.get(name, default_image), image_efforts.get(name))
             try:
                 for config in dict.fromkeys(assignments.values()):
-                    player_provider, model, model_effort, image_model = config
+                    player_provider, model, model_effort, image_model, image_effort = config
                     opened_models[config] = stack.enter_context(open_model(
-                        player_provider, model, effort=model_effort, image_model=image_model,
+                        player_provider, model, effort=model_effort, image_model=image_model, image_effort=image_effort,
                     ))
             except ValueError as error:
                 parser.error(str(error))
@@ -577,6 +590,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             header["image_model"] = args.image_model
         if models and image_overrides:
             header["image_model_overrides"] = image_overrides
+        if models and image_efforts:
+            header["image_effort_overrides"] = image_efforts
         if main_path:
             header["from_main"] = str(main_path)
         if prison_path:

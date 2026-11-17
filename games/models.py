@@ -79,14 +79,18 @@ class InvalidModelChoice(ValueError):
 
 
 class ActionLanguageModel(LanguageModel):
-    def __init__(self, *, effort: str = DEFAULT_EFFORT):
+    def __init__(self, *, effort: str = DEFAULT_EFFORT, image_effort: str | None = None):
         self.effort = effort
+        self._image_effort = image_effort
         self.calls = 0
         self.usage: Counter[str] = Counter()
         self._stats_lock = Lock()
         self._turn: ContextVar[ModelTurn | None] = ContextVar("model_turn", default=None)
         self._images: ContextVar[tuple[bytes, ...]] = ContextVar("model_images", default=())
         self._strategy: ContextVar[StrategyNote | None] = ContextVar("model_strategy", default=None)
+
+    def _request_effort(self) -> str:
+        return self._image_effort if self._images.get() and self._image_effort is not None else self.effort
 
     @contextmanager
     def attached_images(self, images: Sequence[bytes]):
@@ -179,8 +183,8 @@ class CodexLanguageModel(ActionLanguageModel):
     provider = "codex"
 
     def __init__(self, model: str, workspace: Path, *, effort: str = DEFAULT_EFFORT,
-                 image_model: str | None = None):
-        super().__init__(effort=effort)
+                 image_model: str | None = None, image_effort: str | None = None):
+        super().__init__(effort=effort, image_effort=image_effort)
         self._workspace = workspace
         self._image_model = image_model
         schema = workspace / "action.schema.json"
@@ -195,12 +199,12 @@ class CodexLanguageModel(ActionLanguageModel):
             "--color", "never", "--json", "--output-schema", str(schema),
             "--disable", "shell_tool", "--disable", "apps", "--disable", "plugins",
             "--disable", "multi_agent", "-c", 'web_search="disabled"',
-            "-c", 'approval_policy="never"', "-c", f"model_reasoning_effort={json.dumps(effort)}", "-",
+            "-c", 'approval_policy="never"',
         ]
 
     def _complete(self, model_input: str) -> str:
         with ExitStack() as stack:
-            command = self.command.copy()
+            command = [*self.command, "-c", f"model_reasoning_effort={json.dumps(self._request_effort())}", "-"]
             schema = self._response_schema()
             if schema is not ACTION_SCHEMA:
                 command[command.index("--output-schema") + 1] = str(
@@ -239,8 +243,8 @@ class OpenAILanguageModel(ActionLanguageModel):
     provider = "openai"
 
     def __init__(self, model: str, client: OpenAI, *, effort: str = DEFAULT_EFFORT,
-                 image_model: str | None = None):
-        super().__init__(effort=effort)
+                 image_model: str | None = None, image_effort: str | None = None):
+        super().__init__(effort=effort, image_effort=image_effort)
         self._model = model
         self._image_model = image_model
         self._client = client
@@ -256,7 +260,7 @@ class OpenAILanguageModel(ActionLanguageModel):
         try:
             response = self._client.responses.create(
                 model=model, input=[{"role": "user", "content": content}], store=False,
-                reasoning={"effort": self.effort},
+                reasoning={"effort": self._request_effort()},
                 text={"format": {"type": "json_schema", "name": "game_action", "strict": True, "schema": schema}},
             )
         except APIStatusError as error:
@@ -296,8 +300,8 @@ class ClaudeCodeLanguageModel(ActionLanguageModel):
     provider = "claude-code"
 
     def __init__(self, model: str, workspace: Path, *, effort: str = DEFAULT_EFFORT,
-                 image_model: str | None = None):
-        super().__init__(effort=effort)
+                 image_model: str | None = None, image_effort: str | None = None):
+        super().__init__(effort=effort, image_effort=image_effort)
         self._model = model
         self._image_model = image_model
         self._workspace = workspace
@@ -310,7 +314,7 @@ class ClaudeCodeLanguageModel(ActionLanguageModel):
             "--tools", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
             "--disallowedTools", "mcp__*", "--no-session-persistence",
             "--system-prompt", "You are a board game participant. Submit the requested game action.",
-            "--model", model, "--effort", self.effort, "--json-schema", json.dumps(self._response_schema()),
+            "--model", model, "--effort", self._request_effort(), "--json-schema", json.dumps(self._response_schema()),
             "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
         ]
         message = {"type": "user", "message": _claude_message(model_input, images), "parent_tool_use_id": None}
@@ -340,8 +344,8 @@ class AnthropicLanguageModel(ActionLanguageModel):
     provider = "anthropic"
 
     def __init__(self, model: str, api_key: str, *, effort: str = DEFAULT_EFFORT,
-                 image_model: str | None = None):
-        super().__init__(effort=effort)
+                 image_model: str | None = None, image_effort: str | None = None):
+        super().__init__(effort=effort, image_effort=image_effort)
         self._model = model
         self._image_model = image_model
         self._api_key = api_key
@@ -353,7 +357,7 @@ class AnthropicLanguageModel(ActionLanguageModel):
             "max_tokens": 16384,
             "messages": [_claude_message(model_input, images)],
             "output_config": {
-                "effort": self.effort,
+                "effort": self._request_effort(),
                 "format": {"type": "json_schema", "schema": self._response_schema()},
             },
         }
@@ -404,19 +408,20 @@ def _openai_key(env_path: Path) -> str:
 
 
 @contextmanager
-def open_model(provider: str, model: str, *, effort: str = DEFAULT_EFFORT, image_model: str | None = None):
+def open_model(provider: str, model: str, *, effort: str = DEFAULT_EFFORT,
+               image_model: str | None = None, image_effort: str | None = None):
     env_path = Path(__file__).resolve().parents[1] / ".env"
+    options = {"effort": effort, "image_model": image_model, "image_effort": image_effort}
     if provider == "openai":
         with OpenAI(api_key=_openai_key(env_path), base_url="https://api.openai.com/v1", timeout=90.0) as client:
-            yield OpenAILanguageModel(model, client, effort=effort, image_model=image_model)
+            yield OpenAILanguageModel(model, client, **options)
     elif provider == "anthropic":
-        yield AnthropicLanguageModel(model, _api_key(env_path, "ANTHROPIC_API_KEY"),
-                                     effort=effort, image_model=image_model)
+        yield AnthropicLanguageModel(model, _api_key(env_path, "ANTHROPIC_API_KEY"), **options)
     elif provider == "claude-code":
         if which("claude") is None:
             raise ValueError("Claude Code CLI를 설치하고 claude 명령이 PATH에 있는지 확인하세요.")
         with TemporaryDirectory(prefix="devils-plan-model-") as directory:
-            yield ClaudeCodeLanguageModel(model, Path(directory), effort=effort, image_model=image_model)
+            yield ClaudeCodeLanguageModel(model, Path(directory), **options)
     else:
         with TemporaryDirectory(prefix="devils-plan-model-") as directory:
-            yield CodexLanguageModel(model, Path(directory), effort=effort, image_model=image_model)
+            yield CodexLanguageModel(model, Path(directory), **options)

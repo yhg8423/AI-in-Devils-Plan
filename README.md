@@ -124,7 +124,7 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
 | `--seed <seed_number>` | `--seed 42` | 퍼즐 생성과 스크립트 정책의 시드를 지정합니다. |
 | `--player-model ID:[PROVIDER:]MODEL:EFFORT` | `--player-model P06:gpt-6.1-sol:low` | 참가자별로 모델과 effort를 지정합니다. 제공자를 생략하면 매치의 기본 제공자를 사용합니다. 여러 명을 바꾸려면 참가자마다 한 번씩 붙입니다. |
 | `--image-model IMAGE_MODEL` | `--image-model gpt-6.1-terra` | 매치의 기본 제공자를 쓰는 참가자의 이미지용 모델을 지정합니다. 각 참가자의 effort를 그대로 사용합니다. |
-| `--image-model-for [PROVIDER:]MODEL:EFFORT:IMAGE_MODEL` | `--image-model-for codex:gpt-6-luna:medium:gpt-6.1-terra` | 제공자, 모델, effort 조합별 이미지용 모델을 지정합니다. 제공자를 생략하면 매치의 기본 제공자에 적용됩니다. |
+| `--image-model-for [PROVIDER:]MODEL:EFFORT:IMAGE_MODEL[:IMAGE_EFFORT]` | `--image-model-for codex:gpt-6-luna:medium:gpt-6.1-terra:low` | 제공자, 모델, effort 조합별 이미지 모델을 지정합니다. 이미지 effort를 따로 지정하려면 제공자도 써야 합니다. 이미지 effort를 생략하면 참가자의 기본 effort를 사용합니다. |
 | `--model-player <player_id>` | `--model-player P01` | 지정한 참가자만 모델을 사용하고 나머지는 스크립트 정책을 따릅니다. 여러 명을 지정하려면 참가자마다 한 번씩 붙입니다. |
 | `--model-turns <call_limit>` | `--model-turns 12` | 매치 전체에서 공유하는 모델 호출 한도를 지정합니다. |
 | `--no-allow-review` | `--no-allow-review` | 제출 전 추가 검토를 끕니다. 값 없이 붙이는 옵션입니다. |
@@ -191,7 +191,7 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --resume --output runs/matches/codex-example/day1-main/events.jsonl
 ```
 
-같은 매치 모듈과 기존 출력 경로를 지정하면 시드, 참가자별 제공자, 모델과 effort, 이미지 모델 설정을 복원합니다. 저장된 응답은 재사용하고 중단된 제출만 다시 요청합니다. 동시 제출 도중에 중단되면 해당 제출 묶음 전체를 다시 요청합니다. `events.jsonl`과 같은 폴더의 `events.decisions.jsonl`을 함께 보관하세요. 연속 실행이었다면 앞 매치 로그도 필요합니다.
+같은 매치 모듈과 기존 출력 경로를 지정하면 시드와 참가자별 제공자, 텍스트·이미지 모델 및 effort를 복원합니다. 저장된 응답은 재사용하고 중단된 제출만 다시 요청합니다. 동시 제출 도중에 중단되면 해당 제출 묶음 전체를 다시 요청합니다. `events.jsonl`과 같은 폴더의 `events.decisions.jsonl`을 함께 보관하세요. 연속 실행이었다면 앞 매치 로그도 필요합니다.
 
 ## AI 에이전트는 어떻게 플레이하나요?
 
