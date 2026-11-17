@@ -1,6 +1,6 @@
 from base64 import b64decode
 from contextlib import redirect_stderr, redirect_stdout
-from io import StringIO
+from io import BytesIO, StringIO
 import json
 from pathlib import Path
 from random import Random
@@ -188,6 +188,78 @@ class MatchTest(unittest.TestCase):
             self.assertEqual(text_turn["model"], "gpt-6-luna")
             self.assertEqual([item["type"] for item in text_turn["input"][0]["content"]], ["input_text"])
             self.assertIn(persona_context("P01"), text_turn["input"][0]["content"][0]["text"])
+
+    def test_claude_providers_use_default_model_and_resume_structured_actions(self):
+        image = b"puzzle image"
+        reply = {"action": "360", "note": "큐브 높이를 합했다.", "review": False}
+        usage = {"input_tokens": 20, "cache_read_input_tokens": 5, "output_tokens": 10}
+
+        def check_request(model, effort, schema, message):
+            self.assertEqual(model, "claude-vision")
+            self.assertEqual(effort, "medium")
+            self.assertEqual(schema["required"], ["review", "note", "action"])
+            self.assertEqual(message["role"], "user")
+            text, attachment = message["content"]
+            self.assertIn(persona_context("P01"), text["text"])
+            self.assertEqual(attachment["source"]["media_type"], "image/png")
+            self.assertEqual(b64decode(attachment["source"]["data"]), image)
+
+        def complete_cli(command, *, input, **kwargs):
+            self.assertEqual(command[:2], ["claude", "--print"])
+            self.assertEqual(command[command.index("--tools") + 1], "")
+            event = json.loads(input)
+            self.assertEqual(event["type"], "user")
+            check_request(command[command.index("--model") + 1], command[command.index("--effort") + 1],
+                          json.loads(command[command.index("--json-schema") + 1]), event["message"])
+            result = {"type": "result", "subtype": "success", "structured_output": reply, "usage": usage}
+            return CompletedProcess(command, 0, '{"type":"system"}\n' + json.dumps(result), "")
+
+        def complete_api(request, **kwargs):
+            self.assertEqual(request.full_url, "https://api.anthropic.com/v1/messages")
+            self.assertEqual(request.get_header("X-api-key"), "fixture-anthropic-key")
+            body = json.loads(request.data)
+            config = body["output_config"]
+            self.assertEqual(config["format"]["type"], "json_schema")
+            check_request(body["model"], config["effort"], config["format"]["schema"], body["messages"][0])
+            return BytesIO(json.dumps({"stop_reason": "end_turn", "usage": usage, "content": [
+                {"type": "thinking", "thinking": "counting"},
+                {"type": "text", "text": json.dumps(reply)},
+            ]}).encode())
+
+        for provider in ("claude-code", "anthropic"):
+            with (self.subTest(provider=provider), TemporaryDirectory() as directory,
+                  redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+                  patch("games.models.which", return_value="/test/claude"),
+                  patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fixture-anthropic-key"}),
+                  patch("games.models.subprocess.run", side_effect=complete_cli) as cli,
+                  patch("games.models.urlopen", side_effect=complete_api) as api):
+                output = Path(directory) / "events.jsonl"
+                interrupted = True
+
+                def play(match):
+                    self.assertEqual(match.decide("P01", "cubes", "그림을 보세요.", "0", images=(image,),
+                                                  valid=lambda action: action in ("0", "360"), offer_review=True), "360")
+                    if interrupted:
+                        self.assertEqual(dict(match.models["P01"].usage),
+                                         {"input_tokens": 25, "cached_input_tokens": 5, "output_tokens": 10})
+                        raise RuntimeError("provider test interruption")
+                    return {}
+
+                with self.assertRaisesRegex(RuntimeError, "provider test interruption"):
+                    run_cli(play, title="Claude 경기", seats=2, argv=[
+                        "--provider", provider, "--effort", "medium",
+                        "--image-model-for", "claude-haiku-5-5:medium:claude-vision", "--model-player", "P01",
+                        "--output", str(output),
+                    ])
+                interrupted = False
+                run_cli(play, title="Claude 경기", seats=2, argv=["--resume", "--output", str(output)])
+                self.assertEqual((cli.call_count, api.call_count),
+                                 (int(provider == "claude-code"), int(provider == "anthropic")))
+                records = list(map(json.loads, output.read_text(encoding="utf-8").splitlines()))
+                self.assertEqual(records[0]["provider"], provider)
+                self.assertEqual(records[0]["model"], "claude-haiku-5-5")
+                self.assertEqual(records[-1]["type"], "result")
+                self.assertEqual(records[-1]["model_calls"], 1)
 
     def test_either_or_preserves_live_grass_log_on_interrupt(self):
         with TemporaryDirectory() as directory, redirect_stderr(StringIO()):

@@ -1,4 +1,4 @@
-"""Structured game actions from Codex CLI or the OpenAI Responses API."""
+"""Structured game actions from model providers."""
 
 from abc import abstractmethod
 from base64 import b64encode
@@ -11,17 +11,24 @@ import json
 import os
 from pathlib import Path
 import shlex
+from shutil import which
 import subprocess
 from tempfile import TemporaryDirectory
 from threading import Lock
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from concordia.language_model.language_model import LanguageModel
 from openai import APIConnectionError, APIStatusError, OpenAI
 
 
-DEFAULT_MODEL = "gpt-6-luna"
+DEFAULT_MODELS = {
+    "codex": "gpt-6-luna",
+    "openai": "gpt-6-luna",
+    "claude-code": "claude-haiku-5-5",
+    "anthropic": "claude-haiku-5-5",
+}
 DEFAULT_EFFORT = "low"
-PROVIDERS = ("codex", "openai")
 ACTION_SCHEMA = {
     "type": "object",
     "properties": {"action": {"type": "string"}},
@@ -267,8 +274,114 @@ class OpenAILanguageModel(ActionLanguageModel):
         return response.output_text
 
 
-def _openai_key(env_path: Path) -> str:
-    names = ("OPENAI_API_KEY", "openai_api_key")
+def _claude_message(prompt: str, images: Sequence[bytes]) -> dict:
+    content = [{"type": "text", "text": prompt}]
+    for image in images:
+        content.append({"type": "image", "source": {
+            "type": "base64", "media_type": "image/png", "data": b64encode(image).decode("ascii"),
+        }})
+    return {"role": "user", "content": content}
+
+
+def _claude_usage(usage: dict) -> dict[str, int]:
+    cached = usage.get("cache_read_input_tokens", 0)
+    return {
+        "input_tokens": usage.get("input_tokens", 0) + usage.get("cache_creation_input_tokens", 0) + cached,
+        "cached_input_tokens": cached,
+        "output_tokens": usage.get("output_tokens", 0),
+    }
+
+
+class ClaudeCodeLanguageModel(ActionLanguageModel):
+    provider = "claude-code"
+
+    def __init__(self, model: str, workspace: Path, *, effort: str = DEFAULT_EFFORT,
+                 image_model: str | None = None):
+        super().__init__(effort=effort)
+        self._model = model
+        self._image_model = image_model
+        self._workspace = workspace
+
+    def _complete(self, model_input: str) -> str:
+        images = self._images.get()
+        model = self._image_model if images and self._image_model else self._model
+        command = [
+            "claude", "--print", "--safe-mode", "--setting-sources", "",
+            "--tools", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
+            "--disallowedTools", "mcp__*", "--no-session-persistence",
+            "--system-prompt", "You are a board game participant. Submit the requested game action.",
+            "--model", model, "--effort", self.effort, "--json-schema", json.dumps(self._response_schema()),
+            "--input-format", "stream-json", "--output-format", "stream-json", "--verbose",
+        ]
+        message = {"type": "user", "message": _claude_message(model_input, images), "parent_tool_use_id": None}
+        env = os.environ.copy()
+        env.pop("CLAUDECODE", None)
+        env["CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC"] = "1"
+        completed = subprocess.run(command, cwd=self._workspace, env=env, input=json.dumps(message) + "\n",
+                                   text=True, capture_output=True, timeout=90, check=False)
+        result = {}
+        for line in completed.stdout.splitlines():
+            try:
+                event = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(event, dict) and event.get("type") == "result":
+                result = event
+        if usage := result.get("usage"):
+            self._record_usage(_claude_usage(usage))
+        output = result.get("structured_output")
+        if completed.returncode or result.get("is_error") or not isinstance(output, dict):
+            detail = result.get("result") or result.get("subtype") or "claude --version 및 claude auth status를 확인하세요."
+            raise RuntimeError(f"Claude Code가 행동을 반환하지 않았습니다 (종료 코드 {completed.returncode}). {detail}")
+        return json.dumps(output, ensure_ascii=False)
+
+
+class AnthropicLanguageModel(ActionLanguageModel):
+    provider = "anthropic"
+
+    def __init__(self, model: str, api_key: str, *, effort: str = DEFAULT_EFFORT,
+                 image_model: str | None = None):
+        super().__init__(effort=effort)
+        self._model = model
+        self._image_model = image_model
+        self._api_key = api_key
+
+    def _complete(self, model_input: str) -> str:
+        images = self._images.get()
+        payload = {
+            "model": self._image_model if images and self._image_model else self._model,
+            "max_tokens": 16384,
+            "messages": [_claude_message(model_input, images)],
+            "output_config": {
+                "effort": self.effort,
+                "format": {"type": "json_schema", "schema": self._response_schema()},
+            },
+        }
+        request = Request("https://api.anthropic.com/v1/messages", data=json.dumps(payload).encode("utf-8"),
+                          headers={"content-type": "application/json", "anthropic-version": "2023-06-01"},
+                          method="POST")
+        request.add_unredirected_header("x-api-key", self._api_key)
+        try:
+            with urlopen(request, timeout=90) as response:
+                message = json.load(response)
+        except HTTPError as error:
+            error.close()
+            raise RuntimeError(f"Claude API 요청 실패 (HTTP {error.code}).") from None
+        except (URLError, TimeoutError):
+            raise RuntimeError("Claude API에 연결하지 못했거나 응답 시간이 초과되었습니다.") from None
+        if usage := message.get("usage"):
+            self._record_usage(_claude_usage(usage))
+        reason = message.get("stop_reason")
+        if reason == "end_turn":
+            for block in message.get("content", []):
+                if block.get("type") == "text" and block.get("text"):
+                    return block["text"]
+        raise RuntimeError(f"Claude API가 행동을 반환하지 않았습니다 (상태 {reason}).")
+
+
+def _api_key(env_path: Path, variable: str) -> str:
+    names = (variable, variable.lower())
+    service = "OpenAI" if variable == "OPENAI_API_KEY" else "Claude"
     for name in names:
         value = os.getenv(name, "").strip()
         if value:
@@ -280,18 +393,30 @@ def _openai_key(env_path: Path) -> str:
                 try:
                     fields = shlex.split(value, comments=True)
                 except ValueError:
-                    raise ValueError(".env의 OpenAI API 키 형식을 확인하세요.") from None
+                    raise ValueError(f".env의 {service} API 키 형식을 확인하세요.") from None
                 if len(fields) == 1 and fields[0]:
                     return fields[0]
-    raise ValueError("OpenAI API 키가 필요합니다. 환경 변수 OPENAI_API_KEY 또는 프로젝트 .env에 설정하세요.")
+    raise ValueError(f"{service} API 키가 필요합니다. 환경 변수 {variable} 또는 프로젝트 .env에 설정하세요.")
+
+
+def _openai_key(env_path: Path) -> str:
+    return _api_key(env_path, "OPENAI_API_KEY")
 
 
 @contextmanager
 def open_model(provider: str, model: str, *, effort: str = DEFAULT_EFFORT, image_model: str | None = None):
+    env_path = Path(__file__).resolve().parents[1] / ".env"
     if provider == "openai":
-        env_path = Path(__file__).resolve().parents[1] / ".env"
         with OpenAI(api_key=_openai_key(env_path), base_url="https://api.openai.com/v1", timeout=90.0) as client:
             yield OpenAILanguageModel(model, client, effort=effort, image_model=image_model)
+    elif provider == "anthropic":
+        yield AnthropicLanguageModel(model, _api_key(env_path, "ANTHROPIC_API_KEY"),
+                                     effort=effort, image_model=image_model)
+    elif provider == "claude-code":
+        if which("claude") is None:
+            raise ValueError("Claude Code CLI를 설치하고 claude 명령이 PATH에 있는지 확인하세요.")
+        with TemporaryDirectory(prefix="devils-plan-model-") as directory:
+            yield ClaudeCodeLanguageModel(model, Path(directory), effort=effort, image_model=image_model)
     else:
         with TemporaryDirectory(prefix="devils-plan-model-") as directory:
             yield CodexLanguageModel(model, Path(directory), effort=effort, image_model=image_model)

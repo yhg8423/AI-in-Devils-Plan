@@ -97,6 +97,26 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/openai-example/day1-main/events.jsonl
 ```
 
+### Claude Code
+
+Claude Code CLI v2.1.293 이상에서 `--safe-mode` 지원을 확인하고 `claude auth login`으로 로그인합니다. Claude Code와 Claude API는 기본으로 `claude-haiku-5-5`를 사용합니다. `--model`로 다른 모델을 지정할 수 있습니다. [Claude Code 모델 문서](https://code.claude.com/docs/en/model-config)
+
+```bash
+uv run --locked --python 3.12 python -m games.either_or.full_match \
+  --provider claude-code --effort low \
+  --output runs/matches/claude-code-example/day1-main/events.jsonl
+```
+
+### Claude API
+
+`ANTHROPIC_API_KEY`를 환경 변수나 프로젝트 루트의 `.env`에 설정합니다. `--model`과 `--image-model`에는 구조화된 출력과 지정한 effort를 지원하는 Claude API 모델 ID를 사용합니다. [Claude API 구조화된 출력](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) · [모델별 effort](https://platform.claude.com/docs/en/build-with-claude/effort)
+
+```bash
+uv run --locked --python 3.12 python -m games.either_or.full_match \
+  --provider anthropic --effort low \
+  --output runs/matches/anthropic-example/day1-main/events.jsonl
+```
+
 ### 모델과 시뮬레이션 옵션
 
 | 입력 형식 | 예시 | 적용되는 설정 |
@@ -151,7 +171,7 @@ uv run --locked --python 3.12 python -m games.russian_roulette \
   --output "$run_dir/day2-prison/events.jsonl"
 ```
 
-`--from-main`과 `--from-prison`이 앞 매치의 결과 파일을 연결합니다. 바로 위 LLM 예시에서 이어간다면 `run_dir`를 `runs/matches/codex-example` 또는 `runs/matches/openai-example`로 바꿉니다. 같은 모델 구성을 사용하려면 각 매치 명령에 모델 옵션을 다시 지정합니다.
+`--from-main`과 `--from-prison`이 앞 매치의 결과 파일을 연결합니다. LLM으로 실행한 매치에서 이어간다면 `run_dir`를 해당 실행 폴더로 바꿉니다. 같은 모델 구성을 사용하려면 각 매치 명령에 모델 옵션을 다시 지정합니다.
 
 매치 하나만 따로 돌릴 때는 해당 모듈에 `--output`만 지정할 수 있습니다. 자체 명단과 시작 피스를 쓰려면 `--players`와 `--pieces`를 같은 순서로 넘깁니다.
 
@@ -253,7 +273,7 @@ uv run --locked --python 3.12 python -m web.translate_events
 | 위치 | 역할 |
 | --- | --- |
 | [`games/`](games/) | 매치별 규칙과 진행. 잔디 깔기는 `games/either_or/lay_the_grass/`에서 단독으로 실행할 수도 있습니다. |
-| [`games/match.py`](games/match.py), [`games/models.py`](games/models.py) | 공통 매치 실행기, Codex CLI와 OpenAI Responses API 연동. |
+| [`games/match.py`](games/match.py), [`games/models.py`](games/models.py) | 공통 매치 실행기와 모델 제공자 연동. |
 | [`games/personas.py`](games/personas.py), [`games/relationships.py`](games/relationships.py) | 참가자별 페르소나와 친밀도·신뢰도 평가. |
 | [`web/spectator.py`](web/spectator.py), [`web/ui/`](web/ui/) | JSONL 기록을 읽는 Python 서버와 React·Astryx UI. 세트장과 캐릭터는 Canvas에 픽셀 아트로 그립니다. |
 | [`web/ui/content/`](web/ui/content/) | 소개, 방법, 기여하기의 한국어·영어 Markdown 원문. |
