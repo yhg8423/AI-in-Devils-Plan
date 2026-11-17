@@ -16,7 +16,7 @@ ChatArena's `MessagePool` filters the messages each player can see. Concordia ke
 
 ## 3. How are models called and their responses handled?
 
-The same agent code supports the Codex CLI, OpenAI Responses API, Claude Code, and Claude API. You can specify a model for text and another for requests with images. For example, the default model can handle negotiations while an image model receives the four views used in Cube Counting.
+Players in the same match can use different providers from among the Codex CLI, OpenAI Responses API, Claude Code, and Claude API. You can specify a model for text and another for requests with images. For example, the default model can handle negotiations while an image model receives the four views used in Cube Counting.
 
 Models respond in JSON. For Choice 1 in Either/Or, an agent submits both a choice and a reason, such as `{"action":"보험금","note":"감옥동에 갈 가능성이 높다고 봤습니다."}`. Here the agent chooses insurance because it expects to go to the Prison Wing. The engine checks the rules for that point in the game, such as whether a player actually holds the submitted card or whether a tile overlaps an occupied space. If an action is invalid, the shared runner logs it privately and uses the fallback action for that phase.
 

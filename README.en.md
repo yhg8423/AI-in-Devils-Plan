@@ -71,7 +71,7 @@ Save new runs under `runs/`, which Git ignores. Give `--output` a path that does
 
 ## Run with an LLM API or agent service
 
-By default, the model you specify applies to every player. In the examples below, replace `YOUR_MODEL_ID` with a model available through the chosen provider and `YOUR_EFFORT` with a reasoning effort that model supports. This project’s CLI accepts `low`, `medium`, `high`, and `xhigh`.
+Use `--provider` and `--model` to set match defaults, and `--player-model` to configure individual players. In the examples below, replace `YOUR_MODEL_ID` with a model available through the chosen provider and `YOUR_EFFORT` with a reasoning effort that model supports. This project’s CLI accepts `low`, `medium`, `high`, and `xhigh`.
 
 ### Codex CLI
 
@@ -122,9 +122,9 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
 | Syntax | Example | What it changes |
 | --- | --- | --- |
 | `--seed <seed_number>` | `--seed 42` | Sets the seed for puzzle generation and the scripted policy. |
-| `--player-model <player_id>:<model_id>:<effort>` | `--player-model P06:gpt-6.1-sol:low` | Sets the model and effort for one player. Repeat the flag for each player you want to configure. |
-| `--image-model <image_model_id>` | `--image-model gpt-6.1-terra` | Sets the model for requests with attached images. Each player keeps their assigned effort. |
-| `--image-model-for <model_id>:<effort>:<image_model_id>` | `--image-model-for gpt-6-luna:medium:gpt-6.1-terra` | Sets the image model for a particular model and effort combination. In this example, image requests from Luna medium players go to Terra medium. |
+| `--player-model ID:[PROVIDER:]MODEL:EFFORT` | `--player-model P06:gpt-6.1-sol:low` | Sets the model and effort for one player. Omit the provider to use the match default. Repeat the flag for each player you want to configure. |
+| `--image-model IMAGE_MODEL` | `--image-model gpt-6.1-terra` | Sets the image model for players using the match's default provider. Each player keeps their assigned effort. |
+| `--image-model-for [PROVIDER:]MODEL:EFFORT:IMAGE_MODEL` | `--image-model-for codex:gpt-6-luna:medium:gpt-6.1-terra` | Sets the image model for a specific provider, model, and effort. Omit the provider to target the match default. |
 | `--model-player <player_id>` | `--model-player P01` | Enables the model for the specified player. Other players follow the scripted policy. Repeat the flag to enable the model for more players. |
 | `--model-turns <call_limit>` | `--model-turns 12` | Sets a match-wide limit on model calls. |
 | `--no-allow-review` | `--no-allow-review` | Disables additional review before submission. This flag takes no value. |
@@ -139,6 +139,15 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --player-model P16:gpt-6.1-sol:low \
   --image-model-for gpt-6-luna:medium:gpt-6.1-terra \
   --output runs/matches/codex-mixed/day1-main/events.jsonl
+```
+
+**Mix providers in one match.** P01 uses Haiku 5.5 through the Claude API and P02 uses a model through the default provider, the OpenAI API. The remaining players follow the scripted policy. Set both API keys before running this example.
+
+```bash
+uv run --locked --python 3.12 python -m games.either_or.full_match \
+  --provider openai --model YOUR_MODEL_ID --model-player P01 --model-player P02 \
+  --player-model P01:anthropic:claude-haiku-5-5:low --model-turns 12 \
+  --output runs/matches/mixed-providers/day1-main/events.jsonl
 ```
 
 **Test the model connection.** Enable the model only for P01 and allow up to 12 calls. Once the limit is reached, the rest of the match runs on the scripted policy.
@@ -182,7 +191,7 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --resume --output runs/matches/codex-example/day1-main/events.jsonl
 ```
 
-Use the same match module and existing output path to restore the seed, each player’s model and effort, and the image model settings. Saved responses are reused and the interrupted submission is requested again. If the run stopped during simultaneous submissions, the whole batch is requested again. Keep `events.decisions.jsonl` beside `events.jsonl`. In a linked run, keep the preceding match logs too.
+Use the same match module and existing output path to restore the seed, each player’s provider, model, and effort, and the image model settings. Saved responses are reused and the interrupted submission is requested again. If the run stopped during simultaneous submissions, the whole batch is requested again. Keep `events.decisions.jsonl` beside `events.jsonl`. In a linked run, keep the preceding match logs too.
 
 ## How do the AI agents play?
 
