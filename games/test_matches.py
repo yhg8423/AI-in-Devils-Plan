@@ -196,7 +196,7 @@ class MatchTest(unittest.TestCase):
 
         def check_request(model, effort, schema, message):
             self.assertEqual(model, "claude-vision")
-            self.assertEqual(effort, "medium")
+            self.assertEqual(effort, image_effort)
             self.assertEqual(schema["required"], ["review", "note", "action"])
             self.assertEqual(message["role"], "user")
             text, attachment = message["content"]
@@ -227,6 +227,10 @@ class MatchTest(unittest.TestCase):
             ]}).encode())
 
         for provider in ("claude-code", "anthropic"):
+            image_effort = "low" if provider == "claude-code" else "medium"
+            image_option = "claude-haiku-5-5:medium:claude-vision"
+            if provider == "claude-code":
+                image_option = f"{provider}:{image_option}:{image_effort}"
             with (self.subTest(provider=provider), TemporaryDirectory() as directory,
                   redirect_stdout(StringIO()), redirect_stderr(StringIO()),
                   patch("games.models.which", return_value="/test/claude"),
@@ -248,7 +252,7 @@ class MatchTest(unittest.TestCase):
                 with self.assertRaisesRegex(RuntimeError, "provider test interruption"):
                     run_cli(play, title="Claude 경기", seats=2, argv=[
                         "--provider", provider, "--effort", "medium",
-                        "--image-model-for", "claude-haiku-5-5:medium:claude-vision", "--model-player", "P01",
+                        "--image-model-for", image_option, "--model-player", "P01",
                         "--output", str(output),
                     ])
                 interrupted = False
@@ -258,6 +262,8 @@ class MatchTest(unittest.TestCase):
                 records = list(map(json.loads, output.read_text(encoding="utf-8").splitlines()))
                 self.assertEqual(records[0]["provider"], provider)
                 self.assertEqual(records[0]["model"], "claude-haiku-5-5")
+                self.assertEqual(records[0].get("image_effort_overrides"),
+                                 {"P01": "low"} if provider == "claude-code" else None)
                 self.assertEqual(records[-1]["type"], "result")
                 self.assertEqual(records[-1]["model_calls"], 1)
 
@@ -266,17 +272,17 @@ class MatchTest(unittest.TestCase):
         interrupted = True
         providers = {"P01": "anthropic", "P02": "openai", "P03": "anthropic"}
 
-        def answer(provider, model, content):
-            calls.append((provider, model, [block["type"] for block in content]))
+        def answer(provider, model, effort, content):
+            calls.append((provider, model, effort, [block["type"] for block in content]))
             return json.dumps({"action": provider, "note": ""})
 
-        def complete_openai(*, model, input, **kwargs):
+        def complete_openai(*, model, input, reasoning, **kwargs):
             return SimpleNamespace(status="completed", usage=None,
-                                   output_text=answer("openai", model, input[0]["content"]))
+                                   output_text=answer("openai", model, reasoning["effort"], input[0]["content"]))
 
         def complete_anthropic(request, **kwargs):
             body = json.loads(request.data)
-            reply = answer("anthropic", body["model"], body["messages"][0]["content"])
+            reply = answer("anthropic", body["model"], body["output_config"]["effort"], body["messages"][0]["content"])
             return BytesIO(json.dumps({"stop_reason": "end_turn", "content": [
                 {"type": "text", "text": reply},
             ]}).encode())
@@ -301,7 +307,8 @@ class MatchTest(unittest.TestCase):
             args = ["--provider", "openai", "--model", "shared-text", "--image-model", "shared-image",
                     "--player-model", "P01:anthropic:shared-text:low", "--player-model", "P02:shared-text:low",
                     "--player-model", "P03:anthropic:other-text:low",
-                    "--image-model-for", "anthropic:shared-text:low:shared-image", "--output", str(output)]
+                    "--image-model-for", "anthropic:shared-text:low:shared-image:medium",
+                    "--image-model-for", "openai:shared-text:low:shared-image:medium", "--output", str(output)]
             with self.assertRaisesRegex(RuntimeError, "interrupted before image turns"):
                 run_cli(play, title="혼합 제공자", seats=3, argv=args)
 
@@ -311,6 +318,10 @@ class MatchTest(unittest.TestCase):
                 run_cli(play, title="혼합 제공자", seats=3,
                         argv=[*resume, "--player-model", "P01:openai:shared-text:low",
                               "--player-model", "P02:shared-text:low", "--player-model", "P03:anthropic:other-text:low"])
+            with self.assertRaises(SystemExit):
+                run_cli(play, title="혼합 제공자", seats=3,
+                        argv=[*resume, "--image-model-for", "anthropic:shared-text:low:shared-image:high",
+                              "--image-model-for", "openai:shared-text:low:shared-image:medium"])
             self.assertEqual(output.read_bytes(), saved)
 
             interrupted = False
@@ -319,7 +330,8 @@ class MatchTest(unittest.TestCase):
             self.assertEqual(header["provider"], "openai")
             self.assertEqual(header["model_overrides"]["P01"]["provider"], "anthropic")
             self.assertNotIn("provider", header["model_overrides"]["P02"])
-            self.assertEqual(header["image_model_overrides"], {"P01": "shared-image"})
+            self.assertEqual(header["image_model_overrides"], {"P01": "shared-image", "P02": "shared-image"})
+            self.assertEqual(header["image_effort_overrides"], {"P01": "medium", "P02": "medium"})
             self.assertEqual(result["model_calls"], 6)
             self.assertEqual(read_match(output)["provider"], "openai")
             self.assertCountEqual(model_counts(header), [
@@ -330,12 +342,12 @@ class MatchTest(unittest.TestCase):
                 {"provider": "anthropic", "model": "other-text", "effort": "low", "count": 1},
             ])
         self.assertEqual(calls, [
-            ("anthropic", "shared-text", ["text"]),
-            ("openai", "shared-text", ["input_text"]),
-            ("anthropic", "other-text", ["text"]),
-            ("anthropic", "shared-image", ["text", "image"]),
-            ("openai", "shared-image", ["input_text", "input_image"]),
-            ("anthropic", "other-text", ["text", "image"]),
+            ("anthropic", "shared-text", "low", ["text"]),
+            ("openai", "shared-text", "low", ["input_text"]),
+            ("anthropic", "other-text", "low", ["text"]),
+            ("anthropic", "shared-image", "medium", ["text", "image"]),
+            ("openai", "shared-image", "medium", ["input_text", "input_image"]),
+            ("anthropic", "other-text", "low", ["text", "image"]),
         ])
 
     def test_either_or_preserves_live_grass_log_on_interrupt(self):
@@ -437,7 +449,7 @@ class MatchTest(unittest.TestCase):
               patch("games.models.subprocess.run", side_effect=complete)):
             log = Path(directory) / "events.jsonl"
             args = ["--provider", "codex", "--model", luna[0], "--effort", luna[1], "--model-turns", "9",
-                    "--image-model-for", f"{luna[0]}:{luna[1]}:{terra[0]}",
+                    "--image-model-for", f"codex:{luna[0]}:{luna[1]}:{terra[0]}:{terra[1]}",
                     "--player-model", f"P02:{terra[0]}:{terra[1]}", "--output", str(log)]
             for name in overrides:
                 args.extend(("--player-model", f"{name}:{sol[0]}:{sol[1]}"))
@@ -450,9 +462,10 @@ class MatchTest(unittest.TestCase):
             })
             self.assertEqual(header["image_model_overrides"], {name: terra[0] for name in header["players"]
                                                                if name not in (*overrides, "P02")})
+            self.assertEqual(header["image_effort_overrides"], dict.fromkeys(header["image_model_overrides"], terra[1]))
             self.assertEqual(result["model_calls"], 9)
         self.assertCountEqual(calls, [("선택 P01", luna), ("선택 P06", sol), ("검토 P06", sol), ("큐브 P09", sol),
-                                      ("큐브 P01", (terra[0], "high")), ("큐브 P02", terra),
+                                      ("큐브 P01", terra), ("큐브 P02", terra),
                                       ("잔디 P06", sol), ("관계 P06", sol), ("관계 P16", sol)])
 
     def test_day_one_to_day_two(self):

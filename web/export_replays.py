@@ -18,7 +18,7 @@ PREDECESSORS = (
 )
 HEADER_FIELDS = (
     "type", "game", "players", "seed", "pieces", "model", "effort", "provider",
-    "model_players", "model_overrides", "image_model", "image_model_overrides",
+    "model_players", "model_overrides", "image_model", "image_model_overrides", "image_effort_overrides",
     "allow_review", "model_turn_limit",
 )
 RESULT_FIELDS = (
