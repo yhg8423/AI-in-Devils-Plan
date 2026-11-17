@@ -14,7 +14,7 @@ from chatarena.agent import Player
 from chatarena.arena import Arena
 from chatarena.message import Message
 
-from ...models import ActionLanguageModel, DEFAULT_EFFORT, DEFAULT_MODEL, InvalidModelChoice, PROVIDERS, Review, open_model
+from ...models import ActionLanguageModel, DEFAULT_EFFORT, DEFAULT_MODELS, InvalidModelChoice, Review, open_model
 from ...models import CodexLanguageModel as CodexLanguageModel
 from ...relationships import Ratings
 
@@ -256,22 +256,23 @@ def run(arena: Arena, model: ActionLanguageModel, model_name: str, output: Path,
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="실제 모델로 잔디 깔기 한 판을 실행합니다.")
-    parser.add_argument("--model", default=DEFAULT_MODEL)
-    parser.add_argument("--provider", choices=PROVIDERS, default="codex", help="모델 호출 경로 (기본값: %(default)s)")
+    parser.add_argument("--model")
+    parser.add_argument("--provider", choices=DEFAULT_MODELS, default="codex", help="모델 호출 경로 (기본값: %(default)s)")
     parser.add_argument("--effort", default=DEFAULT_EFFORT, help="모델의 추론 노력 수준 (기본값: %(default)s)")
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--allow-review", action=argparse.BooleanOptionalAction, default=None,
                         help="선택 5~8에서 제출 전 추가 검토 허용 (새 경기 기본값 켜짐)")
     args = parser.parse_args()
+    model_name = args.model if args.model is not None else DEFAULT_MODELS[args.provider]
     with ExitStack() as stack:
         try:
-            model = stack.enter_context(open_model(args.provider, args.model, effort=args.effort))
+            model = stack.enter_context(open_model(args.provider, model_name, effort=args.effort))
         except ValueError as error:
             parser.error(str(error))
         game = make_grass_game()
         players = [Player(name=name, role_desc="잔디 깔기 참가자", backend=LiveGrassBackend(name, model, game))
                    for name in game.player_names]
-        run(Arena(players, game), model, args.model, args.output, allow_review=args.allow_review)
+        run(Arena(players, game), model, model_name, args.output, allow_review=args.allow_review)
 
 
 if __name__ == "__main__":

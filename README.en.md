@@ -97,6 +97,26 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/openai-example/day1-main/events.jsonl
 ```
 
+### Claude Code
+
+Use Claude Code CLI v2.1.293 or later with `--safe-mode` support and sign in with `claude auth login`. Claude Code and the Claude API default to `claude-haiku-5-5`. Use `--model` to select a different model. [Claude Code model configuration](https://code.claude.com/docs/en/model-config)
+
+```bash
+uv run --locked --python 3.12 python -m games.either_or.full_match \
+  --provider claude-code --effort low \
+  --output runs/matches/claude-code-example/day1-main/events.jsonl
+```
+
+### Claude API
+
+Set `ANTHROPIC_API_KEY` in your environment or in the repository’s `.env` file. For `--model` and `--image-model`, use Claude API model IDs that support structured outputs and your chosen effort. [Claude API structured outputs](https://platform.claude.com/docs/en/build-with-claude/structured-outputs) · [Effort by model](https://platform.claude.com/docs/en/build-with-claude/effort)
+
+```bash
+uv run --locked --python 3.12 python -m games.either_or.full_match \
+  --provider anthropic --effort low \
+  --output runs/matches/anthropic-example/day1-main/events.jsonl
+```
+
 ### Model and simulation options
 
 | Syntax | Example | What it changes |
@@ -151,7 +171,7 @@ uv run --locked --python 3.12 python -m games.russian_roulette \
   --output "$run_dir/day2-prison/events.jsonl"
 ```
 
-`--from-main` and `--from-prison` connect each match to the earlier result files it needs. If you started with one of the LLM examples above, set `run_dir` to `runs/matches/codex-example` or `runs/matches/openai-example`. Pass the same model options to each match command to keep the same model lineup.
+`--from-main` and `--from-prison` connect each match to the earlier result files it needs. To continue a match you ran with an LLM, set `run_dir` to that run’s folder. Pass the same model options to each match command to keep the same model lineup.
 
 To play a single match on its own, you can pass just `--output` to that module. For a custom lineup and initial Piece counts, list `--players` and `--pieces` in matching order.
 
@@ -253,7 +273,7 @@ The **[How It Works](web/ui/content/how.en.md)** page covers the model response 
 | Path | Role |
 | --- | --- |
 | [`games/`](games/) | Match rules and execution. Lay the Grass can also run on its own from `games/either_or/lay_the_grass/`. |
-| [`games/match.py`](games/match.py), [`games/models.py`](games/models.py) | Shared match runner and integrations for the Codex CLI and OpenAI Responses API. |
+| [`games/match.py`](games/match.py), [`games/models.py`](games/models.py) | Shared match runner and model provider integrations. |
 | [`games/personas.py`](games/personas.py), [`games/relationships.py`](games/relationships.py) | Player personas and affinity and trust ratings. |
 | [`web/spectator.py`](web/spectator.py), [`web/ui/`](web/ui/) | Python server for JSONL logs and the React and Astryx UI. Canvas renders the pixel-art sets and characters. |
 | [`web/ui/content/`](web/ui/content/) | Korean and English Markdown files for the About, How It Works, and Contribute pages. |

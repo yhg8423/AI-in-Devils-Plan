@@ -16,7 +16,7 @@ from concordia.language_model.language_model import LanguageModel
 
 from .either_or.discussion import CHANNEL_NAMES, format_speech
 from .either_or.lay_the_grass.simulation import ConcordiaBackend, parallel_actions
-from .models import ActionLanguageModel, DEFAULT_EFFORT, DEFAULT_MODEL, PROVIDERS, Review, StrategyNote, open_model
+from .models import ActionLanguageModel, DEFAULT_EFFORT, DEFAULT_MODELS, Review, StrategyNote, open_model
 from .personas import persona_context
 from .relationships import REASON_LIMIT, Ratings, RelationshipState, format_ratings, parse_ratings
 from .resume import MatchLog, ResumeError
@@ -413,7 +413,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
     parser.add_argument("--image-model", help="이미지가 첨부된 요청에 사용할 모델")
     parser.add_argument("--image-model-for", action="append", type=parse_group_image_model, default=[],
                         metavar="MODEL:EFFORT:IMAGE_MODEL", help="해당 모델과 effort를 쓰는 그룹의 이미지용 모델")
-    parser.add_argument("--provider", choices=PROVIDERS, help="모델 호출 경로 (기본값: codex)")
+    parser.add_argument("--provider", choices=DEFAULT_MODELS, help="모델 호출 경로 (기본값: codex)")
     parser.add_argument("--effort", choices=EFFORTS)
     parser.add_argument("--model-player", action="append", help="모델 참가자 ID. 반복 지정 가능. 기본값은 전원")
     parser.add_argument("--player-model", action="append", type=parse_player_model, default=[], metavar="ID:MODEL:EFFORT",
@@ -448,9 +448,10 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         provider = args.provider or "codex"
         allow_review = args.allow_review is not False
         model_name = args.model
-        if saved is None and model_name is None and (provider == "openai" or args.image_model
-                                                     or args.image_model_for or args.player_model):
-            model_name = DEFAULT_MODEL
+        if saved is None and model_name is None and (
+            provider != "codex" or args.image_model or args.image_model_for or args.player_model
+        ):
+            model_name = DEFAULT_MODELS[provider]
         main_path = getattr(args, "from_main", None)
         prison_path = getattr(args, "from_prison", None)
         if after_prison and bool(main_path) != bool(prison_path):
@@ -606,7 +607,7 @@ def restore_resume_args(args, saved: dict) -> None:
             or len(set(model_players)) != len(model_players) or set(model_players) - set(players)
             or type(saved["seed"]) is not int or type(saved["model_turn_limit"]) is not int
             or type(saved["allow_review"]) is not bool
-            or (model_players and (not saved["model"] or saved["provider"] not in PROVIDERS
+            or (model_players and (not saved["model"] or saved["provider"] not in DEFAULT_MODELS
                                    or saved["effort"] not in EFFORTS))):
         raise ValueError("참가자나 모델 설정의 형식이 올바르지 않습니다.")
 
