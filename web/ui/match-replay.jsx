@@ -1015,17 +1015,19 @@ function Stage({state, replay, choiceResult}) {
   return <p className="match-roster">{match.players.join(" · ")}</p>;
 }
 
-function modelSettings(model, effort) {
-  return effort ? `${model} ${effort} effort` : model;
+function modelSettings(model, effort, provider) {
+  const settings = effort ? `${model} ${effort} effort` : model;
+  return provider ? `${provider} · ${settings}` : settings;
 }
 
-function modelLabel({model, effort, model_players: modelPlayers, model_overrides: modelOverrides, players}) {
+function modelLabel({provider, model, effort, model_players: modelPlayers, model_overrides: modelOverrides, players}) {
   const prefix = tr("사용 모델:", "Model:");
   if (!model || modelPlayers?.length === 0) return `${prefix} ${tr("스크립트", "Scripted")}`;
-  const defaults = modelSettings(model, effort);
+  const overrides = modelOverrides ?? {};
+  const defaultProvider = Object.values(overrides).some((config) => config.provider) ? provider : undefined;
+  const defaults = modelSettings(model, effort, defaultProvider);
   if (!modelPlayers) return `${prefix} ${defaults}`;
 
-  const overrides = modelOverrides ?? {};
   const enabled = new Set(modelPlayers);
   const groups = new Map();
   const scripted = [];
@@ -1035,7 +1037,7 @@ function modelLabel({model, effort, model_players: modelPlayers, model_overrides
       continue;
     }
     const override = Object.hasOwn(overrides, player) ? overrides[player] : undefined;
-    const settings = override ? modelSettings(override.model, override.effort) : defaults;
+    const settings = override ? modelSettings(override.model, override.effort, override.provider ?? defaultProvider) : defaults;
     if (!groups.has(settings)) groups.set(settings, []);
     groups.get(settings).push(player);
   }

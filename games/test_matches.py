@@ -14,7 +14,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from concordia.language_model.language_model import LanguageModel
-from web.spectator import find_matches, read_match
+from web.spectator import find_matches, model_counts, read_match
 
 from .either_or.cube_counting import cube_height, cube_priority
 from .either_or.game import LimitedGrassBackend, play as either_or
@@ -260,6 +260,83 @@ class MatchTest(unittest.TestCase):
                 self.assertEqual(records[0]["model"], "claude-haiku-5-5")
                 self.assertEqual(records[-1]["type"], "result")
                 self.assertEqual(records[-1]["model_calls"], 1)
+
+    def test_mixed_providers_route_same_model_ids_and_resume(self):
+        calls = []
+        interrupted = True
+        providers = {"P01": "anthropic", "P02": "openai", "P03": "anthropic"}
+
+        def answer(provider, model, content):
+            calls.append((provider, model, [block["type"] for block in content]))
+            return json.dumps({"action": provider, "note": ""})
+
+        def complete_openai(*, model, input, **kwargs):
+            return SimpleNamespace(status="completed", usage=None,
+                                   output_text=answer("openai", model, input[0]["content"]))
+
+        def complete_anthropic(request, **kwargs):
+            body = json.loads(request.data)
+            reply = answer("anthropic", body["model"], body["messages"][0]["content"])
+            return BytesIO(json.dumps({"stop_reason": "end_turn", "content": [
+                {"type": "text", "text": reply},
+            ]}).encode())
+
+        def play(match):
+            for name, provider in providers.items():
+                self.assertEqual(match.decide(name, "text", "응답하세요.", "scripted",
+                                              options=("scripted", provider)), provider)
+            if interrupted:
+                raise RuntimeError("interrupted before image turns")
+            for name, provider in providers.items():
+                self.assertEqual(match.decide(name, "image", "그림을 보세요.", "scripted",
+                                              options=("scripted", provider), images=(b"puzzle",)), provider)
+            return {}
+
+        with (TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+              patch("games.models.OpenAI") as openai, patch("games.models._openai_key", return_value="fixture-key"),
+              patch.dict("os.environ", {"ANTHROPIC_API_KEY": "fixture-key"}),
+              patch("games.models.urlopen", side_effect=complete_anthropic)):
+            openai.return_value.__enter__.return_value.responses.create.side_effect = complete_openai
+            output = Path(directory) / "events.jsonl"
+            args = ["--provider", "openai", "--model", "shared-text", "--image-model", "shared-image",
+                    "--player-model", "P01:anthropic:shared-text:low", "--player-model", "P02:shared-text:low",
+                    "--player-model", "P03:anthropic:other-text:low",
+                    "--image-model-for", "anthropic:shared-text:low:shared-image", "--output", str(output)]
+            with self.assertRaisesRegex(RuntimeError, "interrupted before image turns"):
+                run_cli(play, title="혼합 제공자", seats=3, argv=args)
+
+            saved = output.read_bytes()
+            resume = ["--resume", "--output", str(output)]
+            with self.assertRaises(SystemExit):
+                run_cli(play, title="혼합 제공자", seats=3,
+                        argv=[*resume, "--player-model", "P01:openai:shared-text:low",
+                              "--player-model", "P02:shared-text:low", "--player-model", "P03:anthropic:other-text:low"])
+            self.assertEqual(output.read_bytes(), saved)
+
+            interrupted = False
+            run_cli(play, title="혼합 제공자", seats=3, argv=resume)
+            header, *_, result = map(json.loads, output.read_text().splitlines())
+            self.assertEqual(header["provider"], "openai")
+            self.assertEqual(header["model_overrides"]["P01"]["provider"], "anthropic")
+            self.assertNotIn("provider", header["model_overrides"]["P02"])
+            self.assertEqual(header["image_model_overrides"], {"P01": "shared-image"})
+            self.assertEqual(result["model_calls"], 6)
+            self.assertEqual(read_match(output)["provider"], "openai")
+            self.assertCountEqual(model_counts(header), [
+                {"provider": "anthropic", "model": "shared-text", "effort": "low", "count": 1,
+                 "image_model": "shared-image"},
+                {"provider": "openai", "model": "shared-text", "effort": "low", "count": 1,
+                 "image_model": "shared-image"},
+                {"provider": "anthropic", "model": "other-text", "effort": "low", "count": 1},
+            ])
+        self.assertEqual(calls, [
+            ("anthropic", "shared-text", ["text"]),
+            ("openai", "shared-text", ["input_text"]),
+            ("anthropic", "other-text", ["text"]),
+            ("anthropic", "shared-image", ["text", "image"]),
+            ("openai", "shared-image", ["input_text", "input_image"]),
+            ("anthropic", "other-text", ["text", "image"]),
+        ])
 
     def test_either_or_preserves_live_grass_log_on_interrupt(self):
         with TemporaryDirectory() as directory, redirect_stderr(StringIO()):

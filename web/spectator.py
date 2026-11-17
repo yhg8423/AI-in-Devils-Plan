@@ -110,18 +110,23 @@ def model_counts(header: dict) -> list[dict]:
         return [{"model": default[0], "effort": default[1], "count": None}]
     players = set(enabled or ()) if default[0] else set()
     overrides = header.get("model_overrides") or {}
+    provider = header.get("provider") if any(config.get("provider") for config in overrides.values()) else None
     image_overrides = header.get("image_model_overrides") or {}
-    counts = Counter({(*default, None): 0})
+    counts = Counter({(provider, *default, None): 0})
     for player in roster or enabled or ():
         if player not in players:
-            counts[None, None, None] += 1
+            counts[None, None, None, None] += 1
             continue
         override = overrides.get(player)
         model, effort = (override["model"], override.get("effort")) if override else default
-        image_model = image_overrides.get(player, header.get("image_model")) if image_overrides else None
-        counts[model, effort, image_model if image_model != model else None] += 1
-    return [{"model": model, "effort": effort, "count": count, **({"image_model": image_model} if image_model else {})}
-            for (model, effort, image_model), count in counts.items() if count]
+        player_provider = override.get("provider", provider) if override else provider
+        default_image = header.get("image_model") if player_provider == provider else None
+        image_model = image_overrides.get(player, default_image) if image_overrides or provider else None
+        counts[player_provider, model, effort, image_model if image_model != model else None] += 1
+    return [{"model": model, "effort": effort, "count": count,
+             **({"provider": player_provider} if player_provider else {}),
+             **({"image_model": image_model} if image_model else {})}
+            for (player_provider, model, effort, image_model), count in counts.items() if count]
 
 
 def case_catalog(root: Path) -> list[dict]:
@@ -156,10 +161,12 @@ def case_catalog(root: Path) -> list[dict]:
 
     def chain(run_id: str, stage: int, first: str) -> list[dict]:
         _, header, _, status = records[run_id]
+        counts = model_counts(header)
         match = {"id": run_id, "game": header["game"], "status": status,
-                 "model_counts": model_counts(header)}
+                 "model_counts": counts}
         image_model = header.get("image_model")
-        if image_model and image_model != header.get("model") and not header.get("image_model_overrides"):
+        if (image_model and image_model != header.get("model") and not header.get("image_model_overrides")
+                and not any(group.get("provider") for group in counts)):
             match["image_model"] = image_model
         path = [match]
         if stage == len(CASE_STAGES) - 1 or status != "complete":
@@ -257,7 +264,8 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
             }]})
         return {
             "format": "match", "game": header["game"], "players": header["players"],
-            "model": header.get("model"), "effort": header.get("effort"), "seed": header["seed"],
+            "model": header.get("model"), "effort": header.get("effort"), "provider": header.get("provider"),
+            "seed": header["seed"],
             "model_players": header.get("model_players"),
             "model_overrides": header.get("model_overrides"),
             "board": PARK_ROWS if header["game"].endswith(" · 양자택일") else None,
