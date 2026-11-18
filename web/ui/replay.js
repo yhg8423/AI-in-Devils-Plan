@@ -16,6 +16,7 @@ export const phaseNames = {
   pig_deposit: tr("입금과 전달", "Deposit and pass"), pig_count: tr("동전 개수 선언", "Declare a coin count"),
   pig_doubt: tr("의심 선언", "Call doubt"), pig_reset_vote: tr("리셋 버튼", "Reset button"),
   pig_challenge: tr("전체 저금통 도전", "All-bank challenge"),
+  pig_memory_select: tr("기억 슬롯 선택", "Choose memory slots"),
   gem_bid: tr("선 플레이어 입찰", "Bid for the lead"), gem_auction_agreement: tr("경매 합의", "Auction agreement"),
   gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_swap: tr("카드 교환", "Card swap"),
   gem_opening_talk: tr("게임 시작 전 대화", "Opening discussion"),

@@ -27,8 +27,10 @@ const summaries = [
 export function rulesSummary(heading, body) {
   if (heading.startsWith("돼지 저금통")) {
     const turns = body.includes("전원에게 두 턴씩") ? "two discussion turns" : "one discussion turn";
+    const memory = body.includes("\n\n5. 기억 슬롯\n") ?
+      " The simulation privately retains exact black and white counts for three chosen banks. Players choose at the start and after each reset; slots stay fixed between resets and follow fresh replacements, which start with one coin of each color. Earlier bank-count records are unavailable outside these slots." : "";
     return summaries.find(([prefix]) => prefix === "돼지 저금통")[1] +
-      ` Each player has four opening discussion turns and ${turns} before each deposit.`;
+      ` Each player has four opening discussion turns and ${turns} before each deposit.` + memory;
   }
   if (heading.startsWith("보석 암시장")) {
     const relationships = body.includes("\n\n8. 관계 평가 갱신\n") ?

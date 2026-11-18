@@ -48,6 +48,7 @@ const labels = {
   gem_final: tr("마니또 최종 정산", "Final manito scoring"),
   pig_setup: tr("저금통 배분", "Banks dealt"), pig_turn: tr("입금 차례", "Deposit turn"),
   pig_contents: tr("운영자 동전 현황", "Operator coin counts"), pig_deposit: tr("입금과 전달", "Deposit and pass"),
+  pig_memory_selection: tr("기억 슬롯 선택", "Memory slots selected"), pig_recall: tr("비공개 기억", "Private recall"),
   pig_claim: tr("동전 개수 선언", "Coin count declaration"), pig_doubt: tr("의심 판정", "Doubt resolved"),
   pig_replace: tr("새 저금통 지급", "Replacement bank"), pig_reset_vote: tr("리셋 요청", "Reset request"),
   pig_challenge: tr("전체 저금통 도전", "All-bank challenge"), pig_reset: tr("저금통 리셋", "Banks reset"),
@@ -76,6 +77,7 @@ const actions = {
   swap: tr("조작 위치 선택", "Select slots to swap"),
   pig_preparation: tr("비공개 전략 준비", "Private preparation"), pig_talk: tr("저금통 대화", "Piggy Bank discussion"),
   pig_deposit: tr("입금과 전달", "Deposit and pass"), pig_count: tr("동전 개수 선언", "Coin count declaration"),
+  pig_memory_select: tr("기억 슬롯 선택", "Choose memory slots"),
   pig_doubt: tr("의심 선언", "Call doubt"), pig_reset_vote: tr("리셋 버튼", "Reset button"),
   pig_challenge: tr("전체 저금통 도전", "All-bank challenge"),
 };
@@ -334,7 +336,7 @@ function record(event, step) {
 }
 
 function matchState(events, match, frame, perspective, isMarket, isGemExchange) {
-  const state = {feed: [], stacks: {}, penalties: {}, rounds: 0};
+  const state = {feed: [], stacks: {}, penalties: {}, rounds: 0, pigPerspective: perspective};
   const sceneSteps = [];
   let grassNotes = 0;
   for (let index = 0; index < frame; index++) {

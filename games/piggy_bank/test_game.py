@@ -300,11 +300,64 @@ class PiggyBankTest(unittest.TestCase):
         self.assertEqual(deposits, result["turns"])
         self.assertIsNone(window)
 
-    def test_saved_one_round_discussions_resume_without_changing_the_record(self):
+    def test_memory_selections_are_private_fixed_per_reset_and_limit_exact_recalls(self):
+        match = Match(PLAYERS, 23)
+        result = play(match)
+        slots = {}
+        counts = {}
+        choices = set()
+        epoch = selections = recalls = 0
+        for event in match.events:
+            if event.msg_type == "action" and json.loads(event.content)["phase"] == "pig_memory_select":
+                key = epoch, event.agent_name
+                self.assertNotIn(key, choices, "Players may choose new slots only once per reset")
+                choices.add(key)
+            if not event.msg_type.startswith("pig_"):
+                continue
+            data = json.loads(event.content)
+            if event.msg_type in {"pig_setup", "pig_reset"}:
+                epoch = data.get("reset", 0)
+                slots.clear()
+            elif event.msg_type == "pig_contents":
+                counts = data["banks"]
+            elif event.msg_type == "pig_memory_selection":
+                self.assertEqual(data["reset"], epoch)
+                self.assertEqual(data["capacity"], 3)
+                self.assertEqual(len(set(data["banks"])), 3)
+                self.assertTrue(set(map(str, data["banks"])) <= set(counts))
+                if event.agent_name in slots:
+                    self.assertEqual(set(data["banks"]), slots[event.agent_name],
+                                     "A slot update may only follow the known automatic bank replacement")
+                else:
+                    slots[event.agent_name] = set(data["banks"])
+                    selections += 1
+                self.assertEqual(event.visible_to, [event.agent_name])
+                for player in PLAYERS:
+                    if player != event.agent_name:
+                        self.assertNotIn(event, match.observations(player))
+            elif event.msg_type == "pig_turn":
+                self.assertEqual(set(slots), set(PLAYERS), "Everyone must choose before a future pass target is known")
+            elif event.msg_type == "pig_replace":
+                for selected in slots.values():
+                    if data["old_bank"] in selected:
+                        selected.remove(data["old_bank"])
+                        selected.add(data["bank"])
+            elif event.msg_type == "pig_recall":
+                self.assertEqual(event.visible_to, [event.agent_name])
+                self.assertEqual(data["reset"], epoch)
+                self.assertEqual(set(data["banks"]), set(map(str, slots[event.agent_name])))
+                self.assertEqual(data["banks"], {bank: counts[bank] for bank in data["banks"]})
+                self.assertEqual(len(data["banks"]), 3)
+                recalls += 1
+        self.assertEqual(selections, len(PLAYERS) * (result["resets"] + 1))
+        self.assertEqual(len(choices), selections)
+        self.assertGreater(recalls, selections)
+
+    def test_saved_pre_memory_discussions_resume_without_changing_the_record(self):
         def previous_play(match):
             current_log = match.resume_log
             match.resume_log = SimpleNamespace(
-                resume=True, events=[{"msg_type": "rules", "content": "추가 행동 전에는 전원에게 한 턴씩"}],
+                resume=True, events=[{"msg_type": "rules", "content": old_rules}],
                 journal=current_log.journal,
             )
             try:
@@ -323,33 +376,37 @@ class PiggyBankTest(unittest.TestCase):
             if kind == "pig_deposit":
                 raise RuntimeError("test interruption after legacy discussion")
 
-        with (
-            TemporaryDirectory() as directory,
-            redirect_stdout(StringIO()),
-            redirect_stderr(StringIO()),
-            patch("games.models.CodexLanguageModel._complete", side_effect=reply) as completion,
-        ):
-            full = Path(directory) / "old-full.jsonl"
-            resumed = Path(directory) / "old-resumed.jsonl"
-            arguments = ["--seed", "23", "--model", "test-model", "--model-player", "P01",
-                         "--model-turns", "30", "--no-allow-review"]
-            run_cli(previous_play, title=DAY_THREE_PRISON, seats=4, argv=[*arguments, "--output", str(full)])
-            with patch.object(Match, "event", interrupt), self.assertRaisesRegex(RuntimeError, "legacy discussion"):
-                run_cli(previous_play, title=DAY_THREE_PRISON, seats=4, argv=[*arguments, "--output", str(resumed)])
-            prefix = [json.loads(line) for line in resumed.read_bytes().splitlines()]
-            calls_before = completion.call_count
-            run_cli(play, title=DAY_THREE_PRISON, seats=4, argv=["--resume", "--output", str(resumed)])
-            expected = [json.loads(line) for line in full.read_bytes().splitlines()]
-            actual = [json.loads(line) for line in resumed.read_bytes().splitlines()]
-            self.assertEqual(actual, expected)
-            self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
-            self.assertEqual(completion.call_count - calls_before,
-                             expected[-1]["model_calls"] - prefix[-1]["model_calls"])
-            rules = next(row["content"] for row in actual if row.get("msg_type") == "rules")
-            self.assertIn("추가 행동 전에는 전원에게 한 턴씩", rules)
-            windows = [json.loads(row["content"]) for row in actual if row.get("msg_type") == "pig_discussion"]
-            self.assertEqual(windows[0]["turns"], 4)
-            self.assertTrue(all(window["turns"] == 1 for window in windows[1:]))
+        for old_turns in (1, 2):
+            old_rules = f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩"
+            with (
+                self.subTest(turns=old_turns),
+                TemporaryDirectory() as directory,
+                redirect_stdout(StringIO()),
+                redirect_stderr(StringIO()),
+                patch("games.models.CodexLanguageModel._complete", side_effect=reply) as completion,
+            ):
+                full = Path(directory) / "old-full.jsonl"
+                resumed = Path(directory) / "old-resumed.jsonl"
+                arguments = ["--seed", "23", "--model", "test-model", "--model-player", "P01",
+                             "--model-turns", "30", "--no-allow-review"]
+                run_cli(previous_play, title=DAY_THREE_PRISON, seats=4, argv=[*arguments, "--output", str(full)])
+                with patch.object(Match, "event", interrupt), self.assertRaisesRegex(RuntimeError, "legacy discussion"):
+                    run_cli(previous_play, title=DAY_THREE_PRISON, seats=4, argv=[*arguments, "--output", str(resumed)])
+                prefix = [json.loads(line) for line in resumed.read_bytes().splitlines()]
+                calls_before = completion.call_count
+                run_cli(play, title=DAY_THREE_PRISON, seats=4, argv=["--resume", "--output", str(resumed)])
+                expected = [json.loads(line) for line in full.read_bytes().splitlines()]
+                actual = [json.loads(line) for line in resumed.read_bytes().splitlines()]
+                self.assertEqual(actual, expected)
+                self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
+                self.assertEqual(completion.call_count - calls_before,
+                                 expected[-1]["model_calls"] - prefix[-1]["model_calls"])
+                rules = next(row["content"] for row in actual if row.get("msg_type") == "rules")
+                self.assertIn(old_rules, rules)
+                windows = [json.loads(row["content"]) for row in actual if row.get("msg_type") == "pig_discussion"]
+                self.assertEqual(windows[0]["turns"], 4)
+                self.assertTrue(all(window["turns"] == old_turns for window in windows[1:]))
+                self.assertFalse(any(row.get("msg_type", "").startswith("pig_memory") for row in actual))
 
     def test_interrupted_model_decisions_resume_to_the_same_record(self):
         def reply(prompt):
@@ -368,13 +425,20 @@ class PiggyBankTest(unittest.TestCase):
                          "--model-turns", "30", "--no-allow-review"]
             run_cli(play, title=DAY_THREE_PRISON, seats=4, argv=[*arguments, "--output", str(full)])
             expected = [json.loads(line) for line in full.read_bytes().splitlines()]
-            for checkpoint in ("pig_deposit", "pig_doubt"):
+            for checkpoint in ("pig_memory_selection", "pig_deposit", "pig_recall_update", "pig_doubt",
+                               "pig_reset", "pig_memory_reset_selection"):
                 with self.subTest(checkpoint=checkpoint):
                     resumed = Path(directory) / f"resumed-{checkpoint}.jsonl"
 
                     def interrupt(match, kind, data, **kwargs):
                         original_event(match, kind, data, **kwargs)
-                        if kind == checkpoint:
+                        if checkpoint == "pig_recall_update":
+                            reached = kind == "pig_recall" and any(event.msg_type == "pig_deposit" for event in match.events)
+                        elif checkpoint == "pig_memory_reset_selection":
+                            reached = kind == "pig_memory_selection" and data["reset"] > 0
+                        else:
+                            reached = kind == checkpoint
+                        if reached:
                             raise RuntimeError("test interruption after committed event")
 
                     with patch.object(Match, "event", interrupt):

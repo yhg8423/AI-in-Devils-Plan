@@ -231,7 +231,7 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 2 main match | Mystery Stock Exchange | 12 or 13 | Use public clues to infer what moves each stock’s price. Negotiate and trade throughout the match. |
 | Day 2 prison match | Russian Roulette | 6 | Use public and private clues and conversations to deduce what is in the next chamber. |
 | Day 3 main match | Gem Black Market | 9 or 10 | Exchange hidden gem and bomb cards in forward and reverse order. Buyer cards determine Victory Points, which are multiplied by a secret Manito's points for the final ranking. |
-| Day 3 prison match | Piggy Bank | 4 | Pass banks and remember their black and white coins. Score by calling doubt or recalling all banks before a reset. The last-place player is eliminated. |
+| Day 3 prison match | Piggy Bank | 4 | Accurately recall three banks chosen at the start and after resets, and infer the remaining counts. Score by calling doubt or recalling all banks before a reset. The last-place player is eliminated. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
 

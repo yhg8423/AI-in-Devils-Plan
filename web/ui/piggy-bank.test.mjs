@@ -84,6 +84,35 @@ function openingTag(html, className) {
   return html.match(new RegExp(`<[^>]+class="[^"]*\\b${className}\\b[^"]*"[^>]*>`))?.[0];
 }
 
+function memorySequence() {
+  const pass = (player, to, bank, lower, upper) => event("pig_deposit", {turn: 1, player, to, bank, black: 1, white: 0, lower, upper});
+  const recalled = {1: {black: 631, white: 633}, 3: {black: 1, white: 1}, 5: {black: 2, white: 1}};
+  const other = {2: {black: 871, white: 873}, 4: {black: 1, white: 1}, 5: {black: 2, white: 1}};
+  const finalLower = {P01: 2, P02: 5, P03: 3, P04: 4};
+  const finalUpper = {P01: null, P02: null, P03: 1, P04: null};
+  const selection = (owner, banks, reset = 0) => event("pig_memory_selection", {reset, capacity: 3, banks}, [owner], owner);
+  const recall = (owner, banks, reset = 0) => event("pig_recall", {reset, banks}, [owner], owner);
+  const steps = [
+    event("rules", "돼지 저금통 · 참가자 4명\n\n5. 기억 슬롯\n리셋마다 저금통 3개를 선택합니다."),
+    event("pig_setup", {order: players, lower, upper, scores}),
+    selection("P01", [1, 3, 5]), selection("P02", [2, 4, 5]),
+    pass("P01", "P02", 1, passedLower, {...upper, P01: null, P02: 1}),
+    pass("P02", "P01", 2, {...passedLower, P02: 1}, {...upper, P01: 2}),
+    pass("P01", "P02", 5, {...finalLower, P02: 1}, {...upper, P01: null, P02: 5}),
+    pass("P02", "P03", 1, finalLower, finalUpper),
+    event("pig_contents", {banks: {...recalled, ...other}}, ["__operator__"]),
+    recall("P01", recalled), recall("P02", other),
+  ];
+  return {steps, finalLower, finalUpper, selection, recall};
+}
+
+function physicalBank(html, bank) {
+  const tag = html.match(new RegExp(`<div class="pig-physical-bank[^\"]*"[^>]*data-bank="${bank}"[^>]*>`))?.[0];
+  assert(tag, `Physical bank ${bank} should be rendered`);
+  const start = html.indexOf(tag);
+  return html.slice(start, html.indexOf("</div>", start));
+}
+
 for (const language of ["ko", "en"]) {
   const savedLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
   let render;
@@ -95,9 +124,9 @@ for (const language of ["ko", "en"]) {
     if (savedLocation) Object.defineProperty(globalThis, "location", savedLocation);
     else delete globalThis.location;
   }
-  function replay(steps, view, frame = steps.length) {
+  function replay(steps, view, frame = steps.length, selected = "") {
     return render({id: "piggy-regression", match: {format: "match", game: "3일차 감옥 매치 · 돼지 저금통",
-      players, steps, board: null, model_players: []}, frame, view, selected: "", mode: "paused",
+      players, steps, board: null, model_players: []}, frame, view, selected, mode: "paused",
     choosePlayer: noOp, chooseView: noOp, seek: noOp});
   }
 
@@ -252,5 +281,69 @@ for (const language of ["ko", "en"]) {
         assert(openingTag(finalPanel, "pig-challenge-result"), "A match-ending challenge should retain its comparison beside the final result");
       }
     }
+  });
+
+  test(`${language}: memory choices and counts stay private and operator owner filters suppress omniscient totals`, () => {
+    const {steps} = memorySequence();
+    for (const view of views) {
+      const html = replay(steps, view);
+      const scene = arena(html);
+      if (view === "P01") {
+        assert(scene.includes("631") && scene.includes("633"));
+        assert(physicalBank(scene, 1).includes("631") && physicalBank(scene, 1).includes("633"));
+        assert(!html.includes("871") && !html.includes("873"));
+      } else if (view === "operator") {
+        assert(scene.includes("631") && scene.includes("873"), "Unfiltered operator view keeps the full contents");
+      } else {
+        assert(!html.includes("631") && !html.includes("633"), `${view} cannot see P01’s private recalled totals`);
+      }
+    }
+    const selected = arena(replay(steps, "operator", steps.length, "P01"));
+    assert(selected.includes("631") && selected.includes("633"));
+    assert(!selected.includes("871") && !selected.includes("873"), "Owner-filtered operator graphics must hide unselected bank truth");
+    const own = arena(replay(steps, "P01", steps.length, "P02"));
+    assert(own.includes("631") && !own.includes("873"), "Participant filters must not change the viewer’s memory owner");
+    const publicSelected = arena(replay(steps, "public", steps.length, "P01"));
+    assert(!publicSelected.includes("631") && !publicSelected.includes("633"), "Public participant filters do not reveal recalled counts");
+  });
+
+  test(`${language}: memory slots follow moving banks and their fresh replacements`, () => {
+    const {steps, finalLower, finalUpper, selection, recall} = memorySequence();
+    const moved = arena(replay(steps, "P01"));
+    assert(physicalBank(moved, 1).includes("631") && physicalBank(moved, 1).includes("633"));
+    assert.match(moved, new RegExp(`data-bank="1"[^>]*aria-label="P03 · ${language === "en" ? "Upper tier" : "위칸"}"`));
+    const replacement = event("pig_replace", {turn: 1, player: "P03", next_player: "P03", old_bank: 1,
+      bank: 6, initial: {black: 1, white: 1}, lower: finalLower, upper: {...finalUpper, P03: 6}});
+    const replaced = [...steps, replacement, selection("P01", [6, 3, 5]),
+      recall("P01", {6: {black: 1, white: 1}, 3: {black: 1, white: 1}, 5: {black: 2, white: 1}})];
+    for (const view of ["P01", "operator"]) {
+      const scene = arena(replay(replaced, view, replaced.length, view === "operator" ? "P01" : ""));
+      assert(physicalBank(scene, 6).includes(language === "en" ? "Black 1 · White 1" : "흑 1 · 백 1"));
+      assert(!scene.includes("631") && !scene.includes("633"), "Retired memory counts cannot follow the replacement bank");
+    }
+  });
+
+  test(`${language}: reset epochs, reused IDs, rewinding, and legacy logs cannot retain stale memory slots`, () => {
+    const {steps, selection, recall} = memorySequence();
+    const reset = event("pig_reset", {reset: 1, order: players, lower, upper, scores, next_player: "P01"});
+    const resetOnly = [...steps, reset];
+    const newSelection = [...resetOnly, selection("P01", [2, 4, 5], 1),
+      recall("P01", {2: {black: 47, white: 49}, 4: {black: 1, white: 1}, 5: {black: 1, white: 1}}, 1),
+      recall("P01", {1: {black: 631, white: 633}, 3: {black: 1, white: 1}, 5: {black: 1, white: 1}}, 0)];
+    for (const view of ["P01", "operator"]) {
+      const selected = view === "operator" ? "P01" : "";
+      const resetHtml = replay(resetOnly, view, resetOnly.length, selected);
+      assert(!arena(resetHtml).includes("631"));
+      assert.equal(openingTag(resetHtml, "pig-memory-bank"), undefined);
+      const current = arena(replay(newSelection, view, newSelection.length, selected));
+      assert(current.includes("47") && current.includes("49"));
+      assert(!current.includes("631") && !current.includes("633"), "An old-epoch recall must not overwrite reused bank IDs");
+      assert(physicalBank(current, 2).includes("47") && physicalBank(current, 2).includes("49"));
+      const rewound = replay(newSelection, view, 2, selected);
+      assert.equal(openingTag(rewound, "pig-memory-bank"), undefined, "Future selections must not survive rewind");
+    }
+    const legacy = replay(sequence(true).pending, "P01");
+    assert.equal(openingTag(legacy, "pig-memory-summary"), undefined);
+    assert(!legacy.includes('id="pig-memory"'), "Logs without the version heading keep their original UI");
   });
 }
