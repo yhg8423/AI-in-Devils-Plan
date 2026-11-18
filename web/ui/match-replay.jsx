@@ -6,6 +6,7 @@ import {choiceCountLabel, choiceOptionLabel, choiceResults, optionsByChoice} fro
 import {RouletteInspection, RouletteInspectionLegend, RouletteScene} from "./day-two-scenes.jsx";
 import {applyGemEvent, gemActionText, gemDiscussionLabel, gemEventText, gemSlotLabel, GemStage} from "./gem-exchange.jsx";
 import {drawGemSet, gemSetPoint} from "./gem-floor.js";
+import {GemInformation} from "./gem-info.jsx";
 import {Heavy13Information} from "./heavy-13-info.jsx";
 import {chipColorLabel} from "./heavy-13.js";
 import {runHref} from "./home.jsx";
@@ -1189,11 +1190,12 @@ export function MatchReplay({replay, transport, caseName}) {
         <Selector label={tr("관전 시점", "Viewpoint")} isLabelHidden value={view} size="sm" options={views} onChange={replay.chooseView} />
       </div>
     </div>
-    {match.board || isMarket || isRoulette || isHeavy13 ? <div className="match-details">
+    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange ? <div className="match-details">
       {records}
       {isMarket && <MarketInformation key={replay.id} state={state} replay={replay} />}
       {isRoulette && <RouletteInformation key={replay.id} state={state} replay={replay} />}
       {isHeavy13 && <Heavy13Information key={replay.id} state={state} replay={replay} />}
+      {isGemExchange && <GemInformation key={replay.id} state={state} replay={replay} />}
       {match.board && <MatchInformation key={replay.id} state={state} replay={replay} choices={choices} />}
     </div> : records}
   </main>;
