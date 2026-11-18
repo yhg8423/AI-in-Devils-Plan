@@ -157,20 +157,27 @@ class Discussion:
         invite = None
         if channel == "public":
             recipients = "all"
-        elif channel in ("whisper", "room_invite"):
+        elif channel == "whisper":
+            targets = [payload["to"]] if isinstance(payload["to"], str) else payload["to"]
+            if (not isinstance(targets, list) or not targets
+                    or any(not isinstance(target, str) or target == player_name or target not in self.players
+                           for target in targets)
+                    or len(set(targets)) != len(targets)):
+                raise ValueError("Choose one or more distinct other players for a whisper")
+            if not self._restoring and any(self.location(target) != destination for target in targets):
+                raise ValueError("All whisper recipients must be in the same room or hallway as the sender")
+            recipients = [player_name, *targets]
+        elif channel == "room_invite":
             recipient = payload["to"]
-            if recipient == player_name or recipient not in self.players:
+            if not isinstance(recipient, str) or recipient == player_name or recipient not in self.players:
                 raise ValueError("Invalid recipient")
-            if channel == "whisper" and not self._restoring and self.location(recipient) != destination:
-                raise ValueError("A whisper requires both players to be in the same room or hallway")
             recipients = [player_name, recipient]
-            if channel == "room_invite":
-                if room not in ROOMS:
-                    raise ValueError("An invitation needs a room from 1 to 4")
-                invite = _RoomInvite(player_name, recipient, room, text)
-                text = f"초대 #{turn} · {room_label(room)} · {text}"
-                if room == location:
-                    room = None
+            if room not in ROOMS:
+                raise ValueError("An invitation needs a room from 1 to 4")
+            invite = _RoomInvite(player_name, recipient, room, text)
+            text = f"초대 #{turn} · {room_label(room)} · {text}"
+            if room == location:
+                room = None
         elif channel == "room" and destination in ROOMS:
             recipients = self._room_members(destination, joining=player_name)
         else:

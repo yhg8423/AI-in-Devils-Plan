@@ -80,7 +80,8 @@ class LegacyDecisions:
             elif kind in ("public", "room", "whisper"):
                 action.update(type="speak", channel=kind, text=content)
                 if kind == "whisper":
-                    action["to"] = next(player for player in event["visible_to"] if player != name)
+                    recipients = [player for player in event["visible_to"] if player != name]
+                    action["to"] = recipients[0] if len(recipients) == 1 else recipients
             else:
                 break
         raise self._missing(phase, index)
