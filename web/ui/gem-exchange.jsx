@@ -44,6 +44,8 @@ export function gemEventText(type, data) {
     case "gem_setup": return tr(`참가자 ${data.base_order.length}명 · 카드 ${data.card_count}장 · ${data.rounds}라운드`,
       `${data.base_order.length} players · ${data.card_count} cards · ${data.rounds} rounds`);
     case "gem_manito": return tr(`내 점수가 곱해지는 상대 · ${data.beneficiary}`, `My points multiply ${data.beneficiary}’s score`);
+    case "gem_preparation": return tr(`전략 준비 ${data.turn} / ${data.turns}단계`, `Preparation step ${data.turn} of ${data.turns}`);
+    case "gem_preparation_end": return tr("비공개 전략 준비 완료", "Private strategy preparation complete");
     case "gem_discussion":
     case "gem_discussion_round": return `${gemDiscussionLabel(data)} · ${gemDiscussionProgress(data)}`;
     case "gem_discussion_end": {
@@ -83,8 +85,11 @@ export function applyGemEvent(state, type, data, event) {
       state.gemManitos = {};
       break;
     case "gem_manito": state.gemManitos[event.agent_name] = data.beneficiary; break;
+    case "gem_preparation": state.gemPreparation = data; break;
+    case "gem_preparation_end": state.gemPreparation = null; break;
     case "gem_discussion":
       state.gemDiscussion = {...data, turn: 0};
+      state.gemPreparation = null;
       state.gemStrategy = null;
       break;
     case "gem_discussion_round": state.gemDiscussion = {...state.gemDiscussion, ...data}; break;
@@ -168,14 +173,21 @@ export function GemStage({state, players, selected, onChoose}) {
         ])} />
     </div>;
   }
+  if (state.gemPreparation) return <div className="gem-stage">
+    <h2>{tr("비공개 전략 준비", "Private strategy preparation")}</h2>
+    <p className="muted gem-status">{gemEventText("gem_preparation", state.gemPreparation)}</p>
+  </div>;
   if (!round && !discussion && !state.gemAuctionRound && !auction) {
     const rules = state.feed?.find((event) => event.msg_type === "rules");
     const openingEnded = state.feed?.some((event) => event.msg_type === "gem_discussion_end" && event.data.stage === "opening");
+    const preparationEnded = state.feed?.some((event) => event.msg_type === "gem_preparation_end");
     const heading = openingEnded ? tr("시작 전 대화 종료", "Opening discussion complete") :
+      preparationEnded ? tr("전략 준비 완료", "Preparation complete") :
       rules ? tr("게임 규칙", "Game rules") : tr("게임 시작 전", "Before the game");
     return <div className="gem-stage">
       <h2>{heading}</h2>
       {openingEnded ? <p className="muted gem-status">{tr("선 플레이어 경매 준비", "Preparing the lead-player auction")}</p> :
+        preparationEnded ? <p className="muted gem-status">{tr("시작 전 대화 준비", "Ready for opening discussion")}</p> :
         rules ? <p className="choice-rules">{rules.text}</p> :
           <p className="muted gem-status">{tr("게임 규칙 공개 대기", "Waiting for the game rules")}</p>}
     </div>;

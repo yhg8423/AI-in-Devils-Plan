@@ -35,6 +35,7 @@ const labels = {
   colors: tr("색 칩 공개", "Color chips revealed"), weights: tr("무게 공개", "Weights revealed"), placement: tr("큐브 배치", "Cube placement"), market: tr("시세", "Stock prices"), hints: tr("공개 단서", "Public clues"),
   market_tick: tr("거래 시간", "Trading time"), trade_fill: tr("주문 체결", "Trade filled"), seats: tr("자리 배정", "Seating"), inspection: tr("조사", "Inspection"), shift: tr("회전", "Rotation"), swap: tr("조작 · 두 칸 교환", "Manipulation · Two slots swapped"),
   gem_setup: tr("게임 준비", "Game setup"), gem_manito: tr("비공개 마니또", "Private manito"),
+  gem_preparation: tr("비공개 전략 준비", "Private strategy preparation"), gem_preparation_end: tr("전략 준비 완료", "Preparation complete"),
   gem_discussion: tr("대화 시작", "Discussion begins"), gem_discussion_round: tr("대화 턴", "Discussion turn"),
   gem_discussion_end: tr("대화 종료", "Discussion ends"), gem_strategy: tr("비공개 전략 정리", "Private planning"),
   gem_auction_round: tr("선 플레이어 경매", "Lead auction"), gem_auction: tr("경매 결과", "Auction results"),
@@ -197,7 +198,8 @@ function record(event, step) {
   const {msg_type: type, content, data} = event;
   const displayData = eventFields(event, data);
   const credit = type === "action" && data.phase === "credit" ? rouletteCreditAction(data.action) : null;
-  const label = type === "decision_note" ? decisionNoteLabel(data.phase) :
+  const label = type === "decision_note" ? (data.phase === "gem_preparation" && data.turn && data.turns ?
+    `${phaseNames.gem_preparation} · ${tr(`${data.turn} / ${data.turns}단계`, `Step ${data.turn} of ${data.turns}`)}` : decisionNoteLabel(data.phase)) :
     type === "inspection" ? (event.visible_to === "all" ? tr("공개 조사", "Public inspection") : tr("비공개 조사", "Private inspection")) :
       (type === "action" && actions[data.phase]) || labels[type] || type;
   const text = {
@@ -1109,6 +1111,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const chapterOptions = events.flatMap(({msg_type: type, data}, index) => {
     const label = (type === "rules" ? (index === 0 ? tr("게임 규칙", "Game rules") : ruleHeading(ruleText(data.split("\n", 1)[0]))) : chapters[type]) ??
       (["round", "market", "gem_round"].includes(type) ? roundLabel(data.round) : null) ??
+      (type === "gem_preparation" ? gemEventText(type, data) : null) ??
       (type === "gem_discussion" ? gemDiscussionLabel(data) : null) ??
       (type === "gem_auction_round" && data.manito_reveal ? tr("마니또 확인 · 피스 경매", "Manito reveal and Piece auction") : null) ??
       (type === "gem_strategy" ? gemEventText(type, data) : null) ??

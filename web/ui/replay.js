@@ -15,6 +15,7 @@ export const phaseNames = {
   gem_bid: tr("선 플레이어 입찰", "Bid for the lead"), gem_auction_agreement: tr("경매 합의", "Auction agreement"),
   gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_swap: tr("카드 교환", "Card swap"),
   gem_opening_talk: tr("게임 시작 전 대화", "Opening discussion"),
+  gem_preparation: tr("비공개 전략 준비", "Private strategy preparation"),
   gem_auction_talk: tr("경매 동률 협상", "Auction tie discussion"),
   gem_after_auction_talk: tr("경매 후 대화", "Post-auction discussion"),
   gem_talk: tr("교환 전 대화", "Pre-swap discussion"), gem_strategy: tr("교환 전 판단", "Pre-swap decision"),

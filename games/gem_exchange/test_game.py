@@ -11,7 +11,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ..match import DAY_THREE_MAIN, Match, run_cli
-from ..models import OpenAILanguageModel, StrategyNote
+from ..models import OpenAILanguageModel, STRATEGY_NOTE_LIMIT, StrategyNote
 from .game import BUYERS, CARDS, TABLE, play, round_points
 
 
@@ -170,6 +170,83 @@ class GemBlackMarketTest(unittest.TestCase):
                     self.assertEqual(result["pieces_spent"][player], spent)
                     self.assertEqual(result["pieces"][player], initial[player] + diamond_rewards[player] + reward - spent)
                     self.assertGreaterEqual(result["pieces"][player], 0)
+
+    def test_private_preparation_chains_and_remains_available_during_opening(self):
+        testcase = self
+        players = tuple(f"P{index:02}" for index in range(1, 10))
+        preparation_prompts = {name: [] for name in players}
+        opening_prompts = {name: [] for name in players}
+
+        class OpeningComplete(Exception):
+            pass
+
+        class PreparationMatch(Match):
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "gem_auction_round":
+                    raise OpeningComplete
+
+        def plan(name, turn):
+            return f"PRIVATE_{name}_PREPARATION_{turn}_ONLY"
+
+        def respond(name, **kwargs):
+            prompt = kwargs["input"][0]["content"][0]["text"]
+            if "비공개 관계 평가를 갱신하세요" in prompt:
+                action = "{}"
+            elif not any(event.msg_type == "gem_preparation_end" for event in match.events):
+                turn = next(json.loads(event.content)["turn"] for event in reversed(match.events)
+                            if event.msg_type == "gem_preparation")
+                preparation_prompts[name].append(prompt)
+                if turn > 1:
+                    testcase.assertIn(plan(name, turn - 1), prompt)
+                testcase.assertFalse(any(event.msg_type in {"gem_manito", "gem_card", "gem_round"}
+                                         for event in match.observations(name)))
+                action = plan(name, turn)
+            else:
+                opening_prompts[name].append(prompt)
+                testcase.assertIn(plan(name, 3), prompt)
+                action = json.dumps({"type": "speak", "channel": "public", "text": f"{name}의 공개 협력 제안"})
+            for other in players:
+                if other != name:
+                    for turn in range(1, 4):
+                        testcase.assertNotIn(plan(other, turn), prompt)
+            output = json.dumps({"action": action, "note": ""})
+            return SimpleNamespace(status="completed", output_text=output, usage=None)
+
+        models = {}
+        for name in players:
+            client = Mock()
+            client.responses.create.side_effect = lambda owner=name, **kwargs: respond(owner, **kwargs)
+            models[name] = OpenAILanguageModel("test-model", client)
+        match = PreparationMatch(players, 8, pieces=[3] * 9, models=models, live_turns=1000)
+        with self.assertRaises(OpeningComplete):
+            play(match)
+        stages = [event for event in match.events if event.msg_type == "gem_preparation"]
+        self.assertEqual([json.loads(event.content) for event in stages],
+                         [{"turn": turn, "turns": 3} for turn in range(1, 4)])
+        self.assertTrue(all(event.visible_to == "all" for event in stages))
+        preparation_end = next(event for event in match.events if event.msg_type == "gem_preparation_end")
+        opening = next(event for event in match.events if event.msg_type == "gem_discussion")
+        self.assertLess(preparation_end.turn, opening.turn)
+        self.assertFalse(any(event.msg_type in {"gem_manito", "gem_card", "gem_round"} for event in match.events))
+        self.assertFalse(any(event.msg_type == "action" and json.loads(event.content)["phase"] == "gem_preparation"
+                             for event in match.events))
+        for name in players:
+            notes = [event for event in match.events if event.msg_type == "decision_note" and event.agent_name == name
+                     and json.loads(event.content).get("phase") == "gem_preparation"
+                     and "turn" in json.loads(event.content)]
+            self.assertEqual([json.loads(event.content)["note"] for event in notes], [plan(name, turn) for turn in range(1, 4)])
+            self.assertTrue(all(event.visible_to == [name] for event in notes))
+            self.assertTrue(all(len(json.loads(event.content)["note"]) <= STRATEGY_NOTE_LIMIT for event in notes))
+            pinned = next(event for event in match.events if event.msg_type == "discussion_note" and event.agent_name == name)
+            self.assertEqual(pinned.content, plan(name, 3))
+            self.assertEqual(pinned.visible_to, [name])
+            self.assertEqual(len(preparation_prompts[name]), 3)
+            self.assertEqual(len(opening_prompts[name]), 12)
+            self.assertIn(plan(name, 3), opening_prompts[name][0])
+            self.assertIn(plan(name, 3), opening_prompts[name][-1])
+            other = next(player for player in players if player != name)
+            self.assertFalse(pinned in match.observations(other))
 
     def test_discussion_allows_replies_before_auction_and_every_swap(self):
         testcase = self
@@ -470,7 +547,7 @@ class GemBlackMarketTest(unittest.TestCase):
             redirect_stderr(StringIO()),
             patch("games.models.CodexLanguageModel._complete", side_effect=reply) as completion,
         ):
-            for budget in (16, 300):
+            for budget in (20, 300):
                 uninterrupted = Path(directory) / f"full-{budget}.jsonl"
                 arguments = ["--seed", "41", "--pieces", *(["3"] * 9), "--model", "test-model",
                              "--model-player", "P01", "--model-turns", str(budget), "--no-allow-review"]
@@ -478,13 +555,18 @@ class GemBlackMarketTest(unittest.TestCase):
                         argv=[*arguments, "--output", str(uninterrupted)])
                 expected = [json.loads(line) for line in uninterrupted.read_bytes().splitlines()]
                 self.assertLessEqual(expected[-1]["model_calls"], budget)
-                for checkpoint in ("auction_bid", "after_auction", "relationship_update", "gem_swap", "gem_discussion_end", "gem_strategy_note"):
+                for checkpoint in ("preparation_note", "gem_preparation_end", "auction_bid", "after_auction",
+                                   "relationship_update", "gem_swap", "gem_discussion_end", "gem_strategy_note"):
                     with self.subTest(budget=budget, checkpoint=checkpoint):
                         resumed = Path(directory) / f"resumed-{budget}-{checkpoint}.jsonl"
 
                         def interrupt(match, kind, data, **kwargs):
                             original_event(match, kind, data, **kwargs)
-                            if checkpoint == "auction_bid":
+                            if checkpoint == "preparation_note":
+                                reached = kind == "decision_note" and data.get("phase") == "gem_preparation" and data.get("turn") == 2
+                            elif checkpoint == "gem_preparation_end":
+                                reached = kind == "gem_preparation_end"
+                            elif checkpoint == "auction_bid":
                                 reached = kind == "action" and data.get("phase") == "gem_bid"
                             elif checkpoint == "after_auction":
                                 reached = kind == "gem_discussion_end" and data["stage"] == "after_auction"
@@ -517,6 +599,56 @@ class GemBlackMarketTest(unittest.TestCase):
                         self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
                         self.assertEqual(completion.call_count - calls_before_resume,
                                          expected[-1]["model_calls"] - prefix[-1]["model_calls"])
+
+    def test_existing_rules_without_preparation_resume_without_new_stages(self):
+        previous_rules = ("\n\n5. 협상과 전략 정리\n\n\n6. 동률 경매 협상\n"
+                          "\n\n7. 시작 전 진행 순서\n\n\n8. 관계 평가 갱신\n")
+        original_event = Match.event
+
+        def previous_play(match):
+            current_log = match.resume_log
+            match.resume_log = SimpleNamespace(
+                resume=True, events=[{"msg_type": "rules", "content": previous_rules}], journal=current_log.journal,
+            )
+            try:
+                return play(match)
+            finally:
+                match.resume_log = current_log
+
+        def interrupt(match, kind, data, **kwargs):
+            original_event(match, kind, data, **kwargs)
+            if kind == "gem_swap":
+                raise RuntimeError("test interruption in an existing ruleset")
+
+        def respond(prompt):
+            action = "{}" if "비공개 관계 평가를 갱신하세요" in prompt else "pass"
+            return json.dumps({"action": action, "note": ""})
+
+        with (
+            TemporaryDirectory() as directory,
+            redirect_stdout(StringIO()),
+            redirect_stderr(StringIO()),
+            patch("games.models.CodexLanguageModel._complete", side_effect=respond) as completion,
+        ):
+            full = Path(directory) / "previous-full.jsonl"
+            resumed = Path(directory) / "previous-resumed.jsonl"
+            arguments = ["--seed", "41", "--model", "test-model", "--model-player", "P01", "--model-turns", "60"]
+            run_cli(previous_play, title=DAY_THREE_MAIN, seats=(9, 10), argv=[*arguments, "--output", str(full)])
+            with patch.object(Match, "event", interrupt):
+                with self.assertRaisesRegex(RuntimeError, "existing ruleset"):
+                    run_cli(previous_play, title=DAY_THREE_MAIN, seats=(9, 10), argv=[*arguments, "--output", str(resumed)])
+            prefix = [json.loads(line) for line in resumed.read_bytes().splitlines()]
+            rules = next(row["content"] for row in prefix if row.get("msg_type") == "rules")
+            self.assertIn("\n\n8. 관계 평가 갱신\n", rules)
+            self.assertNotIn("\n\n9. 시작 전 비공개 전략 준비\n", rules)
+            calls_before_resume = completion.call_count
+            run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10), argv=["--resume", "--output", str(resumed)])
+            expected = [json.loads(line) for line in full.read_bytes().splitlines()]
+            actual = [json.loads(line) for line in resumed.read_bytes().splitlines()]
+            self.assertEqual(actual, expected)
+            self.assertFalse(any(row.get("msg_type") in {"gem_preparation", "gem_preparation_end"} for row in actual))
+            self.assertEqual(completion.call_count - calls_before_resume,
+                             expected[-1]["model_calls"] - prefix[-1]["model_calls"])
 
 
 if __name__ == "__main__":

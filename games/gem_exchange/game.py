@@ -15,6 +15,12 @@ STRATEGY_HEADING = "\n\n5. 협상과 전략 정리\n"
 AUCTION_TALK_HEADING = "\n\n6. 동률 경매 협상\n"
 SETUP_ORDER_HEADING = "\n\n7. 시작 전 진행 순서\n"
 RELATIONSHIP_HEADING = "\n\n8. 관계 평가 갱신\n"
+PREPARATION_HEADING = "\n\n9. 시작 전 비공개 전략 준비\n"
+PREPARATION_STEPS = (
+    "초안 작성: 공개 규칙과 내 피스, 기존 관계 평가를 바탕으로 목표와 협력 기준을 정하세요.",
+    "위험·대안 검토: 이전 계획의 약점과 불확실성을 점검하고, 협력이 거절되거나 정보가 틀릴 때의 대안을 반영하세요.",
+    "협상 계획 확정: 첫 대화에서 물을 질문, 제안할 내용, 공개할 정보의 범위와 계획을 바꿀 조건을 정하세요.",
+)
 BUYERS = ("buyer1", "buyer2", "buyer3")
 TABLE = (*BUYERS, "trash")
 CARDS = tuple(
@@ -110,6 +116,7 @@ def play(match: Match) -> dict:
     expanded_discussion = recorded_rules is None or AUCTION_TALK_HEADING in recorded_rules
     reordered_setup = recorded_rules is None or SETUP_ORDER_HEADING in recorded_rules
     event_relationships = recorded_rules is None or RELATIONSHIP_HEADING in recorded_rules
+    private_preparation = recorded_rules is None or PREPARATION_HEADING in recorded_rules
     opening_rounds = OPENING_DISCUSSION_ROUNDS if expanded_discussion else 2
     swap_rounds = DISCUSSION_ROUNDS if expanded_discussion else 2
     discussion_turns = "2회전" if enhanced_discussion else "한 번씩"
@@ -187,6 +194,13 @@ def play(match: Match) -> dict:
             "친밀도와 신뢰도를 검토합니다. 카드 공개 정산, 최종 마니또·점수 공개와 연맹의 징표 사용 후에도 검토합니다. "
             "참가자는 자신에게 보인 새 대화와 행동을 근거로 평가하고, 최근 관측을 참고해 약속과 실제 결과를 비교합니다. "
             "새 근거가 있을 때 갱신하며, 점수와 이유는 본인만 볼 수 있습니다."
+        )
+    if private_preparation:
+        rules += PREPARATION_HEADING + (
+            "게임 규칙 공개 뒤 첫 대화 전에 각자 비공개로 초안 작성, 위험·대안 검토, 협상 계획 확정의 "
+            "3단계를 진행합니다. 매 단계에서 자신의 이전 전략 요약을 이어받아 수정하며, "
+            "각 단계의 결과는 본인만 볼 수 있는 짧은 전략 요약으로 남깁니다. 마지막 요약은 이후 협상에서도 참고합니다. "
+            "이때 마니또와 카드는 아직 공개되지 않았으며, 다른 사람의 준비 내용은 볼 수 없습니다."
         )
     match.event("rules", rules)
     match.event("gem_setup", {"base_order": base_order, "pieces": pieces.copy(), "rounds": ROUNDS, "card_count": len(deck)})
@@ -295,6 +309,28 @@ def play(match: Match) -> dict:
                 "before_swap": f"보석 암시장 {round_number}라운드 {pass_number}차 {acting} 교환 전 협상 종료",
             }
             match.review_relationships(checkpoints[stage])
+
+    if private_preparation:
+        plans = dict.fromkeys(players, "공개 규칙과 피스를 바탕으로 협력 제안을 준비하고, 마니또와 카드가 공개되면 계획을 갱신한다.")
+        turns = len(PREPARATION_STEPS)
+        for turn, focus in enumerate(PREPARATION_STEPS, 1):
+            match.event("gem_preparation", {"turn": turn, "turns": turns})
+            plans = match.decide_together("gem_preparation", {
+                name: Decision(
+                    f"게임 시작 전 비공개 전략 준비 {turn}/{turns}단계입니다. {focus}\n"
+                    f"내 피스 {pieces[name]}. 마니또와 카드는 아직 공개되지 않았습니다. "
+                    "공개 규칙과 본인이 아는 정보만 사용하세요. 다른 참가자와 대화하거나 행동하지 않습니다.\n"
+                    + (f"내가 이전 단계에서 작성한 전략 요약\n{plans[name]}\n" if turn > 1 else "")
+                    + f"이번 단계의 수정사항을 반영한 전체 전략 요약만 한국어 {STRATEGY_NOTE_LIMIT}자 이내로 출력하세요.",
+                    plans[name], valid=lambda text: 0 < len(text.strip()) <= STRATEGY_NOTE_LIMIT,
+                ) for name in players
+            }, record_actions=False)
+            for name, plan in plans.items():
+                match.event("decision_note", {"phase": "gem_preparation", "turn": turn, "turns": turns,
+                                              "note": plan}, actor=name, private=[name])
+        for name, plan in plans.items():
+            match.event("discussion_note", plan, actor=name, private=[name])
+        match.event("gem_preparation_end", {"turns": turns})
 
     if enhanced_discussion:
         discuss(base_order, None, 0, 0)
