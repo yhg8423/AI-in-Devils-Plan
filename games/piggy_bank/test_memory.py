@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from ..match import Decision, Match
 from ..models import CodexLanguageModel
-from .memory import MEMORY_SUMMARY_LIMIT, PiggyMemory, parse_memory_selection, parse_memory_summary
+from .memory import MEMORY_SUMMARY_LIMIT, PiggyMemory, parse_memory_selection, parse_memory_summary, parse_memory_update
 
 
 PLAYERS = ("P01", "P02", "P03", "P04")
@@ -56,7 +56,7 @@ class PiggyMemoryTest(unittest.TestCase):
             with self.subTest(invalid=invalid), self.assertRaises(ValueError):
                 parse_memory_summary(invalid)
         banks = {bank: {"black": 991, "white": 993} for bank in range(1, 6)}
-        memory = PiggyMemory(PLAYERS, banks, summary=True)
+        memory = PiggyMemory(PLAYERS, banks, mode="summary")
         memory.update("P01", text, 1, 12)
         banks[1] = {"black": 1991, "white": 1993}
         self.assertEqual(memory.recall("P01"), {"reset": 0, "mode": "summary", "updated_turn": 1,
@@ -100,7 +100,7 @@ class PiggyMemoryTest(unittest.TestCase):
             ratings = {"P01": {"P02": {"affinity": 60, "trust": 65, "reason": "OLD_REASON94729"}}}
             match = Match(PLAYERS, 23, models={"P01": model}, live_turns=12, relationships=ratings)
             banks = {bank: {"black": 94601, "white": 94603} for bank in range(1, 6)}
-            memory = PiggyMemory(PLAYERS, banks, summary=True)
+            memory = PiggyMemory(PLAYERS, banks, mode="summary")
             memory.update("P02", "OTHER_PRIVATE94761", 0, 0)
             match.model_observations = memory
             lower = {name: bank for bank, name in enumerate(PLAYERS, 1)}
@@ -164,6 +164,117 @@ class PiggyMemoryTest(unittest.TestCase):
             for prompt in prompts:
                 for token in ("94601", "94603", "94761", "94729"):
                     self.assertNotIn(token, prompt, "True counts, another player's summary, and rating reasons must stay private")
+
+    def test_dynamic_slots_accept_any_three_live_ids_without_restoring_dropped_counts(self):
+        banks = {bank: {"black": 991, "white": 993} for bank in range(1, 6)}
+        first = {"1": {"black": 77, "white": None}, "2": {"black": 2222, "white": 2223}, "3": {"black": 3333, "white": 3334}}
+        changed = {"1": first["1"], "4": {"black": None, "white": None}, "5": {"black": 5, "white": None}}
+        self.assertEqual(parse_memory_update(json.dumps(changed), banks), changed)
+        for invalid in ({"1": first["1"]}, {**changed, "2": first["2"]}, {**changed, "6": changed["4"]},
+                        {"01": first["1"], "4": changed["4"], "5": changed["5"]},
+                        {**changed, "4": {"black": True, "white": None}},
+                        {**changed, "4": {"black": -1, "white": None}},
+                        {**changed, "4": {"black": 1.5, "white": None}},
+                        {**changed, "4": {"black": 1}},
+                        {**changed, "4": {"black": 1, "white": None, "note": "extra"}}):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                parse_memory_update(json.dumps(invalid), banks)
+        memory = PiggyMemory(PLAYERS, banks, mode="dynamic")
+        memory.reset(0)
+        self.assertEqual(memory.recall("P01")["banks"], {str(bank): {"black": 1, "white": 1} for bank in (1, 2, 3)})
+        memory.update("P01", first, 1, 12)
+        banks[1]["black"] += 1000
+        self.assertEqual(memory.recall("P01")["banks"]["1"], first["1"], "Later true counts must not repair an incorrect belief")
+        memory.update("P01", changed, 2, 24)
+        self.assertEqual(memory.recall("P01")["banks"], changed)
+        returned = {"1": first["1"], "2": {"black": None, "white": None}, "3": {"black": None, "white": None}}
+        memory.update("P01", returned, 3, 36)
+        self.assertEqual(memory.recall("P01")["banks"], returned)
+        self.assertNotIn("2222", json.dumps(memory.recall("P01")))
+        del banks[2]
+        banks[6] = {"black": 991, "white": 993}
+        memory.replace(2, 6)
+        self.assertEqual(memory.selections["P01"], [1, 6, 3])
+        self.assertEqual(memory.recall("P01")["banks"]["6"], {"black": 1, "white": 1})
+        banks.clear()
+        banks.update({bank: {"black": 1, "white": 1} for bank in range(1, 6)})
+        memory.reset(1, turn=4)
+        self.assertEqual(memory.recall("P01"), {"reset": 1, "mode": "dynamic", "updated_turn": 4,
+                                               "banks": {str(bank): {"black": 1, "white": 1} for bank in (1, 2, 3)}})
+
+    def test_real_model_rebinding_cannot_recover_dropped_slots_from_cache_or_truth(self):
+        prompts = []
+        first = {"1": {"black": 77, "white": None}, "2": {"black": 2222, "white": 2223}, "3": {"black": 3333, "white": 3334}}
+        changed = {"1": first["1"], "4": {"black": None, "white": None}, "5": {"black": 5, "white": None}}
+        returned = {"1": first["1"], "2": {"black": None, "white": None}, "3": {"black": None, "white": None}}
+
+        def complete(prompt):
+            prompts.append(prompt)
+            if "REBIND_145" in prompt:
+                action = json.dumps(changed)
+            elif "REBIND_123" in prompt:
+                action = json.dumps(returned)
+            else:
+                action = "pass"
+            return json.dumps({"action": action, "note": "PRIVATE_SIDE_NOTE94717"})
+
+        with TemporaryDirectory() as directory:
+            model = CodexLanguageModel("test-model", Path(directory))
+            ratings = {"P01": {"P02": {"affinity": 60, "trust": 65, "reason": "OLD_REASON94729"}}}
+            match = Match(PLAYERS, 23, models={"P01": model}, live_turns=10, relationships=ratings)
+            banks = {bank: {"black": 94601, "white": 94603} for bank in range(1, 6)}
+            memory = PiggyMemory(PLAYERS, banks, mode="dynamic")
+            memory.reset(0)
+            match.model_observations = memory
+            lower = {name: bank for bank, name in enumerate(PLAYERS, 1)}
+            upper = {name: 5 if name == "P01" else None for name in PLAYERS}
+            state = {"lower": lower, "upper": upper, "scores": dict.fromkeys(PLAYERS, 0)}
+            match.event("rules", "돼지 저금통 동적 기억 슬롯 검증")
+            match.event("pig_setup", {"order": list(PLAYERS), **state})
+            match.event("discussion_note", "INITIAL_PLAN94701", actor="P01", private=["P01"])
+            match.event("action", {"phase": "pig_count", "action": "OLD_DROPPED94719 · 2222 · 3333"}, actor="P01", private=["P01"])
+            memory.update("P01", first, 0, len(match.events))
+            memory.update("P02", {str(bank): {"black": 94761, "white": 94763} for bank in (1, 4, 5)}, 0, len(match.events))
+
+            def valid_update(answer):
+                try:
+                    parse_memory_update(answer, banks)
+                except ValueError:
+                    return False
+                return True
+
+            def update(marker, turn):
+                response = match.decide_together("pig_memory_update", {
+                    "P01": Decision(marker, json.dumps(memory.recall("P01")["banks"]), valid=valid_update),
+                })["P01"]
+                memory.update("P01", json.loads(response), turn, len(match.events))
+
+            with patch.object(model, "_complete", side_effect=complete):
+                match.decide("P01", "test_dynamic", "현재 기억으로 판단하세요.", "pass", options=("pass",))
+                self.assertIn("2222", prompts[-1], "The old slot value is initially in the backend's real input")
+                update("REBIND_145", 1)
+                memory_start = len(prompts)
+                banks[1]["black"] += 5
+                match.event("pig_contents", {"banks": banks}, private=["__operator__"])
+                match.event("pig_recall", memory.recall("P02"), actor="P02", private=["P02"])
+                match.event("public", "CURRENT_PUBLIC_ADVICE94741", actor="P02")
+                match.decide("P01", "test_dynamic", "현재 기억으로 판단하세요.", "pass", options=("pass",))
+                self.assertIn('"4":{"black":null,"white":null}', prompts[-1].replace(" ", ""))
+                self.assertIn('"1":{"black":77,"white":null}', prompts[-1].replace(" ", ""))
+                update("REBIND_123", 2)
+                self.assertEqual(memory.recall("P01")["banks"], returned)
+                update("INVALID_REBIND", 3)
+                self.assertEqual(memory.recall("P01")["banks"], returned, "An invalid reply must retain the same three beliefs")
+                match.event("public", "AFTER_REBIND94743", actor="P02")
+                match.decide("P01", "test_dynamic", "현재 기억으로 판단하세요.", "pass", options=("pass",))
+                self.assertIn('"2":{"black":null,"white":null}', prompts[-1].replace(" ", ""))
+                match.review_relationships("슬롯 변경 후 새 대화")
+            for prompt in prompts[memory_start:]:
+                for token in ("2222", "2223", "3333", "3334", "94701", "94719", "94717"):
+                    self.assertNotIn(token, prompt, "Dropped slot values must not return through a discarded transcript or cached backend")
+            for prompt in prompts:
+                for token in ("94601", "94603", "94761", "94763", "94729"):
+                    self.assertNotIn(token, prompt, "Rebinding must not consult true counts, other players, or old rating reasons")
 
     def test_action_and_relationship_prompts_cannot_recover_expired_unselected_counts(self):
         prompts = []

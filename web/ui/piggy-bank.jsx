@@ -15,7 +15,7 @@ const bankLabel = (bank) => bank == null ? "–" : tr(`${bank}번`, `#${bank}`);
 const coinText = (coins) => coins ? tr(`흑 ${coins.black ?? "?"} · 백 ${coins.white ?? "?"}`, `Black ${coins.black ?? "?"} · White ${coins.white ?? "?"}`) : tr("미개봉", "Unopened");
 function knownCoins(state, bank, owner) {
   const memory = state.pigMemories?.[owner];
-  if (memory?.mode === "model" && memory.banks.includes(bank)) return memory.counts[bank] ?? {black: null, white: null};
+  if (["model", "dynamic"].includes(memory?.mode) && memory.banks.includes(bank)) return memory.counts[bank] ?? {black: null, white: null};
   return (owner ? memory?.counts[bank] : state.pigContents?.[bank]) ?? state.pigKnown?.[bank];
 }
 const position = (x, y) => ({left: `${x / setWidth * 100}%`, top: `${y / setHeight * 100}%`});
@@ -28,7 +28,13 @@ function memoryOwner(state, selected) {
 
 function hasMemorySlots(state) {
   return state.feed.some((event) => event.msg_type === "rules" &&
-    (typeof event.data === "string" ? event.data : event.content)?.includes("\n\n5. 기억 슬롯\n"));
+    ["\n\n5. 기억 슬롯\n", "\n\n5. 변경 가능한 기억 슬롯\n"].some((heading) =>
+      (typeof event.data === "string" ? event.data : event.content)?.includes(heading)));
+}
+
+function hasDynamicMemory(state) {
+  return state.feed.some((event) => event.msg_type === "rules" &&
+    (typeof event.data === "string" ? event.data : event.content)?.includes("\n\n5. 변경 가능한 기억 슬롯\n"));
 }
 
 function hasModelMemory(state) {
@@ -78,7 +84,7 @@ export function pigEventText(type, data) {
     case "pig_contents": return tr("운영자 전용 · 저금통 내부", "Operator only · Bank contents");
     case "pig_memory_selection": return tr(`기억 슬롯 ${data.banks.map(bankLabel).join(" · ")}`, `Memory slots: ${data.banks.map(bankLabel).join(" · ")}`);
     case "pig_recall": return data.mode === "summary" ? tr("기억 요약 · ", "Memory summary · ") + (data.text || tr("비움", "Cleared")) :
-      (data.mode === "model" ? tr("기억 추정 · ", "Memory estimates · ") : "") +
+      (["model", "dynamic"].includes(data.mode) ? tr("기억 추정 · ", "Memory estimates · ") : "") +
         Object.entries(data.banks).map(([bank, coins]) => `${bankLabel(bank)} · ${coinText(coins)}`).join(" / ");
     case "pig_discussion": return data.stage === "opening" ? tr("게임 시작 전 대화", "Opening discussion") : tr(`${data.turn}턴 행동 전 대화`, `Discussion before turn ${data.turn}`);
     case "pig_discussion_end": return tr("대화 종료", "Discussion complete");
@@ -143,7 +149,7 @@ export function applyPigEvent(state, type, data, event = {}) {
       delete state.pigKnown?.[data.bank];
       delete state.pigContents?.[data.bank];
       for (const memory of Object.values(state.pigMemories ?? {})) {
-        if (memory.mode !== "model") delete memory.counts[data.bank];
+        if (!["model", "dynamic"].includes(memory.mode)) delete memory.counts[data.bank];
       }
       break;
     case "pig_claim": state.pigClaim = data; state.pigActive = data.player; break;
@@ -182,6 +188,14 @@ export function applyPigEvent(state, type, data, event = {}) {
       }
       break;
     case "pig_recall": {
+      if (data.mode === "dynamic") {
+        if (data.reset === state.pigMemoryReset) {
+          state.pigMemories[event.agent_name] = {reset: data.reset, mode: "dynamic", updated_turn: data.updated_turn,
+            banks: Object.keys(data.banks).map(Number),
+            counts: Object.fromEntries(Object.entries(data.banks).map(([bank, coins]) => [bank, {...coins}]))};
+        }
+        break;
+      }
       if (data.mode === "summary") {
         if (data.reset === state.pigMemoryReset) {
           state.pigSummaries[event.agent_name] = {reset: data.reset, text: data.text, limit: data.limit,
@@ -250,14 +264,15 @@ function PiggyMemorySlots({state, selected}) {
   return <section className="pig-memory-summary" data-owner={owner} data-reset={state.pigMemoryReset} data-mode={memory?.mode}
     aria-label={tr(`${owner} 비공개 기억 슬롯`, `${owner}’s private memory slots`)}>
     <h3>{tr(`${owner} 기억 슬롯`, `${owner}’s memory slots`)} <small>{memory?.banks.length ?? 0} / 3</small></h3>
-    {memory?.mode === "model" && <p className="pig-memory-estimate-note">{tr("본인이 갱신한 추정값이며, 실제 개수로 자동 보정하지 않습니다.", "These are the player’s own estimates; they are not automatically corrected to the actual counts.")}
+    {["model", "dynamic"].includes(memory?.mode) && <p className="pig-memory-estimate-note">{tr("본인이 갱신한 추정값이며, 실제 개수로 자동 보정하지 않습니다.", "These are the player’s own estimates; they are not automatically corrected to the actual counts.")}
       {memory.updated_turn != null && <small>{tr(`마지막 갱신 · ${memory.updated_turn}턴`, `Last updated · Turn ${memory.updated_turn}`)}</small>}</p>}
     {memory ? <div className="pig-memory-banks">{memory.banks.map((bank, index) =>
       <div className="pig-memory-bank" key={bank} data-bank={bank}>
         <span className="pig-memory-slot-label">{tr(`슬롯 ${index + 1}`, `Slot ${index + 1}`)}</span>
-        <PigIcon bank={bank} coins={knownCoins(state, bank, owner)} compact estimate={memory.mode === "model"} />
-        <Coins coins={knownCoins(state, bank, owner)} estimate={memory.mode === "model"} />
-      </div>)}</div> : <p className="muted">{tr("기억할 저금통 선택 대기 중입니다.", "Waiting for the memory-bank selection.")}</p>}
+        <PigIcon bank={bank} coins={knownCoins(state, bank, owner)} compact estimate={["model", "dynamic"].includes(memory.mode)} />
+        <Coins coins={knownCoins(state, bank, owner)} estimate={["model", "dynamic"].includes(memory.mode)} />
+      </div>)}</div> : <p className="muted">{hasDynamicMemory(state) ? tr("기억 갱신 대기 중입니다.", "Waiting for the private memory update.") :
+        tr("기억할 저금통 선택 대기 중입니다.", "Waiting for the memory-bank selection.")}</p>}
   </section>;
 }
 
@@ -327,7 +342,7 @@ export function PiggyScene({players, state, frame, selected, onChoose}) {
               const bankCue = tier === "upper" && cue?.player === player ? cue : null;
               const opened = bankCue?.actual != null && bank === bankCue.bank;
               const retired = bankCue?.actual != null && bank !== bankCue.bank;
-              const estimate = !opened && memory?.mode === "model" && memory.banks.includes(bank);
+              const estimate = !opened && ["model", "dynamic"].includes(memory?.mode) && memory.banks.includes(bank);
               return <div className="pig-tier" key={tier} data-bank={bank} data-suspected={bankCue && !retired || undefined}
                 data-retired-reveal={retired || undefined} aria-label={`${player} · ${tier === "upper" ? tr("위칸", "Upper tier") : tr("아래칸", "Lower tier")}`}>
                 <span className="pig-tier-label">{tier === "upper" ? tr("위", "UP") : tr("아래", "LOW")}</span>
@@ -422,6 +437,7 @@ export function PiggyInformation({state, replay}) {
   const [turnChoice, setTurnChoice] = useState("");
   const owner = memoryOwner(state, selected);
   const freeMemory = hasFreeMemory(state);
+  const dynamicMemory = hasDynamicMemory(state);
   const memoryEnabled = hasMemorySlots(state) || freeMemory;
   const memoryRecord = owner && state.feed.findLast((event) => event.msg_type === "pig_recall" &&
     event.agent_name === owner && (freeMemory || event.data.reset === state.pigMemoryReset));
@@ -457,7 +473,7 @@ export function PiggyInformation({state, replay}) {
     </div>
     <div id="pig-banks-panel" className="match-info-scroll" role="tabpanel" aria-labelledby="pig-banks" hidden={tab !== "banks"} tabIndex={0}>
       <p className="muted">{owner ? freeMemory ? tr(`${owner} 시점에서 공개된 동전 정보만 표시합니다. 기억 요약은 수량표로 변환하지 않습니다.`,
-        `Showing publicly known coin counts for ${owner}’s view. The memory summary is not converted into a tally.`) : state.pigMemories?.[owner]?.mode === "model" ?
+        `Showing publicly known coin counts for ${owner}’s view. The memory summary is not converted into a tally.`) : ["model", "dynamic"].includes(state.pigMemories?.[owner]?.mode) ?
         tr(`${owner}이 직접 갱신한 추정값과 공개된 정보입니다. 기억은 실제 개수와 다를 수 있습니다.`, `These are ${owner}’s own estimates and publicly known contents. Recalled counts may differ from the actual counts.`) :
         tr(`${owner}의 기억 슬롯과 공개된 정보만 표시합니다.`, `Showing ${owner}’s memory slots and publicly known contents.`) :
         tr("미개봉 저금통의 누적 동전 수는 공개하지 않습니다. 운영자 시점에서는 내부를 확인할 수 있습니다.", "Accumulated counts in unopened banks remain hidden. The operator view can inspect their contents.")}</p>
@@ -466,14 +482,16 @@ export function PiggyInformation({state, replay}) {
         const lower = Object.entries(state.pigLower ?? {}).find(([, id]) => id === bank)?.[0];
         const memory = state.pigMemories?.[owner];
         return [bankLabel(bank), `${upper ?? lower} · ${upper ? tr("위칸", "Upper tier") : tr("아래칸", "Lower tier")}`,
-          <Coins coins={knownCoins(state, bank, owner)} estimate={memory?.mode === "model" && memory.banks.includes(bank)} />];
+          <Coins coins={knownCoins(state, bank, owner)} estimate={["model", "dynamic"].includes(memory?.mode) && memory.banks.includes(bank)} />];
       }).filter(([, location]) => !selected || location.startsWith(`${selected} ·`))} /> : <p className="empty">{tr("저금통 배분 대기 중입니다.", "Waiting for banks to be distributed.")}</p>}
     </div>
     {memoryEnabled && <div id="pig-memory-panel" className="match-info-scroll" role="tabpanel" aria-labelledby="pig-memory" hidden={tab !== "memory"} tabIndex={0}>
       {state.pigPerspective === "public" ? <p className="empty">{freeMemory ? tr("비공개 기억 요약은 본인만 확인할 수 있습니다.", "Memory summaries are private to each player.") :
         tr("기억할 저금통 선택과 기억 내용은 본인만 확인할 수 있습니다.", "Memory-bank choices and recalled counts are private to each player.")}</p> : <>
         {freeMemory ? <PiggyFreeMemory state={state} selected={selected} /> : <PiggyMemorySlots state={state} selected={selected} />}
-        {owner && !freeMemory && <p className="muted">{tr("리셋까지 같은 저금통 3개를 기억합니다. 선택한 저금통이 교체되면 해당 슬롯에 새 저금통이 들어갑니다.", "These three banks stay selected until reset. A retired selected bank is replaced in the same slot by the fresh bank.")}</p>}
+        {owner && !freeMemory && <p className="muted">{dynamicMemory ?
+          tr("기억을 갱신할 때 현재 저금통 중 3개를 다시 고를 수 있습니다. 슬롯에서 뺀 저금통의 과거 기억은 되살리지 않습니다.", "Each memory update can choose any three current banks. Dropped banks’ previous memories are not restored when selected again.") :
+          tr("리셋까지 같은 저금통 3개를 기억합니다. 선택한 저금통이 교체되면 해당 슬롯에 새 저금통이 들어갑니다.", "These three banks stay selected until reset. A retired selected bank is replaced in the same slot by the fresh bank.")}</p>}
         {memoryRecord && <button type="button" className="result-link" onClick={() => seek(memoryRecord.step)}>{tr("이 기억 상태의 기록 보기", "View this memory snapshot")}</button>}
       </>}
     </div>}

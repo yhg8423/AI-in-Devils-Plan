@@ -406,6 +406,46 @@ for (const language of ["ko", "en"]) {
     assert(omniscient.includes("993") && !omniscient.includes("7777"), "Unfiltered operator counts remain independent of free summaries");
   });
 
+  test(`${language}: changeable memory replaces all three banks without restoring forgotten totals or leaking private estimates`, () => {
+    const base = [event("rules", "돼지 저금통 · 참가자 4명\n\n5. 변경 가능한 기억 슬롯\n매번 저금통 3개를 다시 고를 수 있습니다."),
+      ...sequence(true).pending.slice(0, -1)];
+    const recall = (banks, reset = 0, turn = 1) => event("pig_recall", {
+      reset, mode: "dynamic", updated_turn: turn, banks,
+    }, ["P01"], "P01");
+    const initial = [...base, recall({1: {black: 111, white: 112}, 2: {black: 2222, white: 2223}, 3: {black: 3332, white: 3333}})];
+    const changed = [...initial, recall({1: {black: 114, white: 115}, 4: {black: null, white: null}, 5: {black: 51, white: 52}}, 0, 2)];
+    const restored = [...changed, recall({1: {black: 114, white: 115}, 2: {black: null, white: null}, 3: {black: null, white: null}}, 0, 3)];
+    const reset = event("pig_reset", {reset: 1, order: players, lower, upper, scores, next_player: "P01"});
+    const fresh = [...restored, reset, recall({3: {black: 1, white: 1}, 4: {black: 1, white: 1}, 5: {black: 1, white: 1}}, 1, 3), initial.at(-1)];
+    const bankIds = (html) => [...html.matchAll(/class="pig-memory-bank"[^>]*data-bank="(\d+)"/g)].map(([, bank]) => Number(bank));
+    for (const view of ["P01", "operator"]) {
+      const selected = view === "operator" ? "P01" : "P02";
+      assert.deepEqual(bankIds(replay(initial, view, initial.length, selected)), [1, 2, 3]);
+      const changedHtml = replay(changed, view, changed.length, selected);
+      const changedScene = arena(changedHtml);
+      assert.deepEqual(bankIds(changedHtml), [1, 4, 5]);
+      assert(!changedScene.includes("2222") && !changedScene.includes("3333"), "Dropped banks must lose their previous private estimates");
+      assert(physicalBank(changedScene, 4).includes(language === "en" ? "Black ? · White ?" : "흑 ? · 백 ?"),
+        "A newly selected unknown bank must not fall back to its public starting counts");
+      assert(!changedScene.includes("991") && !changedScene.includes("993"), "Chosen-owner graphics must not reveal operator truth");
+      const restoredHtml = replay(restored, view, restored.length, selected);
+      const restoredScene = arena(restoredHtml);
+      assert.deepEqual(bankIds(restoredHtml), [1, 2, 3]);
+      for (const bank of [2, 3]) assert(physicalBank(restoredScene, bank).includes(language === "en" ? "Black ? · White ?" : "흑 ? · 백 ?"),
+        "Selecting an old bank again must not magically restore its forgotten estimates");
+      const resetHtml = replay([...restored, reset], view, restored.length + 1, selected);
+      assert.deepEqual(bankIds(resetHtml), [], "Reset clears the previous bank bindings");
+      assert.deepEqual(bankIds(replay(fresh, view, fresh.length, selected)), [3, 4, 5], "Old-epoch recalls cannot overwrite new bindings");
+      assert.deepEqual(bankIds(replay(fresh, view, base.length, selected)), [], "Future bindings cannot survive rewind");
+      assert.equal(openingTag(changedHtml, "pig-free-memory"), undefined, "New dynamic slots do not show the old free-summary panel");
+    }
+    for (const view of ["public", "P02", "P03", "P04"]) {
+      const html = replay(changed, view);
+      assert(!html.includes("2222") && !html.includes("3333"), `${view} must not see another player's past memory`);
+      assert.deepEqual(bankIds(html), []);
+    }
+  });
+
   test(`${language}: free memory survives reset until rewritten and supports forgetting, clearing, and rewind`, () => {
     const {steps, recall} = freeMemorySequence();
     const reset = event("pig_reset", {reset: 1, order: players, lower, upper, scores, next_player: "P01"});

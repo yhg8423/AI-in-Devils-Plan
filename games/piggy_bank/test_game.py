@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 from ..match import DAY_THREE_PRISON, Match, run_cli
 from .game import parse_challenge, parse_deposit, play
-from .memory import FREE_MEMORY_HEADING, MEMORY_HEADING, MEMORY_SUMMARY_LIMIT
+from .memory import DYNAMIC_MEMORY_HEADING, FREE_MEMORY_HEADING, MEMORY_HEADING, MEMORY_SUMMARY_LIMIT
 
 
 PLAYERS = ("P01", "P02", "P03", "P04")
@@ -366,6 +366,25 @@ class PiggyBankTest(unittest.TestCase):
                 return super().decide_together(phase, decisions, **kwargs)
 
         match = SummaryMatch(PLAYERS, 23)
+        match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": FREE_MEMORY_HEADING}])
+        self._assert_end_turn_memory(match, "summary")
+
+    def test_dynamic_slot_updates_can_change_ids_at_every_end_of_turn(self):
+        class DynamicMatch(Match):
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if isinstance(data, dict) and "lower" in data and "upper" in data:
+                    self.live_ids = sorted({bank for bank in (*data["lower"].values(), *data["upper"].values()) if bank is not None})
+
+            def decide_together(self, phase, decisions, **kwargs):
+                if phase == "pig_memory_update":
+                    values = json.dumps({str(bank): {"black": 77, "white": None} for bank in self.live_ids[::2]})
+                    decisions = {name: replace(decision, default=values) for name, decision in decisions.items()}
+                return super().decide_together(phase, decisions, **kwargs)
+
+        self._assert_end_turn_memory(DynamicMatch(PLAYERS, 23), "dynamic")
+
+    def _assert_end_turn_memory(self, match, mode):
         result = play(match)
         updates = {}
         recalls = set()
@@ -393,7 +412,8 @@ class PiggyBankTest(unittest.TestCase):
                 self.assertEqual(resolved_turn, turn, "Current outcomes must be available before compression")
                 self.assertNotIn(event.agent_name, updates)
                 self.assertEqual(event.visible_to, [event.agent_name])
-                self.assertLessEqual(len(data["action"]), MEMORY_SUMMARY_LIMIT)
+                if mode == "summary":
+                    self.assertLessEqual(len(data["action"]), MEMORY_SUMMARY_LIMIT)
                 updates[event.agent_name] = data["action"]
                 update_count += 1
             elif event.msg_type == "action" and data["phase"] == "pig_reset_vote":
@@ -402,11 +422,16 @@ class PiggyBankTest(unittest.TestCase):
                 self.assertNotEqual(data["phase"], "pig_memory_select")
             elif event.msg_type == "pig_recall" and updates:
                 self.assertEqual(set(updates), set(PLAYERS))
-                self.assertEqual(set(data), {"reset", "mode", "updated_turn", "text", "limit"})
-                self.assertEqual(data["mode"], "summary")
+                self.assertEqual(data["mode"], mode)
                 self.assertEqual(data["updated_turn"], turn)
-                self.assertEqual(data["text"], updates[event.agent_name])
-                self.assertEqual(data["limit"], MEMORY_SUMMARY_LIMIT)
+                if mode == "summary":
+                    self.assertEqual(set(data), {"reset", "mode", "updated_turn", "text", "limit"})
+                    self.assertEqual(data["text"], updates[event.agent_name])
+                    self.assertEqual(data["limit"], MEMORY_SUMMARY_LIMIT)
+                else:
+                    self.assertEqual(set(data), {"reset", "mode", "updated_turn", "banks"})
+                    self.assertEqual(data["banks"], json.loads(updates[event.agent_name]))
+                    self.assertEqual(len(data["banks"]), 3)
                 recalls.add(event.agent_name)
         self.assertFalse(updates, "A terminal turn must end without another summary round")
         self.assertEqual(update_count, len(PLAYERS) * result["turns"])
@@ -435,10 +460,12 @@ class PiggyBankTest(unittest.TestCase):
             if kind == "pig_deposit":
                 raise RuntimeError("test interruption after legacy discussion")
 
-        for old_turns, exact_memory in ((1, False), (2, False), (2, True)):
-            old_rules = f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩" + (MEMORY_HEADING if exact_memory else "")
+        for old_turns, mode in ((1, "none"), (2, "none"), (2, "exact"), (2, "summary")):
+            old_rules = f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩" + {
+                "none": "", "exact": MEMORY_HEADING, "summary": FREE_MEMORY_HEADING,
+            }[mode]
             with (
-                self.subTest(turns=old_turns, exact_memory=exact_memory),
+                self.subTest(turns=old_turns, mode=mode),
                 TemporaryDirectory() as directory,
                 redirect_stdout(StringIO()),
                 redirect_stderr(StringIO()),
@@ -462,21 +489,27 @@ class PiggyBankTest(unittest.TestCase):
                                  expected[-1]["model_calls"] - prefix[-1]["model_calls"])
                 rules = next(row["content"] for row in actual if row.get("msg_type") == "rules")
                 self.assertIn(f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩", rules)
-                self.assertEqual(MEMORY_HEADING in rules, exact_memory)
+                self.assertEqual(MEMORY_HEADING in rules, mode == "exact")
                 windows = [json.loads(row["content"]) for row in actual if row.get("msg_type") == "pig_discussion"]
                 self.assertEqual(windows[0]["turns"], 4)
                 self.assertTrue(all(window["turns"] == old_turns for window in windows[1:]))
-                self.assertNotIn(FREE_MEMORY_HEADING, rules)
-                self.assertEqual(any(row.get("msg_type") == "pig_memory_selection" for row in actual), exact_memory)
-                self.assertFalse(any(row.get("msg_type") == "action" and
-                                     json.loads(row["content"])["phase"] == "pig_memory_update" for row in actual))
+                self.assertEqual(FREE_MEMORY_HEADING in rules, mode == "summary")
+                self.assertNotIn(DYNAMIC_MEMORY_HEADING, rules)
+                self.assertEqual(any(row.get("msg_type") == "pig_memory_selection" for row in actual), mode == "exact")
+                self.assertEqual(any(row.get("msg_type") == "action" and
+                                     json.loads(row["content"])["phase"] == "pig_memory_update" for row in actual), mode == "summary")
                 for row in actual:
                     if row.get("msg_type") == "pig_recall":
-                        self.assertEqual(set(json.loads(row["content"])), {"reset", "banks"})
+                        self.assertEqual(set(json.loads(row["content"])), {"reset", "banks"} if mode == "exact" else
+                                         {"reset", "mode", "updated_turn", "text", "limit"})
 
     def test_interrupted_model_decisions_resume_to_the_same_record(self):
         def reply(prompt):
-            action = "{}" if "비공개 관계 평가를 갱신하세요" in prompt else "pass"
+            if "다음 구간에 남길 기억 세 개를 갱신하세요" in prompt:
+                current = json.loads(prompt.rsplit("현재 저금통 번호: ", 1)[1].split(". 기존 기억:", 1)[0])
+                action = json.dumps({str(bank): {"black": 77, "white": None} for bank in current[::2]})
+            else:
+                action = "{}" if "비공개 관계 평가를 갱신하세요" in prompt else "pass"
             return json.dumps({"action": action, "note": ""})
 
         original_event = Match.event
@@ -491,6 +524,11 @@ class PiggyBankTest(unittest.TestCase):
                          "--model-turns", "30", "--no-allow-review"]
             run_cli(play, title=DAY_THREE_PRISON, seats=4, argv=[*arguments, "--output", str(full)])
             expected = [json.loads(line) for line in full.read_bytes().splitlines()]
+            retained = next(json.loads(row["content"])["banks"] for row in expected
+                            if row.get("msg_type") == "pig_recall" and row["agent_name"] == "P01"
+                            and any(counts["black"] == 77 for counts in json.loads(row["content"])["banks"].values()))
+            self.assertEqual(set(retained), {"1", "3", "5"})
+            self.assertTrue(all(counts == {"black": 77, "white": None} for counts in retained.values()))
             for checkpoint in ("pig_memory_update_initial", "pig_recall_update", "pig_deposit", "pig_doubt",
                                "pig_memory_update_later", "pig_reset", "pig_memory_update_after_reset"):
                 with self.subTest(checkpoint=checkpoint):
