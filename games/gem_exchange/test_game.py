@@ -6,10 +6,12 @@ from io import StringIO
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from ..match import DAY_THREE_MAIN, Match, run_cli
+from ..models import OpenAILanguageModel, StrategyNote
 from .game import BUYERS, CARDS, TABLE, play, round_points
 
 
@@ -169,41 +171,227 @@ class GemBlackMarketTest(unittest.TestCase):
                     self.assertEqual(result["pieces"][player], initial[player] + diamond_rewards[player] + reward - spent)
                     self.assertGreaterEqual(result["pieces"][player], 0)
 
-    def test_interrupted_swap_resumes_to_identical_game(self):
-        original_event = Match.event
+    def test_discussion_allows_replies_before_auction_and_every_swap(self):
+        testcase = self
+        plans = {}
+        submitted_plans = []
+        queries = []
 
-        def interrupt_after_swap(match, kind, data, **kwargs):
-            original_event(match, kind, data, **kwargs)
-            if kind == "gem_swap" and data["round"] == 2 and data["pass"] == 2:
-                raise RuntimeError("test interruption after a committed swap")
+        class NegotiatingMatch(Match):
+            def request_action(self, name, phase, prompt, default, **kwargs):
+                self.phase = phase
+                self.defaults = {name: default}
+                return super().request_action(name, phase, prompt, default, **kwargs)
+
+            def decide_together(self, phase, decisions, **kwargs):
+                self.phase = phase
+                self.defaults = {name: decision.default for name, decision in decisions.items()}
+                return super().decide_together(phase, decisions, **kwargs)
+
+            def _query(self, name, prompt, *args, **kwargs):
+                queries.append((self.phase, name))
+                response = self.defaults[name]
+                if self.phase in {"gem_opening_talk", "gem_talk", "gem_auction_talk"}:
+                    context = next(json.loads(event.content) for event in reversed(self.events)
+                                   if event.msg_type == "gem_discussion_round")
+                    offer = f"offer {context['stage']} {context['round']} {context['pass']} {context['player']}"
+                    if name == "P01" and (context["turn"] == 1 or context["player"] == "P09"):
+                        response = json.dumps({"type": "speak", "channel": "public", "text": offer})
+                    elif context["turn"] == 2 and name == "P02":
+                        testcase.assertTrue(any(event.content == offer for event in self.observations(name)))
+                        response = json.dumps({"type": "speak", "channel": "whisper", "to": "P01", "text": "reply " + offer})
+                elif self.phase in {"gem_strategy", "gem_swap"}:
+                    context = next(json.loads(event.content) for event in reversed(self.events)
+                                   if event.msg_type == "gem_turn")
+                    key = (name, context["round"], context["pass"])
+                    if self.phase == "gem_strategy":
+                        response = plans[key] = f"plan for {name} round {context['round']} pass {context['pass']}"
+                    else:
+                        testcase.assertIn(plans[key], prompt)
+                        submitted_plans.append(key)
+                return response, StrategyNote()
+
+        players = tuple(f"P{index:02}" for index in range(1, 10))
+        client = Mock()
+        client.responses.create.return_value = SimpleNamespace(status="completed", output_text='{"action":"{}"}', usage=None)
+        model = OpenAILanguageModel("test-model", client)
+        match = NegotiatingMatch(players, 8, pieces=[3] * 9, model=model,
+                                 live_players=("P01", "P02"), live_turns=1000)
+        play(match)
+        events = match.events
+        opening = next(event for event in events if event.msg_type == "gem_discussion")
+        auction = next(event for event in events if event.msg_type == "gem_auction_round")
+        self.assertEqual(json.loads(opening.content)["stage"], "opening")
+        self.assertLess(opening.turn, auction.turn)
+        self.assertFalse(any(event.msg_type == "gem_card" for event in events[:auction.turn]))
+        opening_speakers = [name for phase, name in queries if phase == "gem_opening_talk"]
+        self.assertEqual(len(opening_speakers), 24)
+        self.assertEqual(set(opening_speakers[:2]), {"P01", "P02"})
+        self.assertEqual(opening_speakers, opening_speakers[:2] * 12)
+        opening_end = next(event for event in events if event.msg_type == "gem_discussion_end")
+        opening_rounds = [json.loads(event.content)["turn"] for event in events[:opening_end.turn]
+                          if event.msg_type == "gem_discussion_round"]
+        self.assertEqual(opening_rounds, list(range(1, 13)))
+
+        acting = None
+        for event in events:
+            if event.msg_type == "gem_round":
+                acting = None
+            elif event.msg_type == "gem_turn":
+                acting = json.loads(event.content)["player"]
+                swap = next(candidate for candidate in events[event.turn + 1:] if candidate.msg_type == "gem_swap")
+                segment = events[event.turn:swap.turn]
+                kinds = [candidate.msg_type for candidate in segment]
+                self.assertLess(kinds.index("gem_card"), kinds.index("gem_discussion"))
+                self.assertLess(kinds.index("gem_discussion_end"), kinds.index("gem_strategy"))
+                rounds = [json.loads(candidate.content)["turn"] for candidate in segment
+                          if candidate.msg_type == "gem_discussion_round"]
+                ended = next(json.loads(candidate.content) for candidate in segment
+                             if candidate.msg_type == "gem_discussion_end")
+                if acting == "P09":
+                    self.assertEqual(rounds, [1, 2, 3, 4, 5])
+                    self.assertEqual(ended["reason"], "limit")
+                else:
+                    self.assertEqual(rounds, [1, 2, 3])
+                    self.assertEqual(ended["reason"], "all_passed")
+            elif event.msg_type == "gem_card" and acting is not None:
+                self.assertEqual(event.agent_name, acting)
+            elif event.msg_type == "decision_note" and json.loads(event.content)["phase"] == "gem_strategy":
+                self.assertEqual(event.visible_to, [event.agent_name])
+                other = next(player for player in players if player != event.agent_name)
+                self.assertFalse(event in match.observations(other))
+            elif event.msg_type == "whisper":
+                self.assertEqual(event.visible_to, ["P02", "P01"])
+                self.assertNotIn(event, match.observations("P03"))
+        self.assertEqual(len(plans), 12)
+        self.assertEqual(set(submitted_plans), set(plans))
+
+    def test_tied_auction_negotiates_before_rebid_or_agreement(self):
+        testcase = self
+
+        class AuctionComplete(Exception):
+            pass
+
+        class NegotiatedAuction(Match):
+            bid_round = 0
+
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "gem_auction":
+                    raise AuctionComplete
+
+            def request_action(self, name, phase, prompt, default, **kwargs):
+                self.phase = phase
+                self.defaults = {name: default}
+                return super().request_action(name, phase, prompt, default, **kwargs)
+
+            def decide_together(self, phase, decisions, **kwargs):
+                self.phase = phase
+                self.defaults = {name: decision.default for name, decision in decisions.items()}
+                if phase == "gem_bid":
+                    self.bid_round += 1
+                    if self.bid_round == 1:
+                        self.defaults = {name: "1" if name in {"P01", "P02"} else "0" for name in decisions}
+                    else:
+                        testcase.assertEqual(set(decisions), {"P01", "P02"})
+                        self.defaults = {"P01": "2", "P02": "pass"}
+                elif phase == "gem_auction_agreement":
+                    testcase.assertEqual(set(decisions), {"P01", "P02"})
+                    self.defaults = dict.fromkeys(decisions, "P02")
+                return super().decide_together(phase, decisions, **kwargs)
+
+            def _query(self, name, prompt, *args, **kwargs):
+                response = self.defaults[name]
+                if self.phase == "gem_auction_talk":
+                    context = next(json.loads(event.content) for event in reversed(self.events)
+                                   if event.msg_type == "gem_discussion_round")
+                    if context["turn"] == 1 and name == "P01":
+                        response = '{"type":"speak","channel":"public","text":"선은 P02에게 양보하자"}'
+                    elif context["turn"] == 2 and name == "P02":
+                        testcase.assertTrue(any(event.content == "선은 P02에게 양보하자" for event in self.observations(name)))
+                        response = '{"type":"speak","channel":"public","text":"동의한다"}'
+                return response, StrategyNote()
+
+        players = tuple(f"P{index:02}" for index in range(1, 10))
+        for pieces, winner, price in ((1, "P02", 1), (3, "P01", 2)):
+            with self.subTest(pieces=pieces):
+                match = NegotiatedAuction(players, 8, pieces=[pieces] * 9,
+                                          model=OpenAILanguageModel("test-model", Mock()),
+                                          live_players=players, live_turns=1000)
+                with self.assertRaises(AuctionComplete):
+                    play(match)
+                events = match.events
+                final = json.loads(events[-1].content)
+                self.assertEqual(final["leader"], winner)
+                self.assertEqual(final["bid"], price)
+                self.assertEqual(final["pieces"], {player: pieces - (price if player == winner else 0) for player in players})
+                start = next(event for event in events if event.msg_type == "gem_discussion"
+                             and json.loads(event.content)["stage"] == "auction_tie")
+                context = json.loads(start.content)
+                self.assertEqual(set(context["bidders"]), {"P01", "P02"})
+                self.assertEqual(context["bid"], 1)
+                self.assertEqual(context["rounds"], 5)
+                ended = next(event for event in events[start.turn + 1:] if event.msg_type == "gem_discussion_end")
+                self.assertEqual(json.loads(ended.content)["reason"], "all_passed")
+                turns = [json.loads(event.content)["turn"] for event in events[start.turn:ended.turn]
+                         if event.msg_type == "gem_discussion_round"]
+                self.assertEqual(turns, [1, 2, 3])
+                talkers = [event.agent_name for event in events[start.turn:ended.turn]
+                           if event.msg_type == "action" and json.loads(event.content)["phase"] == "gem_auction_talk"]
+                self.assertEqual(Counter(talkers), Counter(dict.fromkeys(players, 3)))
+                next_phase = "gem_auction_agreement" if pieces == 1 else "gem_bid"
+                next_action = next(event for event in events[ended.turn + 1:] if event.msg_type == "action")
+                self.assertEqual(json.loads(next_action.content)["phase"], next_phase)
+
+    def test_interrupted_decisions_resume_to_identical_game(self):
+        original_event = Match.event
 
         with (
             TemporaryDirectory() as directory,
             redirect_stdout(StringIO()),
             redirect_stderr(StringIO()),
-            patch("games.models.CodexLanguageModel._complete", return_value='{"action":"pass","note":"test"}'),
+            patch("games.models.CodexLanguageModel._complete", return_value='{"action":"pass","note":"test"}') as completion,
         ):
-            uninterrupted = Path(directory) / "full.jsonl"
-            resumed = Path(directory) / "resumed.jsonl"
-            arguments = ["--seed", "41", "--pieces", *(["3"] * 9), "--model", "test-model",
-                         "--model-player", "P01", "--model-turns", "300", "--no-allow-review"]
-            run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10),
-                    argv=[*arguments, "--output", str(uninterrupted)])
-            with patch.object(Match, "event", interrupt_after_swap):
-                with self.assertRaisesRegex(RuntimeError, "committed swap"):
-                    run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10),
-                            argv=[*arguments, "--output", str(resumed)])
-            prefix = [json.loads(line) for line in resumed.read_bytes().splitlines()]
-            self.assertEqual(prefix[-1]["type"], "interrupted")
-            decisions = resumed.with_suffix(".decisions.jsonl")
-            self.assertTrue(decisions.read_bytes())
-            run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10),
-                    argv=["--resume", "--output", str(resumed)])
-            expected = [json.loads(line) for line in uninterrupted.read_bytes().splitlines()]
-            actual = [json.loads(line) for line in resumed.read_bytes().splitlines()]
-            self.assertEqual(actual[:-1], expected[:-1])
-            self.assertEqual(actual[-1], expected[-1])
-            self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
+            for budget in (16, 300):
+                uninterrupted = Path(directory) / f"full-{budget}.jsonl"
+                arguments = ["--seed", "41", "--pieces", *(["3"] * 9), "--model", "test-model",
+                             "--model-player", "P01", "--model-turns", str(budget), "--no-allow-review"]
+                run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10),
+                        argv=[*arguments, "--output", str(uninterrupted)])
+                expected = [json.loads(line) for line in uninterrupted.read_bytes().splitlines()]
+                self.assertLessEqual(expected[-1]["model_calls"], budget)
+                for checkpoint in ("gem_swap", "gem_discussion_end", "gem_strategy_note"):
+                    with self.subTest(budget=budget, checkpoint=checkpoint):
+                        resumed = Path(directory) / f"resumed-{budget}-{checkpoint}.jsonl"
+
+                        def interrupt(match, kind, data, **kwargs):
+                            original_event(match, kind, data, **kwargs)
+                            matches_checkpoint = kind == checkpoint
+                            if checkpoint == "gem_strategy_note":
+                                matches_checkpoint = kind == "decision_note" and data.get("phase") == "gem_strategy"
+                            context = data
+                            if matches_checkpoint and checkpoint == "gem_strategy_note":
+                                context = next(json.loads(event.content) for event in reversed(match.events)
+                                               if event.msg_type == "gem_turn")
+                            if matches_checkpoint and context["round"] == 2 and context["pass"] == 2:
+                                raise RuntimeError("test interruption after committed progress")
+
+                        with patch.object(Match, "event", interrupt):
+                            with self.assertRaisesRegex(RuntimeError, "committed progress"):
+                                run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10),
+                                        argv=[*arguments, "--output", str(resumed)])
+                        prefix = [json.loads(line) for line in resumed.read_bytes().splitlines()]
+                        self.assertEqual(prefix[-1]["type"], "interrupted")
+                        decisions = resumed.with_suffix(".decisions.jsonl")
+                        self.assertTrue(decisions.read_bytes())
+                        calls_before_resume = completion.call_count
+                        run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10),
+                                argv=["--resume", "--output", str(resumed)])
+                        actual = [json.loads(line) for line in resumed.read_bytes().splitlines()]
+                        self.assertEqual(actual, expected)
+                        self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
+                        self.assertEqual(completion.call_count - calls_before_resume,
+                                         expected[-1]["model_calls"] - prefix[-1]["model_calls"])
 
 
 if __name__ == "__main__":

@@ -24,6 +24,17 @@ const summaries = [
 ];
 
 export function rulesSummary(heading, body) {
+  if (heading.startsWith("보석 암시장")) {
+    const summary = summaries.find(([prefix]) => prefix === "보석 암시장")[1];
+    if (body.includes("\n\n6. 동률 경매 협상\n")) return summary.replace(
+      "The three-minute turn becomes one discussion action per player.",
+      "The simulation gives each player 12 opening discussion turns before bidding. Each swap and tied auction allows up to five discussion turns, ending early when everyone passes in one turn. All players may discuss auction ties before re-bidding or the final agreement vote. Tied bidders alone submit further bids or nominate the leader. After discussion and any paid inspection, the acting player privately plans the swap.",
+    );
+    return body.includes("2회전") ? summary.replace(
+      "The three-minute turn becomes one discussion action per player.",
+      "The simulation provides two opening discussion turns before bidding and two before each swap. After discussion and any paid inspection, the acting player privately plans the swap.",
+    ) : summary;
+  }
   if (heading.startsWith("선택 2 ·")) {
     const teams = "Enter Rectangle Counting alone or form a team of three. All three players must privately submit the same lineup.";
     const submissionTurn = body.match(/(\d+)턴부터 자기 차례에 비공개로 제출/)?.[1];

@@ -4,7 +4,7 @@ import {Selector} from "@astryxdesign/core/Selector";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {choiceCountLabel, choiceOptionLabel, choiceResults, optionsByChoice} from "./choice-results.js";
 import {RouletteInspection, RouletteInspectionLegend, RouletteScene} from "./day-two-scenes.jsx";
-import {applyGemEvent, gemActionText, gemEventText, gemSlotLabel, GemStage} from "./gem-exchange.jsx";
+import {applyGemEvent, gemActionText, gemDiscussionLabel, gemEventText, gemSlotLabel, GemStage} from "./gem-exchange.jsx";
 import {drawGemSet, gemSetPoint} from "./gem-floor.js";
 import {Heavy13Information} from "./heavy-13-info.jsx";
 import {chipColorLabel} from "./heavy-13.js";
@@ -35,6 +35,8 @@ const labels = {
   colors: tr("색 칩 공개", "Color chips revealed"), weights: tr("무게 공개", "Weights revealed"), placement: tr("큐브 배치", "Cube placement"), market: tr("시세", "Stock prices"), hints: tr("공개 단서", "Public clues"),
   market_tick: tr("거래 시간", "Trading time"), trade_fill: tr("주문 체결", "Trade filled"), seats: tr("자리 배정", "Seating"), inspection: tr("조사", "Inspection"), shift: tr("회전", "Rotation"), swap: tr("조작 · 두 칸 교환", "Manipulation · Two slots swapped"),
   gem_setup: tr("게임 준비", "Game setup"), gem_manito: tr("비공개 마니또", "Private manito"),
+  gem_discussion: tr("대화 시작", "Discussion begins"), gem_discussion_round: tr("대화 회전", "Discussion turn"),
+  gem_discussion_end: tr("대화 종료", "Discussion ends"), gem_strategy: tr("비공개 전략 정리", "Private planning"),
   gem_auction_round: tr("선 플레이어 경매", "Lead auction"), gem_auction: tr("경매 결과", "Auction results"),
   gem_round: tr("라운드 시작", "Round begins"), gem_turn: tr("카드 교환 차례", "Swap turn"),
   gem_card: tr("내 카드 확인", "Inspect own card"), gem_swap: tr("카드 교환", "Card swap"),
@@ -56,7 +58,9 @@ const actions = {
   market_turn: tr("거래소 행동", "Stock exchange action"), credit: tr("크레딧 사용", "Spend credits"),
   gem_bid: tr("선 플레이어 입찰", "Bid for the lead"), gem_auction_agreement: tr("경매 합의", "Auction agreement"),
   gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_swap: tr("교환 상대 선택", "Choose a swap target"),
-  gem_talk: tr("암시장 협상", "Black market negotiations"),
+  gem_opening_talk: tr("게임 시작 전 대화", "Opening discussion"),
+  gem_auction_talk: tr("경매 동률 협상", "Auction tie discussion"),
+  gem_talk: tr("교환 전 대화", "Pre-swap discussion"), gem_strategy: tr("교환 전 판단", "Pre-swap decision"),
   swap: tr("조작 위치 선택", "Select slots to swap"),
 };
 const grassPhases = {
@@ -203,7 +207,7 @@ function record(event, step) {
     action: () => {
       if (credit) return credit.text;
       if (["gem_bid", "gem_auction_agreement", "gem_peek", "gem_swap"].includes(data.phase)) return gemActionText(data.phase, data.action);
-      if (data.phase === "gem_talk") {
+      if (["gem_talk", "gem_opening_talk", "gem_auction_talk"].includes(data.phase)) {
         const action = parse(data.action);
         if (action?.type === "pass") return tr("패스", "Pass");
         if (action?.type === "peek") return tr(`${gemSlotLabel(action.slot)} 카드 확인`, `Inspect ${gemSlotLabel(action.slot)}`);
@@ -1103,6 +1107,8 @@ export function MatchReplay({replay, transport, caseName}) {
   const chapterOptions = events.flatMap(({msg_type: type, data}, index) => {
     const label = (type === "rules" ? (index === 0 ? tr("게임 규칙", "Game rules") : ruleHeading(ruleText(data.split("\n", 1)[0]))) : chapters[type]) ??
       (["round", "market", "gem_round"].includes(type) ? roundLabel(data.round) : null) ??
+      (type === "gem_discussion" ? gemDiscussionLabel(data) : null) ??
+      (type === "gem_strategy" ? gemEventText(type, data) : null) ??
       (type === "negotiation_start" ? (data.choice === 2 ? tr("선택 2 팀 구성 협상", "Choice 2 team negotiations") : tr(`선택 ${data.choice} 전 협상`, `Negotiation before Choice ${data.choice}`)) : null) ??
       (type === "grass_phase" && grassPhases[data] === "place" ? tr("잔디 타일 배치", "Grass tile placement") : null);
     return label ? [{value: String(index + 1), label}] : [];

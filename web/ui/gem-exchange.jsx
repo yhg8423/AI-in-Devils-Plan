@@ -19,6 +19,18 @@ export function gemCardLabel(card) {
   return card ? `${gemNames[card.kind]} ${card.value}` : tr("비공개", "Face down");
 }
 
+export function gemDiscussionLabel({stage, round, pass, player}) {
+  if (stage === "opening") return tr("게임 시작 전 대화", "Opening discussion");
+  if (stage === "auction_tie") return tr("경매 동률 협상", "Auction tie discussion");
+  return tr(`${round}라운드 · ${player} ${pass === 1 ? "정순" : "역순"} 교환 전 대화`,
+    `Round ${round} · Discussion before ${player}’s ${pass === 1 ? "forward" : "reverse"} swap`);
+}
+
+function gemDiscussionProgress({turn, rounds}) {
+  return turn ? tr(`대화 ${turn} / ${rounds}회전`, `Discussion turn ${turn} of ${rounds}`) :
+    tr(`${rounds}회전 대화 시작`, `${rounds} discussion turns begin`);
+}
+
 export function gemActionText(phase, action) {
   if (phase === "gem_bid") return action === "pass" ? tr("기존 입찰 유지", "Keep previous bid") : tr(`피스 ${action}개 입찰`, `Bid ${action} Pieces`);
   if (phase === "gem_auction_agreement") return tr(`선 플레이어로 ${action} 지명`, `Nominate ${action} to lead`);
@@ -31,6 +43,17 @@ export function gemEventText(type, data) {
     case "gem_setup": return tr(`참가자 ${data.base_order.length}명 · 카드 ${data.card_count}장 · ${data.rounds}라운드`,
       `${data.base_order.length} players · ${data.card_count} cards · ${data.rounds} rounds`);
     case "gem_manito": return tr(`내 점수가 곱해지는 상대 · ${data.beneficiary}`, `My points multiply ${data.beneficiary}’s score`);
+    case "gem_discussion":
+    case "gem_discussion_round": return `${gemDiscussionLabel(data)} · ${gemDiscussionProgress(data)}`;
+    case "gem_discussion_end": {
+      const reason = {
+        all_passed: tr("전원 패스", "All players passed"),
+        limit: tr("대화 한도 도달", "Discussion limit reached"),
+      }[data.reason];
+      return [tr(`${gemDiscussionLabel(data)} 종료`, `${gemDiscussionLabel(data)} ends`), reason].filter(Boolean).join(" · ");
+    }
+    case "gem_strategy": return tr(`${data.round}라운드 · ${data.player} 비공개 전략 정리`,
+      `Round ${data.round} · ${data.player}’s private planning`);
     case "gem_auction_round": return tr(`경매 ${data.round}차 · ${data.bidders.join(" · ")}`, `Auction ${data.round} · ${data.bidders.join(" · ")}`);
     case "gem_auction": return tr(`선 ${data.leader} · 피스 ${data.bid}개`, `Leader ${data.leader} · ${data.bid} Pieces`);
     case "gem_round": return tr(`${data.round}라운드 · 선 ${data.leader}`, `Round ${data.round} · Leader ${data.leader}`);
@@ -57,6 +80,13 @@ export function applyGemEvent(state, type, data, event) {
       state.gemManitos = {};
       break;
     case "gem_manito": state.gemManitos[event.agent_name] = data.beneficiary; break;
+    case "gem_discussion":
+      state.gemDiscussion = {...data, turn: 0};
+      state.gemStrategy = null;
+      break;
+    case "gem_discussion_round": state.gemDiscussion = {...state.gemDiscussion, ...data}; break;
+    case "gem_discussion_end": state.gemDiscussion = null; break;
+    case "gem_strategy": state.gemStrategy = data; break;
     case "gem_auction_round": state.gemAuctionRound = data; break;
     case "gem_auction":
       state.gemAuction = data;
@@ -70,14 +100,20 @@ export function applyGemEvent(state, type, data, event) {
       state.gemTurn = null;
       state.gemReveal = null;
       state.gemLastSwap = null;
+      state.gemDiscussion = null;
+      state.gemStrategy = null;
       break;
-    case "gem_turn": state.gemTurn = data; break;
+    case "gem_turn":
+      state.gemTurn = data;
+      state.gemStrategy = null;
+      break;
     case "gem_card":
     case "gem_peek": state.gemCards[data.slot] = data.card; break;
     case "gem_swap": {
       const cards = state.gemCards;
       [cards[data.player], cards[data.target]] = [cards[data.target], cards[data.player]];
       state.gemLastSwap = data;
+      state.gemStrategy = null;
       break;
     }
     case "gem_bonus": state.gemScores = data.scores; break;
@@ -113,6 +149,7 @@ function GemCard({slot, card, active, selected, onChoose}) {
 
 export function GemStage({state, players, selected, onChoose}) {
   const {gemSetup: setup, gemAuction: auction, gemRound: round, gemTurn: turn, gemReveal: reveal,
+    gemDiscussion: discussion, gemStrategy: strategy,
     gemCards: cards = {}, gemScores: scores = {}, gemPieces: pieces = {}, gemManitos: manitos = {}, gemFinal: final, result} = state;
   const order = round?.order ?? auction?.order ?? setup?.base_order ?? players;
   const incoming = Object.fromEntries(Object.entries(manitos).map(([source, beneficiary]) => [beneficiary, source]));
@@ -129,11 +166,19 @@ export function GemStage({state, players, selected, onChoose}) {
     </div>;
   }
   return <div className="gem-stage">
-    <h2>{round ? tr(`${round.round} / ${setup?.rounds ?? 3}라운드`, `Round ${round.round} of ${setup?.rounds ?? 3}`) : tr("선 플레이어 경매", "Auction for the lead")}</h2>
+    <h2>{round ? tr(`${round.round} / ${setup?.rounds ?? 3}라운드`, `Round ${round.round} of ${setup?.rounds ?? 3}`) :
+      discussion ? gemDiscussionLabel(discussion) : tr("선 플레이어 경매", "Auction for the lead")}</h2>
     <p className="muted gem-status">{reveal ? tr(`카드 공개 · 다음 선 ${reveal.next_leader}`, `Cards revealed · Next leader ${reveal.next_leader}`) :
+      discussion && discussion.stage !== "before_swap" ? gemDiscussionProgress(discussion) :
+      discussion ? gemEventText(discussion.turn ? "gem_discussion_round" : "gem_discussion", discussion) :
+        strategy ? gemEventText("gem_strategy", strategy) :
       turn ? gemEventText("gem_turn", turn) : auction ? tr(`선 ${auction.leader}`, `Leader ${auction.leader}`) :
         state.gemAuctionRound ? gemEventText("gem_auction_round", state.gemAuctionRound) :
           tr("피스로 비공개 입찰", "Sealed bids using Pieces")}</p>
+    {discussion?.stage === "auction_tie" && <p className="choice-result">{tr(
+      `피스 ${discussion.bid}개 동률 · ${discussion.bidders.join(" · ")}`,
+      `Tied at ${discussion.bid} Pieces · ${discussion.bidders.join(" · ")}`,
+    )}</p>}
     {round && <>
       <div className="gem-market-cards" aria-label={tr("구매자와 휴지통 카드", "Buyer and trash cards")}>
         {marketSlots.map((slot) => <GemCard key={slot} slot={slot} card={cards[slot]} />)}
