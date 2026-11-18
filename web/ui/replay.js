@@ -16,6 +16,7 @@ export const phaseNames = {
   gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_swap: tr("카드 교환", "Card swap"),
   gem_opening_talk: tr("게임 시작 전 대화", "Opening discussion"),
   gem_auction_talk: tr("경매 동률 협상", "Auction tie discussion"),
+  gem_after_auction_talk: tr("경매 후 대화", "Post-auction discussion"),
   gem_talk: tr("교환 전 대화", "Pre-swap discussion"), gem_strategy: tr("교환 전 판단", "Pre-swap decision"),
   roulette_talk: tr("러시안 룰렛 대화", "Russian Roulette conversation"), roulette_reflection: tr("행동 후 복기", "Post-action reflection"),
   before_choice: tr("선택 5 전 협상", "Talks before Choice 5"), choice_five: tr("선택 5 · 점수 또는 정보", "Choice 5 · Points or information"),
@@ -66,12 +67,29 @@ const relationshipCheckpoints = {
   "선택 5 전 협상 종료": "End of negotiations before Choice 5", "미리보기 후 협상 종료": "End of negotiations after the preview",
   "잔디 깔기 배치 전 협상 종료": "End of talks before tile placement", "잔디 깔기 결과": "Lay the Grass results",
   "선택 9 모금 결과": "Choice 9 pledge results", "무거운 13 전반 종료": "End of the first half of Heavy 13",
+  "보석 암시장 시작 전 협상 종료": "End of opening discussions · Gem Black Market",
+  "보석 암시장 경매 후 협상 종료": "End of post-auction discussions · Gem Black Market",
+  "보석 암시장 선 경매 결과 공개": "Lead auction results revealed · Gem Black Market",
+  "보석 암시장 마니또·최종 점수 공개": "Manitos and final scores revealed · Gem Black Market",
+  "보석 암시장 연맹의 징표 사용": "Alliance Token used · Gem Black Market",
 };
 
 export function checkpointLabel(checkpoint, translated) {
   if (!en || !checkpoint) return checkpoint;
   const round = checkpoint.match(/^(거래소|러시안 룰렛|보석 암시장) (\d+)라운드 종료$/);
   if (round) return `End of round ${round[2]} · ${{"거래소": "Mystery Stock Exchange", "러시안 룰렛": "Russian Roulette", "보석 암시장": "Gem Black Market"}[round[1]]}`;
+  const auction = checkpoint.match(/^보석 암시장 (\d+)피스 동률 협상 종료$/);
+  if (auction) return `End of tied-auction discussions · ${auction[1]} Pieces · Gem Black Market`;
+  const swap = checkpoint.match(/^보석 암시장 (\d+)라운드 ([12])차 (.+) (교환 전 협상 종료|교환 완료)$/);
+  if (swap) {
+    const [, round, pass, player, stage] = swap;
+    const label = stage === "교환 완료" ? "Swap complete" : "End of pre-swap discussions";
+    return `${label} · Round ${round} · ${pass === "1" ? "Forward" : "Reverse"} · ${player} · Gem Black Market`;
+  }
+  const reveal = checkpoint.match(/^보석 암시장 (\d+)라운드 카드 공개$/);
+  if (reveal) return `Cards revealed · Round ${reveal[1]} · Gem Black Market`;
+  const inspection = checkpoint.match(/^보석 암시장 (\d+)라운드 (.+) 유료 카드 확인 완료$/);
+  if (inspection) return `Paid card inspection complete · Round ${inspection[1]} · ${inspection[2]} · Gem Black Market`;
   return relationshipCheckpoints[checkpoint] ?? translated ?? checkpoint;
 }
 

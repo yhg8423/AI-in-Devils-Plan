@@ -22,6 +22,7 @@ export function gemCardLabel(card) {
 export function gemDiscussionLabel({stage, round, pass, player}) {
   if (stage === "opening") return tr("게임 시작 전 대화", "Opening discussion");
   if (stage === "auction_tie") return tr("경매 동률 협상", "Auction tie discussion");
+  if (stage === "after_auction") return tr("경매 후 대화", "Post-auction discussion");
   return tr(`${round}라운드 · ${player} ${pass === 1 ? "정순" : "역순"} 교환 전 대화`,
     `Round ${round} · Discussion before ${player}’s ${pass === 1 ? "forward" : "reverse"} swap`);
 }
@@ -54,7 +55,9 @@ export function gemEventText(type, data) {
     }
     case "gem_strategy": return tr(`${data.round}라운드 · ${data.player} 비공개 전략 정리`,
       `Round ${data.round} · ${data.player}’s private planning`);
-    case "gem_auction_round": return tr(`경매 ${data.round}차 · ${data.bidders.join(" · ")}`, `Auction ${data.round} · ${data.bidders.join(" · ")}`);
+    case "gem_auction_round": return data.manito_reveal ?
+      tr(`마니또 확인 · 피스 경매 · ${data.bidders.join(" · ")}`, `Manito reveal and Piece auction · ${data.bidders.join(" · ")}`) :
+      tr(`경매 ${data.round}차 · ${data.bidders.join(" · ")}`, `Auction ${data.round} · ${data.bidders.join(" · ")}`);
     case "gem_auction": return tr(`선 ${data.leader} · 피스 ${data.bid}개`, `Leader ${data.leader} · ${data.bid} Pieces`);
     case "gem_round": return tr(`${data.round}라운드 · 선 ${data.leader}`, `Round ${data.round} · Leader ${data.leader}`);
     case "gem_turn": return tr(`${data.player} · ${data.pass === 1 ? "정순" : "역순"} 교환`,
@@ -167,7 +170,8 @@ export function GemStage({state, players, selected, onChoose}) {
   }
   return <div className="gem-stage">
     <h2>{round ? tr(`${round.round} / ${setup?.rounds ?? 3}라운드`, `Round ${round.round} of ${setup?.rounds ?? 3}`) :
-      discussion ? gemDiscussionLabel(discussion) : tr("선 플레이어 경매", "Auction for the lead")}</h2>
+      discussion ? gemDiscussionLabel(discussion) : state.gemAuctionRound?.manito_reveal && !auction ?
+        tr("마니또 확인 · 피스 경매", "Manito reveal and Piece auction") : tr("선 플레이어 경매", "Auction for the lead")}</h2>
     <p className="muted gem-status">{reveal ? tr(`카드 공개 · 다음 선 ${reveal.next_leader}`, `Cards revealed · Next leader ${reveal.next_leader}`) :
       discussion && discussion.stage !== "before_swap" ? gemDiscussionProgress(discussion) :
       discussion ? gemEventText(discussion.turn ? "gem_discussion_round" : "gem_discussion", discussion) :

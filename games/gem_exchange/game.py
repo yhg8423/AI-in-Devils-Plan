@@ -13,6 +13,8 @@ OPENING_DISCUSSION_ROUNDS = 12
 DISCUSSION_ROUNDS = 5
 STRATEGY_HEADING = "\n\n5. 협상과 전략 정리\n"
 AUCTION_TALK_HEADING = "\n\n6. 동률 경매 협상\n"
+SETUP_ORDER_HEADING = "\n\n7. 시작 전 진행 순서\n"
+RELATIONSHIP_HEADING = "\n\n8. 관계 평가 갱신\n"
 BUYERS = ("buyer1", "buyer2", "buyer3")
 TABLE = (*BUYERS, "trash")
 CARDS = tuple(
@@ -34,7 +36,7 @@ def round_points(cards):
     }
 
 
-def auction(match, base_order, pieces, *, negotiate=None):
+def auction(match, base_order, pieces, *, negotiate=None, manitos=None):
     """Only the winner pays. A rebid replaces the bidder's total commitment."""
     bidders = list(base_order)
     highest = -1
@@ -42,7 +44,13 @@ def auction(match, base_order, pieces, *, negotiate=None):
     resolution = "bid"
     while len(bidders) > 1:
         round_number += 1
-        match.event("gem_auction_round", {"round": round_number, "bidders": bidders, "minimum": highest + 1})
+        auction_round = {"round": round_number, "bidders": bidders, "minimum": highest + 1}
+        if manitos is not None:
+            auction_round["manito_reveal"] = round_number == 1
+        match.event("gem_auction_round", auction_round)
+        if round_number == 1 and manitos is not None:
+            for name in base_order:
+                match.event("gem_manito", {"beneficiary": manitos[name]}, actor=name, private=[name])
         decisions = {}
         for name in bidders:
             amounts = tuple(str(value) for value in range(highest + 1, pieces[name] + 1))
@@ -51,7 +59,9 @@ def auction(match, base_order, pieces, *, negotiate=None):
                 f"1라운드 선을 정하는 비공개 피스 경매입니다. 기본 순서 {encode(base_order)}. "
                 f"내 피스 {pieces[name]}개. 현재 최고 입찰 {max(0, highest)}개. "
                 "입찰액은 총 지불할 피스 수입니다. 낙찰자만 지불하고 다른 참가자의 피스는 반환됩니다. "
-                "재경매에서는 이전 최고액보다 높게 입찰하거나 pass로 기존 입찰을 유지하세요.",
+                "재경매에서는 이전 최고액보다 높게 입찰하거나 pass로 기존 입찰을 유지하세요."
+                + (f"\n이번 경매 단계에서 확인한 내 점수의 수혜자는 {manitos[name]}입니다."
+                   if manitos is not None else ""),
                 match.policy.choice(options), options=options,
             )
         responses = match.decide_together("gem_bid", decisions)
@@ -98,6 +108,8 @@ def play(match: Match) -> dict:
         recorded_rules = next((event["content"] for event in log.events if event["msg_type"] == "rules"), None)
     enhanced_discussion = recorded_rules is None or STRATEGY_HEADING in recorded_rules
     expanded_discussion = recorded_rules is None or AUCTION_TALK_HEADING in recorded_rules
+    reordered_setup = recorded_rules is None or SETUP_ORDER_HEADING in recorded_rules
+    event_relationships = recorded_rules is None or RELATIONSHIP_HEADING in recorded_rules
     opening_rounds = OPENING_DISCUSSION_ROUNDS if expanded_discussion else 2
     swap_rounds = DISCUSSION_ROUNDS if expanded_discussion else 2
     discussion_turns = "2회전" if enhanced_discussion else "한 번씩"
@@ -145,8 +157,11 @@ def play(match: Match) -> dict:
         "생활동으로 옮깁니다. 최종 승점이 1점 이상이면 피스 1개, 10점 이상이면 총 2개를 받습니다."
     )
     if enhanced_discussion:
+        opening_rule = f"규칙과 개인 마니또를 확인한 뒤, 선 경매 전에 전원이 {opening_rounds}회전 동안 협상하고 대화합니다. "
+        if reordered_setup:
+            opening_rule = f"게임 규칙을 확인한 뒤, 마니또가 공개되기 전에 전원이 {opening_rounds}회전 동안 협상하고 대화합니다. "
         rules += STRATEGY_HEADING + (
-            f"규칙과 개인 마니또를 확인한 뒤, 선 경매 전에 전원이 {opening_rounds}회전 동안 협상하고 대화합니다. "
+            opening_rule +
             f"각 교환 차례에도 전원이 {discussion_turns} 동안 대화할 수 있어 제안과 응답을 주고받습니다. "
             "각 회전에서 모두가 한 번씩 대화 행동을 선택하며, 교환자는 마지막에 말합니다. "
             "유료 카드 확인 여부를 결정한 교환자는 자신의 카드와 지금까지 들은 대화를 바탕으로 비공개 전략 메모를 "
@@ -159,10 +174,25 @@ def play(match: Match) -> dict:
             "재입찰과 최종 지명 투표는 동률 참가자만 합니다. 교환 전 대화와 동률 협상은 "
             "한 회전에서 모두 패스하면 일찍 끝납니다. 시작 전 협상은 12회전을 진행합니다."
         )
+    if reordered_setup:
+        rules += SETUP_ORDER_HEADING + (
+            "시작 전 대화가 끝나면 마니또 확인과 피스 경매를 같은 단계에서 진행합니다. "
+            "모두 자신의 마니또를 비공개로 전달받고, 중간 대화 없이 입찰액을 동시에 비공개로 제출합니다. "
+            "경매가 끝난 뒤 전원에게 최대 5회전의 추가 대화 기회를 줍니다. 이 대화에서도 "
+            "한 회전에서 모두 패스하면 일찍 끝납니다. 이후 카드를 배분하고 1라운드를 시작합니다."
+        )
+    if event_relationships:
+        rules += RELATIONSHIP_HEADING + (
+            "각 협상 구간이 끝날 때, 선 경매 결과가 공개될 때, 유료 카드 확인과 교환을 마칠 때 "
+            "친밀도와 신뢰도를 검토합니다. 카드 공개 정산, 최종 마니또·점수 공개와 연맹의 징표 사용 후에도 검토합니다. "
+            "참가자는 자신에게 보인 새 대화와 행동을 근거로 평가하고, 최근 관측을 참고해 약속과 실제 결과를 비교합니다. "
+            "새 근거가 있을 때 갱신하며, 점수와 이유는 본인만 볼 수 있습니다."
+        )
     match.event("rules", rules)
     match.event("gem_setup", {"base_order": base_order, "pieces": pieces.copy(), "rounds": ROUNDS, "card_count": len(deck)})
-    for name in players:
-        match.event("gem_manito", {"beneficiary": manitos[name]}, actor=name, private=[name])
+    if not reordered_setup:
+        for name in players:
+            match.event("gem_manito", {"beneficiary": manitos[name]}, actor=name, private=[name])
 
     def peek(name, slot, round_number, cards):
         pieces[name] -= 1
@@ -171,6 +201,8 @@ def play(match: Match) -> dict:
         match.event("gem_piece", {"player": name, "pieces": pieces[name], "reason": "peek"})
         match.event("gem_peek", {"round": round_number, "slot": slot, "card": cards[slot]},
                     actor=name, private=[name])
+        if event_relationships:
+            match.review_relationships(f"보석 암시장 {round_number}라운드 {name} 유료 카드 확인 완료")
 
     def talk(name, acting, round_number, pass_number, cards, *, stage="before_swap", turn_number=1, seat=0,
              bidders=(), bid=None):
@@ -195,10 +227,17 @@ def play(match: Match) -> dict:
         if stage == "opening":
             topic = ("게임 규칙과 개인 마니또를 확인한 뒤, 선 경매에 입찰하기 전의 협상입니다. "
                      "아직 카드는 배분되지 않았습니다. 경매, 정보 공유와 협력 계획을 논의할 수 있습니다. ")
+            if reordered_setup:
+                topic = ("게임 규칙을 확인한 뒤의 시작 전 협상입니다. 아직 개인 마니또와 카드는 공개되지 않았습니다. "
+                         "마니또는 다음 피스 경매 단계에서 각자 확인합니다. 경매, 정보 공유와 협력 계획을 논의하세요. ")
         elif stage == "auction_tie":
             topic = (f"선 경매 최고액 {bid}피스의 동률 협상입니다. 동률 후보 {encode(bidders)}. "
                      "재입찰 또는 최종 지명을 앞두고 선 플레이어, 입찰과 협력을 논의하세요. "
                      "전원이 대화할 수 있으며 재입찰과 최종 지명은 동률 참가자만 합니다. ")
+        elif stage == "after_auction":
+            topic = ("개인 마니또를 비공개로 확인하고 선 경매를 마친 뒤의 추가 협상입니다. "
+                     "공개된 선과 입찰 결과, 본인 마니또를 바탕으로 협력과 정보 공유를 논의하세요. "
+                     "아직 카드는 배분되지 않았습니다. ")
         else:
             topic = f"{round_number}라운드 {pass_number}차 교환 전 대화입니다. 이번 교환자는 {acting}입니다. "
         request = discussion.request(
@@ -215,7 +254,8 @@ def play(match: Match) -> dict:
                           ((round_number - 1) * 2 + pass_number - 1) * len(players) ** 2),
             notes=False,
         )
-        phase = {"opening": "gem_opening_talk", "auction_tie": "gem_auction_talk"}.get(stage, "gem_talk")
+        phase = {"opening": "gem_opening_talk", "auction_tie": "gem_auction_talk",
+                 "after_auction": "gem_after_auction_talk"}.get(stage, "gem_talk")
         action = match.decide(name, phase, request.content, PASS, valid=valid, request_type=request.msg_type)
         decision = parse(action)
         if isinstance(decision, str):
@@ -247,14 +287,29 @@ def play(match: Match) -> dict:
                 reason = "all_passed"
                 break
         match.event("gem_discussion_end", {**context, "reason": reason} if expanded_discussion else context)
+        if event_relationships:
+            checkpoints = {
+                "opening": "보석 암시장 시작 전 협상 종료",
+                "after_auction": "보석 암시장 경매 후 협상 종료",
+                "auction_tie": f"보석 암시장 {bid}피스 동률 협상 종료",
+                "before_swap": f"보석 암시장 {round_number}라운드 {pass_number}차 {acting} 교환 전 협상 종료",
+            }
+            match.review_relationships(checkpoints[stage])
 
     if enhanced_discussion:
         discuss(base_order, None, 0, 0)
+
     def negotiate(bidders, bid):
         discuss(base_order, None, 0, 0, stage="auction_tie", bidders=bidders, bid=bid)
 
-    leader, bid = auction(match, base_order, pieces, negotiate=negotiate if expanded_discussion else None)
+    leader, bid = auction(match, base_order, pieces, negotiate=negotiate if expanded_discussion else None,
+                          manitos=manitos if reordered_setup else None)
     spent[leader] += bid
+    if event_relationships:
+        match.review_relationships("보석 암시장 선 경매 결과 공개")
+    if reordered_setup:
+        offset = base_order.index(leader)
+        discuss(base_order[offset:] + base_order[:offset], None, 0, 0, stage="after_auction")
 
     for round_number in range(1, ROUNDS + 1):
         offset = base_order.index(leader)
@@ -325,6 +380,9 @@ def play(match: Match) -> dict:
                 match.event("gem_card", {"round": round_number, "slot": name, "card": cards[name]},
                             actor=name, private=[name])
 
+                if event_relationships:
+                    match.review_relationships(f"보석 암시장 {round_number}라운드 {pass_number}차 {name} 교환 완료")
+
         points = round_points(cards)
         for name in players:
             scores[name] += points[name]
@@ -339,11 +397,14 @@ def play(match: Match) -> dict:
             "round": round_number, "cards": cards.copy(), "points": points, "scores": scores.copy(),
             "pieces": pieces.copy(), "next_leader": leader,
         })
-        match.review_relationships(f"보석 암시장 {round_number}라운드 종료")
+        match.review_relationships(f"보석 암시장 {round_number}라운드 카드 공개" if event_relationships else
+                                   f"보석 암시장 {round_number}라운드 종료")
 
     final_scores = {beneficiary: scores[beneficiary] * scores[source] for source, beneficiary in manitos.items()}
     ranking = sorted(base_order, key=lambda name: -final_scores[name])
     match.event("gem_final", {"manitos": manitos, "scores": scores, "final_scores": final_scores})
+    if event_relationships:
+        match.review_relationships("보석 암시장 마니또·최종 점수 공개")
     living, prison = ranking[:3], ranking[3:-1]
     saved = match.decide(
         ranking[0], "alliance", f"최종 승점 {encode(final_scores)}. 연맹의 징표로 생활동으로 옮길 참가자를 고르세요.",
@@ -351,6 +412,8 @@ def play(match: Match) -> dict:
     )
     living.append(saved)
     prison.remove(saved)
+    if event_relationships:
+        match.review_relationships("보석 암시장 연맹의 징표 사용")
     for name in players:
         reward = int(final_scores[name] >= 1) + int(final_scores[name] >= 10)
         pieces[name] += reward

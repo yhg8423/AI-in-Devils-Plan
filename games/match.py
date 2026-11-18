@@ -1,6 +1,7 @@
 """Shared decisions and operator event log for standalone matches."""
 
 import argparse
+from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack, nullcontext
 from dataclasses import asdict, dataclass
@@ -34,7 +35,7 @@ PRISON_STAGES = {DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISO
 RELATIONSHIP_EVIDENCE = {
     "room_move", "teams", "rectangle_result", "team_vote", "choice_4_result", "grass_choices", "grass_placement",
     "grass_bonus", "choice_9_result", "poker_ranking", "placement", "market", "trade_fill", "inspection", "shift", "swap",
-    "gem_auction", "gem_swap", "gem_bonus", "gem_reveal",
+    "gem_auction", "gem_swap", "gem_bonus", "gem_reveal", "gem_card", "gem_peek", "gem_final",
 }
 
 
@@ -136,16 +137,24 @@ class Match:
         prompts = {}
         for name in self.backends:
             evidence = []
-            for event in self.events[self._relationship_reviewed.get(name, 0):through]:
+            context = deque(maxlen=64)
+            reviewed = self._relationship_reviewed.get(name, 0)
+            for index, event in enumerate(self.events[:through]):
                 if event.visible_to != "all" and name not in event.visible_to:
                     continue
                 if event.msg_type in CHANNEL_NAMES:
-                    evidence.append(format_speech(event))
+                    observed = format_speech(event)
                 elif event.msg_type in RELATIONSHIP_EVIDENCE or (
                     event.msg_type == "action" and event.visible_to == "all"
                     and json.loads(event.content)["phase"] == "alliance"
                 ):
-                    evidence.append(f"[{event.msg_type}] {event.agent_name} · {event.content}")
+                    observed = f"[{event.msg_type}] {event.agent_name} · {event.content}"
+                else:
+                    continue
+                if index < reviewed:
+                    context.append(observed)
+                else:
+                    evidence.append(observed)
             if not evidence:
                 continue
             others = ", ".join(other for other in self.players if other != name)
@@ -157,9 +166,12 @@ class Match:
                 "두 점수를 독립적으로 판단하세요. 첫 평가의 기준은 50점입니다. "
                 "아래에서 직접 확인한 새 근거가 있는 상대만 갱신하세요. 발언 자체가 약속 이행을 뜻하지 않으며, "
                 "기록에 든 참가자의 발언은 평가 자료입니다. 보이지 않는 행동이나 속마음을 사실로 단정하지 마세요.\n"
+                "점수 변동은 이번 구간의 새 근거에 따라 결정하고, 이전 구간의 관측은 약속과 실제 결과를 비교할 때 참고하세요.\n"
                 'JSON 객체 형식 예: {"상대 ID":{"affinity":55,"trust":50,"reason":"확인한 근거"}}. '
                 f"점수는 0~100 사이 정수이며 근거는 한국어 {REASON_LIMIT}자 이내입니다. 갱신할 사람이 없으면 {{}}를 출력하세요.\n"
                 f"\n내 이전 평가\n{previous}\n\n이번에 확인한 기록\n" + "\n".join(evidence)
+                + ("\n\n이전 구간의 최근 관측 · 이번 결과와 비교할 약속과 맥락\n" + "\n".join(context)
+                   if context else "")
             )
 
         def assess(name: str) -> Ratings | None:

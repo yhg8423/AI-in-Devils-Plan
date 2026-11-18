@@ -60,6 +60,7 @@ const actions = {
   gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_swap: tr("교환 상대 선택", "Choose a swap target"),
   gem_opening_talk: tr("게임 시작 전 대화", "Opening discussion"),
   gem_auction_talk: tr("경매 동률 협상", "Auction tie discussion"),
+  gem_after_auction_talk: tr("경매 후 대화", "Post-auction discussion"),
   gem_talk: tr("교환 전 대화", "Pre-swap discussion"), gem_strategy: tr("교환 전 판단", "Pre-swap decision"),
   swap: tr("조작 위치 선택", "Select slots to swap"),
 };
@@ -207,7 +208,7 @@ function record(event, step) {
     action: () => {
       if (credit) return credit.text;
       if (["gem_bid", "gem_auction_agreement", "gem_peek", "gem_swap"].includes(data.phase)) return gemActionText(data.phase, data.action);
-      if (["gem_talk", "gem_opening_talk", "gem_auction_talk"].includes(data.phase)) {
+      if (["gem_talk", "gem_opening_talk", "gem_auction_talk", "gem_after_auction_talk"].includes(data.phase)) {
         const action = parse(data.action);
         if (action?.type === "pass") return tr("패스", "Pass");
         if (action?.type === "peek") return tr(`${gemSlotLabel(action.slot)} 카드 확인`, `Inspect ${gemSlotLabel(action.slot)}`);
@@ -1108,6 +1109,7 @@ export function MatchReplay({replay, transport, caseName}) {
     const label = (type === "rules" ? (index === 0 ? tr("게임 규칙", "Game rules") : ruleHeading(ruleText(data.split("\n", 1)[0]))) : chapters[type]) ??
       (["round", "market", "gem_round"].includes(type) ? roundLabel(data.round) : null) ??
       (type === "gem_discussion" ? gemDiscussionLabel(data) : null) ??
+      (type === "gem_auction_round" && data.manito_reveal ? tr("마니또 확인 · 피스 경매", "Manito reveal and Piece auction") : null) ??
       (type === "gem_strategy" ? gemEventText(type, data) : null) ??
       (type === "negotiation_start" ? (data.choice === 2 ? tr("선택 2 팀 구성 협상", "Choice 2 team negotiations") : tr(`선택 ${data.choice} 전 협상`, `Negotiation before Choice ${data.choice}`)) : null) ??
       (type === "grass_phase" && grassPhases[data] === "place" ? tr("잔디 타일 배치", "Grass tile placement") : null);

@@ -176,6 +176,7 @@ class GemBlackMarketTest(unittest.TestCase):
         plans = {}
         submitted_plans = []
         queries = []
+        refreshed_choices = set()
 
         class NegotiatingMatch(Match):
             def request_action(self, name, phase, prompt, default, **kwargs):
@@ -191,19 +192,38 @@ class GemBlackMarketTest(unittest.TestCase):
             def _query(self, name, prompt, *args, **kwargs):
                 queries.append((self.phase, name))
                 response = self.defaults[name]
-                if self.phase in {"gem_opening_talk", "gem_talk", "gem_auction_talk"}:
+                observations = self.observations(name)
+                identities = [event for event in observations if event.msg_type == "gem_manito"]
+                if self.phase == "gem_opening_talk":
+                    testcase.assertEqual(identities, [])
+                    testcase.assertNotIn("개인 마니또를 확인한 뒤", prompt)
+                elif self.phase in {"gem_bid", "gem_after_auction_talk"}:
+                    testcase.assertEqual(len(identities), 1)
+                    testcase.assertEqual(identities[0].agent_name, name)
+                    testcase.assertEqual(identities[0].visible_to, [name])
+                if self.phase in {"gem_opening_talk", "gem_talk", "gem_auction_talk", "gem_after_auction_talk"}:
                     context = next(json.loads(event.content) for event in reversed(self.events)
                                    if event.msg_type == "gem_discussion_round")
                     offer = f"offer {context['stage']} {context['round']} {context['pass']} {context['player']}"
                     if name == "P01" and (context["turn"] == 1 or context["player"] == "P09"):
-                        response = json.dumps({"type": "speak", "channel": "public", "text": offer})
+                        message = offer
+                        if self.phase == "gem_after_auction_talk":
+                            outcome = next(json.loads(event.content) for event in observations if event.msg_type == "gem_auction")
+                            beneficiary = json.loads(identities[0].content)["beneficiary"]
+                            message += f" · 내 마니또 {beneficiary} · 낙찰자 {outcome['leader']}"
+                        response = json.dumps({"type": "speak", "channel": "public", "text": message})
                     elif context["turn"] == 2 and name == "P02":
-                        testcase.assertTrue(any(event.content == offer for event in self.observations(name)))
-                        response = json.dumps({"type": "speak", "channel": "whisper", "to": "P01", "text": "reply " + offer})
+                        heard = next((event.content for event in observations if event.content.startswith(offer)), None)
+                        testcase.assertIsNotNone(heard)
+                        response = json.dumps({"type": "speak", "channel": "whisper", "to": "P01", "text": "reply " + heard})
                 elif self.phase in {"gem_strategy", "gem_swap"}:
                     context = next(json.loads(event.content) for event in reversed(self.events)
                                    if event.msg_type == "gem_turn")
                     key = (name, context["round"], context["pass"])
+                    if name == "P01" and any(event.msg_type == "gem_swap" for event in self.events):
+                        testcase.assertIs(self.backends[name].relationships, self.relationships[name])
+                        testcase.assertEqual(self.backends[name].relationships["P02"]["trust"], 80)
+                        refreshed_choices.add(self.phase)
                     if self.phase == "gem_strategy":
                         response = plans[key] = f"plan for {name} round {context['round']} pass {context['pass']}"
                     else:
@@ -213,7 +233,19 @@ class GemBlackMarketTest(unittest.TestCase):
 
         players = tuple(f"P{index:02}" for index in range(1, 10))
         client = Mock()
-        client.responses.create.return_value = SimpleNamespace(status="completed", output_text='{"action":"{}"}', usage=None)
+
+        def relationship_response(**kwargs):
+            prompt = kwargs["input"][0]["content"][0]["text"]
+            ratings = {}
+            if "Exercise: P01의" in prompt:
+                if "[gem_swap]" in prompt:
+                    ratings = {"P02": {"affinity": 61, "trust": 80, "reason": "공개 교환 결과를 확인함"}}
+                elif "P02" not in match.relationships["P01"]:
+                    ratings = {"P02": {"affinity": 55, "trust": 55, "reason": "협상에서 답변을 받음"}}
+            response = json.dumps({"action": json.dumps(ratings, ensure_ascii=False)})
+            return SimpleNamespace(status="completed", output_text=response, usage=None)
+
+        client.responses.create.side_effect = relationship_response
         model = OpenAILanguageModel("test-model", client)
         match = NegotiatingMatch(players, 8, pieces=[3] * 9, model=model,
                                  live_players=("P01", "P02"), live_turns=1000)
@@ -232,6 +264,27 @@ class GemBlackMarketTest(unittest.TestCase):
         opening_rounds = [json.loads(event.content)["turn"] for event in events[:opening_end.turn]
                           if event.msg_type == "gem_discussion_round"]
         self.assertEqual(opening_rounds, list(range(1, 13)))
+        self.assertLess(opening_end.turn, auction.turn)
+        self.assertTrue(json.loads(auction.content)["manito_reveal"])
+        identities = [event for event in events if event.msg_type == "gem_manito"]
+        bids = [event for event in events if event.msg_type == "action" and json.loads(event.content)["phase"] == "gem_bid"]
+        self.assertEqual(len(identities), 9)
+        self.assertTrue(all(auction.turn < event.turn < bids[0].turn for event in identities))
+        outcome = next(event for event in events if event.msg_type == "gem_auction")
+        after_auction = next(event for event in events if event.msg_type == "gem_discussion"
+                             and json.loads(event.content)["stage"] == "after_auction")
+        after_end = next(event for event in events[after_auction.turn + 1:] if event.msg_type == "gem_discussion_end")
+        deal = next(event for event in events if event.msg_type == "gem_round")
+        self.assertLess(outcome.turn, after_auction.turn)
+        self.assertLess(after_end.turn, deal.turn)
+        self.assertFalse(any(event.msg_type == "gem_card" for event in events[:deal.turn]))
+        self.assertEqual(json.loads(after_auction.content)["rounds"], 5)
+        self.assertEqual(json.loads(after_end.content)["reason"], "all_passed")
+        after_rounds = [json.loads(event.content)["turn"] for event in events[after_auction.turn:after_end.turn]
+                        if event.msg_type == "gem_discussion_round"]
+        self.assertEqual(after_rounds, [1, 2, 3])
+        self.assertTrue(any(event.msg_type == "public" and "내 마니또" in event.content and "낙찰자" in event.content
+                            for event in events[after_auction.turn:after_end.turn]))
 
         acting = None
         for event in events:
@@ -265,6 +318,17 @@ class GemBlackMarketTest(unittest.TestCase):
                 self.assertNotIn(event, match.observations("P03"))
         self.assertEqual(len(plans), 12)
         self.assertEqual(set(submitted_plans), set(plans))
+        self.assertEqual(refreshed_choices, {"gem_strategy", "gem_swap"})
+        updates = [event for event in events if event.msg_type == "relationship_update" and event.agent_name == "P01"]
+        initial_rating = next(event for event in updates if json.loads(event.content)["ratings"]["P02"]["trust"] == 55)
+        result_rating = next(event for event in updates if json.loads(event.content)["ratings"]["P02"]["trust"] == 80)
+        self.assertTrue(opening_end.turn < initial_rating.turn < auction.turn)
+        first_swap = next(event for event in events if event.msg_type == "gem_swap")
+        following_turn = next(event for event in events[first_swap.turn + 1:] if event.msg_type == "gem_turn")
+        self.assertTrue(first_swap.turn < result_rating.turn < following_turn.turn)
+        for event in updates:
+            self.assertEqual(event.visible_to, ["P01"])
+            self.assertFalse(event in match.observations("P02"))
 
     def test_tied_auction_negotiates_before_rebid_or_agreement(self):
         testcase = self
@@ -315,8 +379,10 @@ class GemBlackMarketTest(unittest.TestCase):
         players = tuple(f"P{index:02}" for index in range(1, 10))
         for pieces, winner, price in ((1, "P02", 1), (3, "P01", 2)):
             with self.subTest(pieces=pieces):
+                client = Mock()
+                client.responses.create.return_value = SimpleNamespace(status="completed", output_text='{"action":"{}"}', usage=None)
                 match = NegotiatedAuction(players, 8, pieces=[pieces] * 9,
-                                          model=OpenAILanguageModel("test-model", Mock()),
+                                          model=OpenAILanguageModel("test-model", client),
                                           live_players=players, live_turns=1000)
                 with self.assertRaises(AuctionComplete):
                     play(match)
@@ -343,14 +409,66 @@ class GemBlackMarketTest(unittest.TestCase):
                 next_action = next(event for event in events[ended.turn + 1:] if event.msg_type == "action")
                 self.assertEqual(json.loads(next_action.content)["phase"], next_phase)
 
+    def test_relationship_reviews_use_only_new_visible_evidence(self):
+        prompts = []
+        client = Mock()
+
+        def respond(**kwargs):
+            prompt = kwargs["input"][0]["content"][0]["text"]
+            prompts.append(prompt)
+            action = "대기"
+            if "비공개 관계 평가를 갱신하세요" in prompt:
+                ratings = {}
+                if "Exercise: P01의" in prompt:
+                    ratings = {"P02": {"affinity": 60, "trust": 80 if "[gem_card]" in prompt else 55,
+                                       "reason": "직접 확인한 정보"}}
+                action = json.dumps(ratings, ensure_ascii=False)
+            return SimpleNamespace(status="completed", output_text=json.dumps({"action": action}), usage=None)
+
+        client.responses.create.side_effect = respond
+        model = OpenAILanguageModel("test-model", client)
+        players = ("P01", "P02", "P03")
+        match = Match(players, 1, model=model, live_players=players, live_turns=20)
+        match.event("public", "공개 협력 제안", actor="P02")
+        match.event("whisper", "P02와 P03만 아는 비밀", actor="P02", private=("P02", "P03"))
+        match.review_relationships("협상 종료")
+        self.assertEqual(model.calls, 3)
+        first_prompt = next(prompt for prompt in prompts if "Exercise: P01의" in prompt)
+        self.assertIn("공개 협력 제안", first_prompt)
+        self.assertNotIn("P02와 P03만 아는 비밀", first_prompt)
+        self.assertEqual(match.relationships["P01"]["P02"]["trust"], 55)
+        self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
+        remaining = match.live_turns
+        match.review_relationships("새 근거 없음")
+        self.assertEqual(model.calls, 3)
+        self.assertEqual(match.live_turns, remaining)
+        match.event("gem_card", {"round": 1, "slot": "P01", "card": {"kind": "gold", "value": 5}},
+                    actor="P01", private=("P01",))
+        match.review_relationships("교환 결과 확인")
+        self.assertEqual(model.calls, 4)
+        self.assertIn("[gem_card]", prompts[-1])
+        self.assertIn("공개 협력 제안", prompts[-1])
+        self.assertNotIn("P02와 P03만 아는 비밀", prompts[-1])
+        self.assertEqual(match.relationships["P01"]["P02"]["trust"], 80)
+        self.assertIs(match.backends["P01"].relationships, match.relationships["P01"])
+        match.decide("P01", "test", "갱신한 관계를 참고하세요.", "대기", options=("대기",))
+        self.assertIn("신뢰도 80/100", prompts[-1])
+        self.assertNotIn("P02와 P03만 아는 비밀", prompts[-1])
+
     def test_interrupted_decisions_resume_to_identical_game(self):
         original_event = Match.event
+
+        def reply(prompt):
+            action = "pass"
+            if "비공개 관계 평가를 갱신하세요" in prompt:
+                action = json.dumps({"P02": {"affinity": 55, "trust": 60, "reason": "공개 결과를 확인함"}}, ensure_ascii=False)
+            return json.dumps({"action": action, "note": "test"})
 
         with (
             TemporaryDirectory() as directory,
             redirect_stdout(StringIO()),
             redirect_stderr(StringIO()),
-            patch("games.models.CodexLanguageModel._complete", return_value='{"action":"pass","note":"test"}') as completion,
+            patch("games.models.CodexLanguageModel._complete", side_effect=reply) as completion,
         ):
             for budget in (16, 300):
                 uninterrupted = Path(directory) / f"full-{budget}.jsonl"
@@ -360,20 +478,27 @@ class GemBlackMarketTest(unittest.TestCase):
                         argv=[*arguments, "--output", str(uninterrupted)])
                 expected = [json.loads(line) for line in uninterrupted.read_bytes().splitlines()]
                 self.assertLessEqual(expected[-1]["model_calls"], budget)
-                for checkpoint in ("gem_swap", "gem_discussion_end", "gem_strategy_note"):
+                for checkpoint in ("auction_bid", "after_auction", "relationship_update", "gem_swap", "gem_discussion_end", "gem_strategy_note"):
                     with self.subTest(budget=budget, checkpoint=checkpoint):
                         resumed = Path(directory) / f"resumed-{budget}-{checkpoint}.jsonl"
 
                         def interrupt(match, kind, data, **kwargs):
                             original_event(match, kind, data, **kwargs)
-                            matches_checkpoint = kind == checkpoint
-                            if checkpoint == "gem_strategy_note":
-                                matches_checkpoint = kind == "decision_note" and data.get("phase") == "gem_strategy"
-                            context = data
-                            if matches_checkpoint and checkpoint == "gem_strategy_note":
-                                context = next(json.loads(event.content) for event in reversed(match.events)
-                                               if event.msg_type == "gem_turn")
-                            if matches_checkpoint and context["round"] == 2 and context["pass"] == 2:
+                            if checkpoint == "auction_bid":
+                                reached = kind == "action" and data.get("phase") == "gem_bid"
+                            elif checkpoint == "after_auction":
+                                reached = kind == "gem_discussion_end" and data["stage"] == "after_auction"
+                            elif checkpoint == "relationship_update":
+                                reached = kind == "relationship_update"
+                            elif checkpoint == "gem_strategy_note":
+                                reached = kind == "decision_note" and data.get("phase") == "gem_strategy"
+                                if reached:
+                                    context = next(json.loads(event.content) for event in reversed(match.events)
+                                                   if event.msg_type == "gem_turn")
+                                    reached = context["round"] == 2 and context["pass"] == 2
+                            else:
+                                reached = kind == checkpoint and data["round"] == 2 and data["pass"] == 2
+                            if reached:
                                 raise RuntimeError("test interruption after committed progress")
 
                         with patch.object(Match, "event", interrupt):
