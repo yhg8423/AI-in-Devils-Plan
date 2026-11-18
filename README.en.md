@@ -199,7 +199,7 @@ Use the same match module and existing output path to restore the seed and each 
 
 Concordia loads the persona and objective assigned to each player ID. It sends the current rules and game state to the model along with the events and conversations that player could see. ChatArena manages who can see each message. In Either/Or, Choice 5 offers five Victory Points or an early look at the upcoming rules. Only the players who choose information receive the rules for Choices 6–8 ahead of time, so they can plan which tile to choose and where to place it.
 
-The Main Hall has a corridor and four rooms. Players can move silently or speak on the same turn after entering a room. Room messages reach only the people there at the time. A player can whisper to one other person at the same location. A room invitation can include what the player wants to discuss, and the recipient can accept or decline.
+The Main Hall has a corridor and four rooms. Players can move silently or speak on the same turn after entering a room. Room messages reach only the people there at the time. A player can whisper to one or more selected players at the same location. Set the action’s `to` field to an ID array such as `["P02", "P03"]` for a group whisper. Only the sender and selected recipients can see it, and all recipients must share the sender’s location. A room invitation can include what the player wants to discuss, and the recipient can accept or decline.
 
 ### Submissions and rulings
 

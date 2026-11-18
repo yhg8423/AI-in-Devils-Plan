@@ -1,7 +1,7 @@
 import React, {useLayoutEffect, useRef} from "react";
 import {setHeight, setWidth} from "./floor.js";
 import {tr} from "./locale.js";
-import {ArenaSpeech, Sprite, whisperRecipient} from "./scene.jsx";
+import {ArenaSpeech, Sprite, whisperRecipients} from "./scene.jsx";
 
 const center = [setWidth / 2, setHeight / 2];
 const rouletteAngles = Array.from({length: 6}, (_, index) => index * Math.PI / 3 - Math.PI / 2);
@@ -121,7 +121,7 @@ export function RouletteScene({players, state, frame, selected, onChoose}) {
   const active = state.feed.at(-1)?.agent_name;
   const speech = state.feed.findLast(({msg_type, step}) =>
     frame - step <= 5 && (msg_type === "public" || msg_type === "whisper"));
-  const recipient = whisperRecipient(speech, players);
+  const recipients = whisperRecipients(speech, players);
   return <div className="arena">
     <Venue draw={drawRouletteSet} label={tr("러시안 룰렛 감옥 매치 세트장", "Russian Roulette prison match arena")}>
     {state.seats && <div className="roulette-board" role="img" aria-label={tr(`1번 칸 · ${state.first} 방향`, `Slot 1 · facing ${state.first}`)}>
@@ -139,9 +139,9 @@ export function RouletteScene({players, state, frame, selected, onChoose}) {
       return <Seat key={player} player={player} point={seatPoints[index]}
         label={[player, tr(`${slot}번 칸`, `Slot ${slot}`), tr(status, {탈락: "Eliminated", 선: "Lead player"}[status])].filter(Boolean).join(" · ")}
         status={status} selected={selected} acting={active === player} speaking={speaking}
-        whispering={Boolean(recipient) && (speaking || player === recipient)} onChoose={onChoose} />;
+        whispering={recipients.length > 0 && (speaking || recipients.includes(player))} onChoose={onChoose} />;
     })}
     </Venue>
-    <ArenaSpeech speech={speech} recipient={recipient} />
+    <ArenaSpeech speech={speech} recipients={recipients} />
   </div>;
 }
