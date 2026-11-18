@@ -308,6 +308,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--color-accent); 
 }
 .room-label { translate: -50% calc(-100% - 4px); }
 .hall-label { left: 50%; bottom: 2%; translate: -50%; }
+.venue-stage:has(.gem-stage) .hall-label { bottom: 0; }
 .token {
   position: absolute; display: grid; justify-items: center; gap: 1px; translate: -50% -100%;
   border: 0; padding: 0 2px; background: transparent; color: #f1ede5;

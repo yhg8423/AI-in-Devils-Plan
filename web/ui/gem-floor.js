@@ -1,4 +1,4 @@
-import {drawSet, setHeight, setWidth} from "./floor.js";
+import {drawSet, setHeight, setPoint, setWidth} from "./floor.js";
 
 import {tr} from "./locale.js";
 
@@ -9,6 +9,13 @@ const cardColors = {
   copper: ["#623e32", "#9e6248", "#d18a63", "#f9bd8b"],
   bomb: ["#512a39", "#71364b", "#ca6377", "#ffb1b7"],
 };
+
+export function gemSetPoint(room, index, count) {
+  if (room) return setPoint(room, index);
+  const row = Math.floor(index / 5);
+  const columns = Math.min(5, count - row * 5);
+  return [256 + (index % 5 - (columns - 1) / 2) * 58, 251 + row * 25];
+}
 
 export function drawGemSet(canvas, cards = {}) {
   drawSet(canvas);
@@ -37,18 +44,26 @@ export function drawGemSet(canvas, cards = {}) {
     c.fillText(card ? String(card.value) : "?", x + 11, y + 25);
   }
 
-  // The card table fits between the original stairs and their walking routes.
-  rect(204, 168, 104, 49, "#53625d");
-  rect(206, 170, 100, 45, "#172123");
-  rect(204, 215, 104, 2, "#a28d63");
+  // A freestanding felt table sits in front of the players on the lower floor.
+  rect(164, 334, 184, 6, "#111920");
+  rect(175, 329, 8, 11, "#3b302b");
+  rect(329, 329, 8, 11, "#3b302b");
+  rect(176, 330, 2, 9, "#927457");
+  rect(330, 330, 2, 9, "#927457");
+  rect(166, 284, 180, 49, "#503e33");
+  rect(168, 285, 176, 2, "#bc9a6d");
+  rect(170, 288, 172, 40, "#1e3836");
+  rect(172, 289, 168, 1, "#4c6960");
+  rect(166, 330, 180, 5, "#684d3a");
+  rect(168, 331, 176, 1, "#a88a62");
 
   for (let index = 0; index < 4; index++) {
-    const x = 205 + index * 25;
+    const x = 191 + index * 36;
     const slot = index < 3 ? `buyer${index + 1}` : "trash";
-    cardFace(cards?.[slot], x, 172);
+    cardFace(cards?.[slot], x, 290);
     c.font = "bold 6px monospace";
     c.textAlign = "center";
     c.fillStyle = "#e1cfaa";
-    c.fillText(index < 3 ? tr(`구매자 ${index + 1}`, `BUYER ${index + 1}`) : tr("휴지통", "TRASH"), x + 11, 211);
+    c.fillText(index < 3 ? tr(`구매자 ${index + 1}`, `BUYER ${index + 1}`) : tr("휴지통", "TRASH"), x + 11, 327);
   }
 }

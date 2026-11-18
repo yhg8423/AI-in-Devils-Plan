@@ -5,7 +5,7 @@ import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {choiceCountLabel, choiceOptionLabel, choiceResults, optionsByChoice} from "./choice-results.js";
 import {RouletteInspection, RouletteInspectionLegend, RouletteScene} from "./day-two-scenes.jsx";
 import {applyGemEvent, gemActionText, gemEventText, gemSlotLabel, GemStage} from "./gem-exchange.jsx";
-import {drawGemSet} from "./gem-floor.js";
+import {drawGemSet, gemSetPoint} from "./gem-floor.js";
 import {Heavy13Information} from "./heavy-13-info.jsx";
 import {chipColorLabel} from "./heavy-13.js";
 import {runHref} from "./home.jsx";
@@ -1156,6 +1156,7 @@ export function MatchReplay({replay, transport, caseName}) {
       {state.scene && <RoomScene state={state.scene} players={match.players} frame={frame} following={replay.mode === "follow"}
           row={latest?.step === frame ? {player: latest.agent_name} : undefined} selected={selected}
           onChoose={replay.choosePlayer} playerDetails={playerDetails} drawMap={isGemExchange ? drawGemMap : undefined}
+          getPoint={isGemExchange ? gemSetPoint : undefined}
           label={isGemExchange ? tr("보석 암시장 메인홀", "Gem Black Market main hall") :
             isMarket ? tr("미스터리 거래소 메인홀", "Mystery Stock Exchange main hall") : tr("전체 세트장", "Full set")} />}
       {Venue && <Venue players={match.players} state={state} frame={frame} selected={selected} onChoose={replay.choosePlayer} />}

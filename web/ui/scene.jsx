@@ -65,7 +65,7 @@ function walk(button, points, width, height) {
   animation.oncancel = settle;
 }
 
-export function RoomScene({state, players, row, frame, following, selected, onChoose, playerDetails, label, standalone, drawMap = drawSet}) {
+export function RoomScene({state, players, row, frame, following, selected, onChoose, playerDetails, label, standalone, drawMap = drawSet, getPoint = setPoint}) {
   const floor = useRef(null);
   const map = useRef(null);
   const previous = useRef({frame: -1, locations: {}, points: {}, pair: []});
@@ -78,7 +78,7 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
   const partner = recipient && (state.locations[recipient] ?? 0) === speech.room &&
     (state.locations[speech.agent_name] ?? 0) === speech.room ? recipient : undefined;
   const pair = partner ? [speech.agent_name, partner] : [];
-  const points = Object.fromEntries(players.map((name, index) => [name, setPoint(state.locations[name] ?? 0, index)]));
+  const points = Object.fromEntries(players.map((name, index) => [name, getPoint(state.locations[name] ?? 0, index, players.length)]));
   if (partner) {
     const speaker = speech.agent_name;
     const [speakerX, speakerY] = points[speaker];
