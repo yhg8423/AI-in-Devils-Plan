@@ -9,9 +9,10 @@ export function tr(korean, english) {
 export const siteTitle = tr("AI in 데블스 플랜: 데드 어게인", "AI in The Devil’s Plan: Dead Again");
 
 const gameNames = new Map([
-  ["1일차", "Day 1"], ["2일차", "Day 2"],
+  ["1일차", "Day 1"], ["2일차", "Day 2"], ["3일차", "Day 3"],
   ["1일차 메인 매치", "Day 1 Main Match"], ["1일차 감옥 매치", "Day 1 Prison Match"],
   ["2일차 메인 매치", "Day 2 Main Match"], ["2일차 감옥 매치", "Day 2 Prison Match"],
+  ["3일차 메인 매치", "Day 3 Main Match"], ["보석 암시장", "Gem Black Market"],
   ["양자택일", "Either/Or"], ["무거운 13", "Heavy 13"],
   ["미스터리 거래소", "Mystery Stock Exchange"], ["러시안 룰렛", "Russian Roulette"],
   ["큐브 세기", "Cube Counting"], ["네모 세기", "Rectangle Counting"],

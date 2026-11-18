@@ -5,6 +5,7 @@ const points = "Choose Points for 5 Victory Points or Information for a private 
 
 // Replay logs retain the original rules. Summaries cover known headings without changing archived data.
 const summaries = [
+  ["보석 암시장", "Play three rounds with hidden gem and bomb cards. Nine players use 13 cards. A ten-player continuation adds one Copper 1. Secretly bid Pieces for the lead. Ties trigger another auction, then agreement, with base order resolving failed agreement. Swap once in forward order and once in reverse. The three-minute turn becomes one discussion action per player. Bomb holders must swap with another player. Losing your bomb to someone else’s swap earns 3 points. Once per game, a Piece inspects one buyer or trash card. At reveal, each matching buyer earns your card’s value. A scoring diamond also earns one Piece. Bombs score their printed negative value. The −6 holder leads next, then −4, then the previous leader. Final VP equals your cumulative VP times your incoming manito’s VP. Base order breaks final ties. The top three enter the Living Quarters, the bottom player is eliminated, and the winner saves one prisoner with the Alliance Token. Final VP of at least 1 earns one Piece, or two at 10 or more."],
   ["양자택일 ·", "Sixteen players face ten choices and four minigames. Everyone starts at 0 Victory Points and normally holds one Piece. Scores are public. By default, the top six are assigned to the Living Quarters, the next eight to the Prison Wing, and the bottom two are eliminated. First place may move one player from the Prison Wing to the Living Quarters."],
   ["선택 1 ·", "Performance Pay awards one Piece if you end up in the Living Quarters. Insurance awards two Pieces if you end up in the Prison Wing. The final assignments after the alliance token decide the payout."],
   ["미니게임 1 ·", "Count all the cubes and submit the total privately. Wrong answers have a 20-second virtual cooldown. Correct answers establish priority in submission order. The game ends after 15 correct answers, and the remaining player ranks 16th. Priority breaks later ties on scores and tile numbers."],
@@ -23,6 +24,28 @@ const summaries = [
 ];
 
 export function rulesSummary(heading, body) {
+  if (heading.startsWith("보석 암시장")) {
+    const relationships = body.includes("\n\n8. 관계 평가 갱신\n") ?
+      " Players review affinity and trust after discussions, auction results, swaps, card reveals, final scoring, and the Alliance Token decision. Updates require new evidence visible to that player." : "";
+    const preparation = body.includes("\n\n9. 시작 전 비공개 전략 준비\n") ?
+      " Each player privately plans, reviews, and finalizes a strategy in three steps before the 12 opening discussion turns. Each step retains the player's own previous summary. Manitos and cards remain unrevealed throughout preparation." : "";
+    const swapDiscussion = body.includes("\n\n10. 교환 전 대화 단축과 조기 종료\n") ?
+      "Pre-swap discussions allow up to four turns. The active player speaks first each turn and may immediately end the discussion to proceed to the swap. Tied-auction discussions allow up to five turns. Both windows also end when everyone passes in a turn." :
+      "Pre-swap and tied-auction discussions also allow up to five turns, ending early when everyone passes in one turn.";
+    const summary = summaries.find(([prefix]) => prefix === "보석 암시장")[1] + relationships + preparation;
+    if (body.includes("\n\n7. 시작 전 진행 순서\n")) return summary.replace(
+      "The three-minute turn becomes one discussion action per player.",
+      "The opening discussion allows 12 turns per player before manitos are revealed. Players then privately learn whose score their points affect and submit simultaneous sealed Piece bids, with no discussion between revelation and the initial bids. After the auction winner is announced, players may discuss for up to five turns before cards are dealt. " + swapDiscussion + " All players may discuss auction ties before re-bidding or the final agreement vote. Tied bidders alone submit further bids or nominate the leader. After pre-swap discussion and any paid inspection, the acting player privately plans the swap.",
+    );
+    if (body.includes("\n\n6. 동률 경매 협상\n")) return summary.replace(
+      "The three-minute turn becomes one discussion action per player.",
+      "The simulation gives each player 12 opening discussion turns before bidding. Each swap and tied auction allows up to five discussion turns, ending early when everyone passes in one turn. All players may discuss auction ties before re-bidding or the final agreement vote. Tied bidders alone submit further bids or nominate the leader. After discussion and any paid inspection, the acting player privately plans the swap.",
+    );
+    return /2(?:회전|턴)/.test(body) ? summary.replace(
+      "The three-minute turn becomes one discussion action per player.",
+      "The simulation provides two opening discussion turns before bidding and two before each swap. After discussion and any paid inspection, the acting player privately plans the swap.",
+    ) : summary;
+  }
   if (heading.startsWith("선택 2 ·")) {
     const teams = "Enter Rectangle Counting alone or form a team of three. All three players must privately submit the same lineup.";
     const submissionTurn = body.match(/(\d+)턴부터 자기 차례에 비공개로 제출/)?.[1];

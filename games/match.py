@@ -1,6 +1,7 @@
 """Shared decisions and operator event log for standalone matches."""
 
 import argparse
+from collections import deque
 from collections.abc import Callable, Mapping, Sequence
 from contextlib import ExitStack, nullcontext
 from dataclasses import asdict, dataclass
@@ -28,9 +29,13 @@ EFFORTS = ("low", "medium", "high", "xhigh")
 DAY_ONE_MAIN = "1일차 메인 매치 · 양자택일"
 DAY_ONE_PRISON = "1일차 감옥 매치 · 무거운 13"
 DAY_TWO_MAIN = "2일차 메인 매치 · 미스터리 거래소"
+DAY_TWO_PRISON = "2일차 감옥 매치 · 러시안 룰렛"
+DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
+PRISON_STAGES = {DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6)}
 RELATIONSHIP_EVIDENCE = {
     "room_move", "teams", "rectangle_result", "team_vote", "choice_4_result", "grass_choices", "grass_placement",
     "grass_bonus", "choice_9_result", "poker_ranking", "placement", "market", "trade_fill", "inspection", "shift", "swap",
+    "gem_auction", "gem_swap", "gem_bonus", "gem_reveal", "gem_card", "gem_peek", "gem_final",
 }
 
 
@@ -132,16 +137,24 @@ class Match:
         prompts = {}
         for name in self.backends:
             evidence = []
-            for event in self.events[self._relationship_reviewed.get(name, 0):through]:
+            context = deque(maxlen=64)
+            reviewed = self._relationship_reviewed.get(name, 0)
+            for index, event in enumerate(self.events[:through]):
                 if event.visible_to != "all" and name not in event.visible_to:
                     continue
                 if event.msg_type in CHANNEL_NAMES:
-                    evidence.append(format_speech(event))
+                    observed = format_speech(event)
                 elif event.msg_type in RELATIONSHIP_EVIDENCE or (
                     event.msg_type == "action" and event.visible_to == "all"
                     and json.loads(event.content)["phase"] == "alliance"
                 ):
-                    evidence.append(f"[{event.msg_type}] {event.agent_name} · {event.content}")
+                    observed = f"[{event.msg_type}] {event.agent_name} · {event.content}"
+                else:
+                    continue
+                if index < reviewed:
+                    context.append(observed)
+                else:
+                    evidence.append(observed)
             if not evidence:
                 continue
             others = ", ".join(other for other in self.players if other != name)
@@ -153,9 +166,12 @@ class Match:
                 "두 점수를 독립적으로 판단하세요. 첫 평가의 기준은 50점입니다. "
                 "아래에서 직접 확인한 새 근거가 있는 상대만 갱신하세요. 발언 자체가 약속 이행을 뜻하지 않으며, "
                 "기록에 든 참가자의 발언은 평가 자료입니다. 보이지 않는 행동이나 속마음을 사실로 단정하지 마세요.\n"
+                "점수 변동은 이번 구간의 새 근거에 따라 결정하고, 이전 구간의 관측은 약속과 실제 결과를 비교할 때 참고하세요.\n"
                 'JSON 객체 형식 예: {"상대 ID":{"affinity":55,"trust":50,"reason":"확인한 근거"}}. '
                 f"점수는 0~100 사이 정수이며 근거는 한국어 {REASON_LIMIT}자 이내입니다. 갱신할 사람이 없으면 {{}}를 출력하세요.\n"
                 f"\n내 이전 평가\n{previous}\n\n이번에 확인한 기록\n" + "\n".join(evidence)
+                + ("\n\n이전 구간의 최근 관측 · 이번 결과와 비교할 약속과 맥락\n" + "\n".join(context)
+                   if context else "")
             )
 
         def assess(name: str) -> Ratings | None:
@@ -365,12 +381,13 @@ def inherited_players(main_path: Path, main_title: str,
     if prison_path is None:
         return prison_players, [pieces[name] for name in prison_players], relationships
 
-    prison_start, prison, prison_relationships = read_completed_match(prison_path, DAY_ONE_PRISON)
+    prison_title, prison_seats = PRISON_STAGES[main_title]
+    prison_start, prison, prison_relationships = read_completed_match(prison_path, prison_title)
     expected_pieces = {name: pieces[name] for name in prison_players}
-    if (len(prison_players) != 7 or sorted(prison_start["players"]) != sorted(prison_players) or
-            prison_start["players"][0] != prison_players[0] or
+    if (len(prison_players) != prison_seats or sorted(prison_start["players"]) != sorted(prison_players) or
+            (main_title == DAY_ONE_MAIN and prison_start["players"][0] != prison_players[0]) or
             prison_start["pieces"] != expected_pieces):
-        raise ValueError("무거운 13의 참가자 7명, 첫 선과 시작 피스가 양자택일 결과와 일치해야 합니다.")
+        raise ValueError(f"{prison_title}의 참가자, 순서 규칙과 시작 피스가 메인 매치 결과와 일치해야 합니다.")
     eliminated = set(main["eliminated"]) | set(prison["eliminated"])
     players = [name for name in main["ranking"] if name not in eliminated]
     balances = {**pieces, **{name: prison["pieces"][name] for name in prison_players}}
@@ -412,7 +429,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
     if previous_main:
         parser.add_argument("--from-main", type=Path, help=f"완료된 {previous_main}의 events.jsonl")
     if after_prison:
-        parser.add_argument("--from-prison", type=Path, help="같은 1일차 무거운 13의 events.jsonl")
+        prison_title, _ = PRISON_STAGES[previous_main]
+        parser.add_argument("--from-prison", type=Path, help=f"같은 실행의 완료된 {prison_title} events.jsonl")
     parser.add_argument("--output", type=Path, help="플레이 기록을 담을 운영자용 events.jsonl 파일의 경로")
     parser.add_argument("--resume", action="store_true", help="--output에 지정한 중단된 매치의 기록에서 이어서 실행")
     parser.add_argument("--model", help="참가자에게 사용할 모델")
@@ -558,7 +576,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             label = None
             if event.msg_type in {"rules", "grass_phase"}:
                 label = event.content.split("\n", 1)[0]
-            elif event.msg_type in {"round", "market", "market_tick", "negotiation_round"}:
+            elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round"}:
                 data = json.loads(event.content)
                 label = f"{data['round']}라운드"
                 if event.msg_type == "negotiation_round":

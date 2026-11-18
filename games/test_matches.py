@@ -23,8 +23,9 @@ from .either_or.lay_the_grass.environment import LayTheGrass
 from .either_or.memory_poker import hand_rank, memory_stage, poker_duel
 from .either_or.negotiation import negotiate
 from .either_or.rectangle_counting import count_rectangles, rectangle_race, rectangle_stage
+from .gem_exchange.game import play as gem_exchange
 from .heavy_13.game import place, play as heavy_13
-from .match import DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, Decision, Match, run_cli
+from .match import DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_THREE_MAIN, DAY_TWO_MAIN, DAY_TWO_PRISON, Decision, Match, run_cli
 from .models import CodexLanguageModel, OpenAILanguageModel, StrategyNote, _openai_key
 from .mystery_stock_market.game import next_prices, play as market, trade_orders
 from .personas import persona_context
@@ -596,9 +597,9 @@ class MatchTest(unittest.TestCase):
                 redirect_stdout(StringIO()),
                 redirect_stderr(StringIO()),
             ):
-                main_log, prison_log, market_log, roulette_log = [
+                main_log, prison_log, market_log, roulette_log, gem_log = [
                     Path(directory) / game / "events.jsonl"
-                    for game in ("day1-main", "day1-prison", "day2-main", "day2-prison")
+                    for game in ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main")
                 ]
 
                 def play_stage(game, title, seats, output, *args, **kwargs):
@@ -629,14 +630,29 @@ class MatchTest(unittest.TestCase):
                 })
                 self.assertEqual(len(second_main["prison"]), 6)
                 self.assertEqual(len(second_main["living"]), len(survivors) - 7)
-                roulette_start, _ = play_stage(
-                    roulette, "2일차 감옥 매치 · 러시안 룰렛", 6, roulette_log,
+                roulette_start, second_prison = play_stage(
+                    roulette, DAY_TWO_PRISON, 6, roulette_log,
                     "--from-main", str(market_log), previous_main=DAY_TWO_MAIN,
                 )
                 self.assertEqual(roulette_start["players"], second_main["prison"])
                 self.assertEqual(roulette_start["pieces"], {
                     name: second_main["pieces"][name] for name in second_main["prison"]
                 })
+                gem_start, gems = play_stage(
+                    gem_exchange, DAY_THREE_MAIN, (9, 10), gem_log, "--from-main", str(market_log),
+                    "--from-prison", str(roulette_log), previous_main=DAY_TWO_MAIN, after_prison=True,
+                )
+                eliminated = set(second_main["eliminated"] + second_prison["eliminated"])
+                advancing = [name for name in second_main["ranking"] if name not in eliminated]
+                self.assertEqual(len(advancing), 11 - eliminations)
+                self.assertEqual(gem_start["players"], advancing)
+                self.assertEqual(gem_start["pieces"], {
+                    name: second_main["pieces"][name] + second_prison["pieces_awarded"].get(name, 0)
+                    for name in advancing
+                })
+                self.assertEqual(gems["rounds"], 3)
+                self.assertEqual(gems["living"] + gems["prison"] + gems["eliminated"], gems["ranking"])
+                self.assertCountEqual(gems["ranking"], advancing)
 
     def test_private_relationship_updates_follow_players_across_matches(self):
         players = [f"P{seat:02}" for seat in range(1, 10)]

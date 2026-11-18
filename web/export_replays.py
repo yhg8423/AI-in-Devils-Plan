@@ -9,12 +9,13 @@ from .spectator import CASE_STAGES, EVENT_FIELDS, source_paths
 from .translate_events import translation_rows
 
 
-STAGES = ("day1-main", "day1-prison", "day2-main", "day2-prison")
+STAGES = ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main")
 PREDECESSORS = (
     {},
     {"from_main": 0},
     {"from_main": 0, "from_prison": 1},
     {"from_main": 2},
+    {"from_main": 2, "from_prison": 3},
 )
 HEADER_FIELDS = (
     "type", "game", "players", "seed", "pieces", "model", "effort", "provider",
@@ -25,6 +26,7 @@ RESULT_FIELDS = (
     "type", "ranking", "scores", "priority", "grass_placements", "alliance_saved",
     "living", "prison", "eliminated", "pieces", "prize_token", "penalties",
     "pieces_awarded", "assets", "rounds", "credits", "seats", "survivors", "model_calls",
+    "raw_scores", "manitos", "pieces_spent",
 )
 
 
@@ -109,16 +111,18 @@ def export_replays(campaigns, source_root, output_root):
         logs = [campaign / stage / "events.jsonl" for stage in STAGES]
         if any(log.parent.is_symlink() for log in logs):
             raise ValueError(f"{campaign}: symbolic links are not supported")
+        if not logs[-1].is_symlink() and not logs[-1].exists():
+            logs.pop()
         prepared[destination] = [
             prepare_match(log, game, links, logs, source_root, campaign.name)
-            for log, game, links in zip(logs, CASE_STAGES, PREDECESSORS, strict=True)
+            for log, game, links in zip(logs, CASE_STAGES[:len(logs)], PREDECESSORS[:len(logs)], strict=True)
         ]
 
     destination_root.mkdir(parents=True, exist_ok=True)
     for destination, matches in prepared.items():
         with TemporaryDirectory(dir=destination_root, prefix=".export-") as temp:
             stage_root = Path(temp)
-            for stage, (events, translated) in zip(STAGES, matches, strict=True):
+            for stage, (events, translated) in zip(STAGES[:len(matches)], matches, strict=True):
                 path = stage_root / stage
                 path.mkdir()
                 (path / "events.jsonl").write_text(encode_rows(events), encoding="utf-8")
