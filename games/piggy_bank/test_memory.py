@@ -90,6 +90,10 @@ class PiggyMemoryTest(unittest.TestCase):
                 match.review_relationships("새 차례 대화 완료")
             self.assertTrue(any("비공개 관계 평가를 갱신하세요" in prompt for prompt in prompts[1:]))
             for prompt in prompts:
+                if "비공개 관계 평가를 갱신하세요" not in prompt:
+                    self.assertIn("별도 메모·기록장·장부·누적 카운터를 작성하거나 조회할 수 없으며", prompt)
+                    self.assertIn("'기록했다'고 말해도 기억 슬롯 밖의 수량이 다음 턴에 보존되지 않습니다", prompt)
+                    self.assertIn("동전을 추가하겠다는 계획은 실제로 추가·전달되기 전까지", prompt)
                 for token in ("94729", "94747", "94753", "94761"):
                     self.assertNotIn(token, prompt, f"Private token {token} leaked into a model input")
             for prompt in prompts[1:]:

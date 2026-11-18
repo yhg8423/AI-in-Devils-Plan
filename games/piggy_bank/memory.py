@@ -7,6 +7,14 @@ from chatarena.message import Message, SYSTEM_NAME
 
 MEMORY_HEADING = "\n\n5. 기억 슬롯\n"
 MEMORY_CAPACITY = 3
+MEMORY_INSTRUCTIONS = (
+    "기억과 발언에 관한 안내\n"
+    "별도 메모·기록장·장부·누적 카운터를 작성하거나 조회할 수 없으며, 관전용 전체 기록도 열람할 수 없습니다. "
+    "대화나 전략 메모에 수량을 적거나 '기록했다'고 말해도 기억 슬롯 밖의 수량이 다음 턴에 보존되지 않습니다. "
+    "실제로 기록장을 쓰거나 저장한 것처럼 '기록했습니다', '적어 두겠습니다'라고 말하지 마세요. "
+    "선택한 세 저금통에서 정확히 회상한 값, 이번 턴에 직접 확인한 사실, 상대의 주장과 자신의 추정을 구분해 말하세요. "
+    "동전을 추가하겠다는 계획은 실제로 추가·전달되기 전까지 실행된 행동으로 간주하지 마세요."
+)
 _BOUNDARIES = {"pig_setup", "pig_turn", "pig_reset"}
 _CURRENT_EVENTS = {
     *_BOUNDARIES, "pig_preparation", "pig_preparation_end", "pig_discussion", "pig_discussion_end",
@@ -88,6 +96,8 @@ class PiggyMemory:
         turn = visible[-1].turn if visible else 0
         encode = lambda value: json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         projected = [rules] if rules is not None else []
+        projected.append(Message(SYSTEM_NAME, MEMORY_INSTRUCTIONS, turn=turn,
+                                 msg_type="rules", visible_to=[name]))
         if plan is not None:
             projected.append(plan)
         projected.append(Message(SYSTEM_NAME, encode(state), turn=turn, msg_type="pig_state"))
