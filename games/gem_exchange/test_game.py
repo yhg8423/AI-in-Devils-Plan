@@ -159,8 +159,14 @@ class GemBlackMarketTest(unittest.TestCase):
                                  sorted(result["scores"].values(), reverse=True))
                 self.assertEqual(result["living"][:3], ranking[:3])
                 self.assertEqual(len(result["living"]), 4)
-                self.assertEqual(result["eliminated"], ranking[-1:])
+                elimination_count = count - 8
+                self.assertEqual(result["eliminated"], ranking[-elimination_count:])
                 self.assertEqual(result["living"][-1], result["alliance_saved"])
+                self.assertIn(result["alliance_saved"], ranking[3:-elimination_count])
+                self.assertEqual(set(result["prison"]), set(ranking[3:-elimination_count]) - {result["alliance_saved"]})
+                self.assertEqual(len(result["prison"]), 4)
+                rules = next(event.content for event in match.events if event.msg_type == "rules")
+                self.assertIn(f"최하위 {'두' if count == 10 else '한'} 명은 탈락", rules)
                 self.assertEqual(len(result["living"]) + len(result["prison"]) + len(result["eliminated"]), count)
                 self.assertEqual(set(result["living"]) | set(result["prison"]) | set(result["eliminated"]), set(players))
                 for player in players:
@@ -645,13 +651,15 @@ class GemBlackMarketTest(unittest.TestCase):
             redirect_stderr(StringIO()),
             patch("games.models.CodexLanguageModel._complete", side_effect=reply) as completion,
         ):
-            for budget in (20, 300):
-                uninterrupted = Path(directory) / f"full-{budget}.jsonl"
-                arguments = ["--seed", "41", "--pieces", *(["3"] * 9), "--model", "test-model",
+            for count, budget in ((9, 20), (9, 300), (10, 300)):
+                uninterrupted = Path(directory) / f"full-{count}-{budget}.jsonl"
+                arguments = ["--seed", "41", "--players", *(f"P{seat:02}" for seat in range(1, count + 1)),
+                             "--pieces", *(["3"] * count), "--model", "test-model",
                              "--model-player", "P01", "--model-turns", str(budget), "--no-allow-review"]
                 run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10),
                         argv=[*arguments, "--output", str(uninterrupted)])
                 expected = [json.loads(line) for line in uninterrupted.read_bytes().splitlines()]
+                self.assertEqual(len(expected[-1]["eliminated"]), count - 8)
                 self.assertLessEqual(expected[-1]["model_calls"], budget)
                 checkpoints = ("preparation_note", "gem_preparation_end", "auction_bid", "after_auction",
                                "relationship_update", "gem_swap", "gem_discussion_end", "gem_strategy_note")
@@ -660,8 +668,8 @@ class GemBlackMarketTest(unittest.TestCase):
                                         json.loads(row["content"])["reason"] == "player_ready" for row in expected))
                     checkpoints += ("player_ready",)
                 for checkpoint in checkpoints:
-                    with self.subTest(budget=budget, checkpoint=checkpoint):
-                        resumed = Path(directory) / f"resumed-{budget}-{checkpoint}.jsonl"
+                    with self.subTest(players=count, budget=budget, checkpoint=checkpoint):
+                        resumed = Path(directory) / f"resumed-{count}-{budget}-{checkpoint}.jsonl"
 
                         def interrupt(match, kind, data, **kwargs):
                             original_event(match, kind, data, **kwargs)
@@ -737,7 +745,8 @@ class GemBlackMarketTest(unittest.TestCase):
         ):
             full = Path(directory) / "previous-full.jsonl"
             resumed = Path(directory) / "previous-resumed.jsonl"
-            arguments = ["--seed", "41", "--model", "test-model", "--model-player", "P01", "--model-turns", "60"]
+            arguments = ["--seed", "41", "--players", *(f"P{seat:02}" for seat in range(1, 11)),
+                         "--model", "test-model", "--model-player", "P01", "--model-turns", "60"]
             run_cli(previous_play, title=DAY_THREE_MAIN, seats=(9, 10), argv=[*arguments, "--output", str(full)])
             with patch.object(Match, "event", interrupt):
                 with self.assertRaisesRegex(RuntimeError, "existing ruleset"):
@@ -745,10 +754,12 @@ class GemBlackMarketTest(unittest.TestCase):
             prefix = [json.loads(line) for line in resumed.read_bytes().splitlines()]
             rules = next(row["content"] for row in prefix if row.get("msg_type") == "rules")
             self.assertIn("\n\n8. 관계 평가 갱신\n", rules)
+            self.assertIn("최하위 한 명은 탈락", rules)
             self.assertNotIn("\n\n9. 시작 전 비공개 전략 준비\n", rules)
             calls_before_resume = completion.call_count
             run_cli(play, title=DAY_THREE_MAIN, seats=(9, 10), argv=["--resume", "--output", str(resumed)])
             expected = [json.loads(line) for line in full.read_bytes().splitlines()]
+            self.assertEqual(expected[-1]["eliminated"], expected[-1]["ranking"][-1:])
             actual = [json.loads(line) for line in resumed.read_bytes().splitlines()]
             self.assertEqual(actual, expected)
             self.assertFalse(any(row.get("msg_type") in {"gem_preparation", "gem_preparation_end"} for row in actual))

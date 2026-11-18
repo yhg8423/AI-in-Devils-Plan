@@ -653,6 +653,9 @@ class MatchTest(unittest.TestCase):
                 self.assertEqual(gems["rounds"], 3)
                 self.assertEqual(gems["living"] + gems["prison"] + gems["eliminated"], gems["ranking"])
                 self.assertCountEqual(gems["ranking"], advancing)
+                self.assertEqual(len(gems["eliminated"]), len(advancing) - 8)
+                self.assertEqual(len(gems["living"]), 4)
+                self.assertEqual(len(gems["prison"]), 4)
 
     def test_private_relationship_updates_follow_players_across_matches(self):
         players = [f"P{seat:02}" for seat in range(1, 10)]

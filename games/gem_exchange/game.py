@@ -120,6 +120,9 @@ def play(match: Match) -> dict:
     event_relationships = recorded_rules is None or RELATIONSHIP_HEADING in recorded_rules
     private_preparation = recorded_rules is None or PREPARATION_HEADING in recorded_rules
     early_swap = recorded_rules is None or EARLY_SWAP_HEADING in recorded_rules
+    elimination_count = 2 if len(players) == 10 and (
+        recorded_rules is None or "최하위 두 명은 탈락" in recorded_rules
+    ) else 1
     opening_rounds = OPENING_DISCUSSION_ROUNDS if expanded_discussion else 2
     discussion_rounds = DISCUSSION_ROUNDS if expanded_discussion else 2
     swap_rounds = SWAP_DISCUSSION_ROUNDS if early_swap else discussion_rounds
@@ -164,7 +167,8 @@ def play(match: Match) -> dict:
         "마니또 관계는 추첨한 한 방향의 고리입니다. 내가 점수에 영향을 주는 상대만 비공개로 확인합니다. "
         "내 점수에 영향을 주는 상대는 종료할 때 공개합니다. 3라운드 뒤 내 누적 승점과 나에게 영향을 주는 "
         "마니또의 누적 승점을 곱해 최종 승점을 정합니다. 동점은 시뮬레이터의 기본 순서로 판정합니다. "
-        "상위 3명은 생활동, 최하위 한 명은 탈락, 나머지는 감옥동입니다. 1위는 연맹의 징표로 감옥동 한 명을 "
+        f"상위 3명은 생활동, 최하위 {'두' if elimination_count == 2 else '한'} 명은 탈락, 나머지는 감옥동입니다. "
+        "1위는 연맹의 징표로 감옥동 한 명을 "
         "생활동으로 옮깁니다. 최종 승점이 1점 이상이면 피스 1개, 10점 이상이면 총 2개를 받습니다."
     )
     if enhanced_discussion:
@@ -472,7 +476,7 @@ def play(match: Match) -> dict:
     match.event("gem_final", {"manitos": manitos, "scores": scores, "final_scores": final_scores})
     if event_relationships:
         match.review_relationships("보석 암시장 마니또·최종 점수 공개")
-    living, prison = ranking[:3], ranking[3:-1]
+    living, prison = ranking[:3], ranking[3:-elimination_count]
     saved = match.decide(
         ranking[0], "alliance", f"최종 승점 {encode(final_scores)}. 연맹의 징표로 생활동으로 옮길 참가자를 고르세요.",
         prison[0], options=prison, private=False,
@@ -487,6 +491,6 @@ def play(match: Match) -> dict:
         awards[name] += reward
     return {
         "rounds": ROUNDS, "ranking": ranking, "scores": final_scores, "raw_scores": scores,
-        "manitos": manitos, "living": living, "prison": prison, "eliminated": ranking[-1:],
+        "manitos": manitos, "living": living, "prison": prison, "eliminated": ranking[-elimination_count:],
         "alliance_saved": saved, "pieces_awarded": awards, "pieces_spent": spent, "pieces": pieces,
     }
