@@ -1,4 +1,4 @@
-"""A private three-bank memory, separate from the complete operator log."""
+"""Private memory summaries and legacy bank slots, separate from the operator log."""
 
 import json
 
@@ -6,6 +6,8 @@ from chatarena.message import Message, SYSTEM_NAME
 
 
 MEMORY_HEADING = "\n\n5. 기억 슬롯\n"
+FREE_MEMORY_HEADING = "\n\n5. 비공개 기억 요약\n"
+MEMORY_SUMMARY_LIMIT = 300
 MEMORY_CAPACITY = 3
 MEMORY_INSTRUCTIONS = (
     "기억과 발언에 관한 안내\n"
@@ -14,6 +16,15 @@ MEMORY_INSTRUCTIONS = (
     "실제로 기록장을 쓰거나 저장한 것처럼 '기록했습니다', '적어 두겠습니다'라고 말하지 마세요. "
     "선택한 세 저금통에서 정확히 회상한 값, 이번 턴에 직접 확인한 사실, 상대의 주장과 자신의 추정을 구분해 말하세요. "
     "동전을 추가하겠다는 계획은 실제로 추가·전달되기 전까지 실행된 행동으로 간주하지 마세요."
+)
+FREE_MEMORY_INSTRUCTIONS = (
+    "비공개 기억 요약 안내\n"
+    "다음 구간에도 보존되는 개인 기억은 자신이 직접 작성한 300자 이내 요약 하나뿐입니다. "
+    "저금통 번호와 주제의 제한 없이 관측한 수량, 자신의 추정, 발언, 약속, 전략 중 필요한 내용을 골라 남길 수 있습니다. "
+    "틀린 기억도 자동 보정하지 않으며 요약에서 빠진 내용은 다음 갱신 뒤 다시 제공되지 않습니다. "
+    "대화나 전략 메모는 요약에 포함한 내용만 이후에 기억할 수 있습니다. "
+    "별도 기록장이나 장부를 사용하거나 전체 관전 기록을 조회할 수 없습니다. "
+    "실제 사실과 상대의 주장, 자신의 추정을 구분하고 계획한 동전 추가를 실행된 행동으로 간주하지 마세요."
 )
 _BOUNDARIES = {"pig_setup", "pig_turn", "pig_reset"}
 _CURRENT_EVENTS = {
@@ -32,15 +43,30 @@ def parse_memory_selection(action, bank_ids):
     return sorted(banks)
 
 
+def parse_memory_summary(action):
+    if not isinstance(action, str) or len(action) > MEMORY_SUMMARY_LIMIT:
+        raise ValueError(f"기억 요약은 {MEMORY_SUMMARY_LIMIT}자 이내의 문자열로 답하세요.")
+    return action
+
+
 class PiggyMemory:
-    def __init__(self, players, banks):
+    def __init__(self, players, banks, *, summary=False):
         self.players = tuple(players)
         self.banks = banks
         self.selections = {name: [] for name in players}
         self.epoch = 0
+        self.summary = summary
+        self.summaries = dict.fromkeys(self.players, "")
+        self.updated_turn = dict.fromkeys(self.players, 0)
+        self.through = dict.fromkeys(self.players, 0)
 
     def select(self, name, banks):
         self.selections[name] = parse_memory_selection(json.dumps(banks), self.banks)
+
+    def update(self, name, text, turn, through):
+        self.summaries[name] = parse_memory_summary(text)
+        self.updated_turn[name] = turn
+        self.through[name] = through
 
     def replace(self, old_bank, new_bank):
         changed = []
@@ -50,17 +76,21 @@ class PiggyMemory:
                 changed.append(name)
         return changed
 
-    def reset(self, epoch):
+    def reset(self, epoch, turn=0):
         self.epoch = epoch
-        self.selections = {name: [] for name in self.players}
+        if not self.summary:
+            self.selections = {name: [] for name in self.players}
 
     def recall(self, name):
+        if self.summary:
+            return {"reset": self.epoch, "mode": "summary", "updated_turn": self.updated_turn[name],
+                    "text": self.summaries[name], "limit": MEMORY_SUMMARY_LIMIT}
         return {"reset": self.epoch, "banks": {
             str(bank): self.banks[bank].copy() for bank in self.selections[name] if bank in self.banks
         }}
 
     def __call__(self, name, history):
-        """Keep this turn's observations and three exact memories, never the old transcript."""
+        """Expose retained memory and fresh observations without recovering expired history."""
         visible = [event for event in history if event.visible_to == "all" or name in event.visible_to]
         boundary = 0
         first_turn = len(visible)
@@ -72,7 +102,8 @@ class PiggyMemory:
                 rules = event
             if kind == "pig_turn":
                 first_turn = min(first_turn, index)
-            if kind == "discussion_note" and event.agent_name == name and index < first_turn:
+            if (kind == "discussion_note" and event.agent_name == name and index < first_turn
+                    and (not self.summary or self.through[name] == 0)):
                 plan = event
             if event.visible_to != "all" or not kind.startswith("pig_"):
                 continue
@@ -96,12 +127,14 @@ class PiggyMemory:
         turn = visible[-1].turn if visible else 0
         encode = lambda value: json.dumps(value, ensure_ascii=False, separators=(",", ":"))
         projected = [rules] if rules is not None else []
-        projected.append(Message(SYSTEM_NAME, MEMORY_INSTRUCTIONS, turn=turn,
+        instructions = FREE_MEMORY_INSTRUCTIONS if self.summary else MEMORY_INSTRUCTIONS
+        projected.append(Message(SYSTEM_NAME, instructions, turn=turn,
                                  msg_type="rules", visible_to=[name]))
         if plan is not None:
             projected.append(plan)
         projected.append(Message(SYSTEM_NAME, encode(state), turn=turn, msg_type="pig_state"))
-        projected.extend(event for event in visible[boundary:] if event.msg_type in _CURRENT_EVENTS)
+        fresh = (event for event in visible if event.turn >= self.through[name]) if self.summary else visible[boundary:]
+        projected.extend(event for event in fresh if event.msg_type in _CURRENT_EVENTS)
         projected.append(Message(name, encode(self.recall(name)), turn=turn,
                                  msg_type="pig_recall", visible_to=[name]))
         # Requests are normally appended after projection; accept that form for direct callers too.

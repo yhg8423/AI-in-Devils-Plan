@@ -64,6 +64,14 @@
 .pig-memory-bank .pig-icon.compact strong { font-size: 11px; }
 .pig-memory-bank .pig-coins { font-size: 11px; gap: 5px; }
 .pig-memory-help { margin-block: 8px 12px; color: #b7cddd; font-size: 11px; }
+.pig-memory-estimate-note { margin-block: 0 9px; color: #c3d2df; font-size: 11px; line-height: 1.5; }
+.pig-memory-estimate-note small { display: block; margin-top: 3px; color: #9fb4c7; }
+.pig-coins > [data-uncertain] { color: #b2c4d4; }
+.pig-free-memory { margin-block: 10px 14px; padding: 10px; border: 1px solid #60758b; background: #1a2939; }
+.pig-free-memory h3 { margin: 0 0 8px; font: 700 12px/1.4 var(--pixel-font); }
+.pig-memory-text { margin-block: 8px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.7; font-size: 13px; }
+.pig-memory-text[data-empty] { color: #a7b7c5; }
+.pig-memory-meta { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 5px 12px; color: #adc5da; font-size: 10px; }
 .pig-current-claim { display: flex; align-items: center; gap: 16px; padding: 12px; margin-bottom: 14px; border: 1px solid #80674f; background: #272a2c; }
 .pig-current-claim p { margin-block: 3px; }
 .pig-current-claim small { color: #abb6bf; font-size: 11px; }

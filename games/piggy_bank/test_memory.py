@@ -6,9 +6,9 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 
-from ..match import Match
+from ..match import Decision, Match
 from ..models import CodexLanguageModel
-from .memory import PiggyMemory, parse_memory_selection
+from .memory import MEMORY_SUMMARY_LIMIT, PiggyMemory, parse_memory_selection, parse_memory_summary
 
 
 PLAYERS = ("P01", "P02", "P03", "P04")
@@ -46,6 +46,124 @@ class PiggyMemoryTest(unittest.TestCase):
         self.assertEqual(memory.recall("P02")["banks"], {})
         memory.select("P01", [1, 4, 5])
         self.assertEqual(memory.recall("P01")["banks"], {str(bank): {"black": 1, "white": 1} for bank in (1, 4, 5)})
+
+    def test_free_summary_accepts_five_banks_strategy_and_forgetting_without_truth_correction(self):
+        text = "1번 흑77, 2번 백9, 3번 불명, 4번 흑4, 5번 백5. 확신 없으면 의심하지 않는다."
+        self.assertEqual(parse_memory_summary(text), text)
+        self.assertEqual(parse_memory_summary(""), "")
+        self.assertEqual(parse_memory_summary("가" * MEMORY_SUMMARY_LIMIT), "가" * MEMORY_SUMMARY_LIMIT)
+        for invalid in (None, True, 123, {}, "가" * (MEMORY_SUMMARY_LIMIT + 1)):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                parse_memory_summary(invalid)
+        banks = {bank: {"black": 991, "white": 993} for bank in range(1, 6)}
+        memory = PiggyMemory(PLAYERS, banks, summary=True)
+        memory.update("P01", text, 1, 12)
+        banks[1] = {"black": 1991, "white": 1993}
+        self.assertEqual(memory.recall("P01"), {"reset": 0, "mode": "summary", "updated_turn": 1,
+                                               "text": text, "limit": MEMORY_SUMMARY_LIMIT})
+        del banks[1]
+        banks[6] = {"black": 991, "white": 993}
+        memory.replace(1, 6)
+        self.assertEqual(memory.recall("P01")["text"], text)
+        banks.clear()
+        banks.update({bank: {"black": 1, "white": 1} for bank in range(1, 6)})
+        memory.reset(1, turn=4)
+        self.assertEqual(memory.recall("P01")["text"], text, "A public reset must be interpreted by the model, not rewrite its summary")
+        self.assertEqual(memory.through["P01"], 12)
+        self.assertEqual(memory.recall("P01")["reset"], 1)
+        memory.update("P01", "리셋됐다. 예전 수량은 잊고 신중히 의심한다.", 4, 30)
+        self.assertNotIn("77", memory.recall("P01")["text"])
+        memory.update("P01", "", 5, 40)
+        self.assertEqual(memory.recall("P01")["text"], "")
+
+    def test_real_model_summary_bounds_history_and_keeps_wrong_or_omitted_facts(self):
+        prompts = []
+        wrong = "1번 흑77. 2·3·4·5번은 불확실하다. 확신 없으면 의심하지 않는다."
+        forgotten = "구체적인 수량은 기억나지 않는다. 다음 공개 행동을 신중히 본다."
+
+        def complete(prompt):
+            prompts.append(prompt)
+            if "비공개 관계 평가를 갱신하세요" in prompt:
+                action = "{}"
+            elif "UPDATE_SUMMARY_A" in prompt:
+                action = wrong
+            elif "BROKEN_SUMMARY" in prompt:
+                action = "가" * (MEMORY_SUMMARY_LIMIT + 1)
+            elif "UPDATE_SUMMARY_B" in prompt:
+                action = forgotten
+            else:
+                action = "pass"
+            return json.dumps({"action": action, "note": "OLD_SIDE_NOTE94717"})
+
+        with TemporaryDirectory() as directory:
+            model = CodexLanguageModel("test-model", Path(directory))
+            ratings = {"P01": {"P02": {"affinity": 60, "trust": 65, "reason": "OLD_REASON94729"}}}
+            match = Match(PLAYERS, 23, models={"P01": model}, live_turns=12, relationships=ratings)
+            banks = {bank: {"black": 94601, "white": 94603} for bank in range(1, 6)}
+            memory = PiggyMemory(PLAYERS, banks, summary=True)
+            memory.update("P02", "OTHER_PRIVATE94761", 0, 0)
+            match.model_observations = memory
+            lower = {name: bank for bank, name in enumerate(PLAYERS, 1)}
+            upper = {name: 5 if name == "P01" else None for name in PLAYERS}
+            state = {"lower": lower, "upper": upper, "scores": dict.fromkeys(PLAYERS, 0)}
+            match.event("rules", "돼지 저금통 비공개 기억 요약 검증")
+            match.event("pig_setup", {"order": list(PLAYERS), **state})
+            match.event("discussion_note", "INITIAL_PLAN94701", actor="P01", private=["P01"])
+            match.event("public", "OLD_ADVICE94723", actor="P02")
+
+            def valid_update(answer):
+                try:
+                    parse_memory_summary(answer)
+                except ValueError:
+                    return False
+                return True
+
+            def update(marker, turn):
+                response = match.decide_together("pig_memory_update", {
+                    "P01": Decision(marker, memory.recall("P01")["text"], valid=valid_update),
+                })["P01"]
+                memory.update("P01", response, turn, len(match.events))
+
+            with patch.object(model, "_complete", side_effect=complete):
+                update("UPDATE_SUMMARY_A", 0)
+                self.assertIn("INITIAL_PLAN94701", prompts[-1])
+                self.assertIn("OLD_ADVICE94723", prompts[-1])
+                memory_start = len(prompts)
+                match.event("pig_turn", {"turn": 1, "player": "P02", "color": "black", **state})
+                banks[1]["black"] += 1
+                match.event("pig_deposit", {"turn": 1, "player": "P02", "to": "P01", "bank": 1,
+                                            "black": 1, "white": 0, **state})
+                match.event("pig_contents", {"banks": banks}, private=["__operator__"])
+                match.event("pig_recall", memory.recall("P02"), actor="P02", private=["P02"])
+                match.event("public", "CURRENT_ADVICE94741", actor="P02")
+                match.event("pig_pass", {"turn": 1, "player": "P01", "bank": 1, "color": "black", "count": 94971})
+                match.decide("P01", "test_summary", "현재 기억으로 판단하세요.", "pass", options=("pass",))
+                self.assertIn(wrong, prompts[-1])
+                self.assertIn("CURRENT_ADVICE94741", prompts[-1])
+                update("BROKEN_SUMMARY", 1)
+                self.assertIn("CURRENT_ADVICE94741", prompts[-1])
+                self.assertIn("94971", prompts[-1], "The summary update must see the turn's outcome")
+                self.assertEqual(memory.recall("P01")["text"], wrong, "Invalid updates retain the previous summary without consulting true counts")
+                match.event("public", "NEW_COMPRESSION_FACT94743", actor="P02")
+                update("UPDATE_SUMMARY_B", 1)
+                self.assertIn("NEW_COMPRESSION_FACT94743", prompts[-1])
+                forgotten_start = len(prompts)
+                match.event("public", "AFTER_COMPRESSION94745", actor="P02")
+                match.decide("P01", "test_summary", "현재 기억으로 판단하세요.", "pass", options=("pass",))
+                self.assertIn(forgotten, prompts[-1])
+                self.assertNotIn("77", prompts[-1])
+                self.assertNotIn("CURRENT_ADVICE94741", prompts[-1])
+                self.assertNotIn("NEW_COMPRESSION_FACT94743", prompts[-1])
+                match.review_relationships("압축 후 새 대화")
+            for prompt in prompts[forgotten_start:]:
+                self.assertNotIn("CURRENT_ADVICE94741", prompt)
+                self.assertNotIn("NEW_COMPRESSION_FACT94743", prompt)
+            for prompt in prompts[memory_start:]:
+                for token in ("94701", "94723", "94717"):
+                    self.assertNotIn(token, prompt, "An expired initial plan, transcript, or side note must not bypass the summary")
+            for prompt in prompts:
+                for token in ("94601", "94603", "94761", "94729"):
+                    self.assertNotIn(token, prompt, "True counts, another player's summary, and rating reasons must stay private")
 
     def test_action_and_relationship_prompts_cannot_recover_expired_unselected_counts(self):
         prompts = []

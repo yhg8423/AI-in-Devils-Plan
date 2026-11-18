@@ -8,7 +8,10 @@ import json
 from ..either_or.discussion import Discussion
 from ..match import Decision, Match, encode
 from ..models import STRATEGY_NOTE_LIMIT
-from .memory import MEMORY_CAPACITY, MEMORY_HEADING, PiggyMemory, parse_memory_selection
+from .memory import (
+    FREE_MEMORY_HEADING, MEMORY_CAPACITY, MEMORY_HEADING, MEMORY_SUMMARY_LIMIT, PiggyMemory,
+    parse_memory_selection, parse_memory_summary,
+)
 
 
 WIN_SCORE = 5
@@ -64,7 +67,8 @@ def play(match: Match) -> dict:
         recorded_rules = next((event["content"] for event in match.resume_log.events
                                if event["msg_type"] == "rules"), None)
     discussion_turns = 1 if recorded_rules is not None and "전원에게 한 턴씩" in recorded_rules else 2
-    limited_memory = recorded_rules is None or MEMORY_HEADING in recorded_rules
+    free_memory = recorded_rules is None or FREE_MEMORY_HEADING in recorded_rules
+    limited_memory = free_memory or MEMORY_HEADING in recorded_rules
     order = match.rng.sample(list(players), 4)
     scores = dict.fromkeys(players, 0)
     acting = order[0]
@@ -75,7 +79,7 @@ def play(match: Match) -> dict:
     voters = []
     resets = turn = 0
     discussion = Discussion(order, OPENING_TURNS)
-    memory = PiggyMemory(players, banks) if limited_memory else None
+    memory = PiggyMemory(players, banks, summary=free_memory) if limited_memory else None
     if memory is not None:
         match.model_observations = memory
 
@@ -102,7 +106,7 @@ def play(match: Match) -> dict:
                                                 "banks": memory.selections[name]}, actor=name, private=[name])
 
     def select_memory():
-        if memory is None:
+        if memory is None or free_memory:
             return
         memory.reset(resets)
         choices = match.decide_together("pig_memory_select", {
@@ -122,6 +126,27 @@ def play(match: Match) -> dict:
         memory_selection(order)
         remember()
 
+    def summarize_memory():
+        if not free_memory:
+            return
+        through = len(match.events)
+        summaries = match.decide_together("pig_memory_update", {
+            name: Decision(
+                f"돼지 저금통 {turn}턴까지 확인한 내용으로 다음 구간에 남길 비공개 기억을 갱신하세요. "
+                f"기존 기억: {encode(memory.recall(name))}\n"
+                f"저금통 번호나 주제 제한 없이 관측한 수량, 추정, 발언, 약속, 전략 중 필요한 내용을 "
+                f"{MEMORY_SUMMARY_LIMIT}자 이내로 직접 골라 요약하세요. 실제 사실과 추정을 구분하세요. "
+                "기존 요약을 이어 쓰거나 고칠 수 있으며 빈 문자열로 모두 잊을 수도 있습니다. "
+                "이번 응답 하나만 이후 개인 기억으로 남고, 빠진 내용과 이전 전략·대화 원문은 다시 제공되지 않습니다. "
+                "정답이나 이전 전체 기록을 조회할 수 없고 틀린 기억도 시스템이 자동 보정하지 않습니다. "
+                "별도 기록장 없이 요약 자체만 일반 문자열로 출력하세요.",
+                memory.summaries[name], valid=lambda action: _accepts(parse_memory_summary, action),
+            ) for name in order
+        })
+        for name, text in summaries.items():
+            memory.update(name, text, turn, through)
+        remember()
+
     def seating():
         return f"아래칸 {encode(lower)} · 위칸 {encode(upper)} · 공개 승점 {encode(scores)}"
 
@@ -136,7 +161,9 @@ def play(match: Match) -> dict:
                     '전체 발언은 {"type":"speak","channel":"public","text":"..."}, '
                     '귓속말은 {"type":"speak","channel":"whisper","to":"상대 ID","text":"..."}입니다. '
                     '여럿에게는 to를 ["P02","P03"]처럼 지정하세요. 말하지 않으려면 {"type":"pass"}입니다. '
-                    + ("선택한 세 저금통의 정확한 기억과 이번 턴의 전달·발언을 바탕으로 판단하세요. "
+                    + ("본인의 기억 요약과 그 뒤 새로 확인한 전달·발언을 바탕으로 판단하세요. "
+                       "필요한 수량·추정·전략은 다음 기억 요약에 남길 수 있지만 별도 기록장은 사용할 수 없습니다." if free_memory else
+                       "선택한 세 저금통의 정확한 기억과 이번 턴의 전달·발언을 바탕으로 판단하세요. "
                        "선택하지 않은 저금통의 과거 기록이나 별도 누적 수량표는 제공되지 않습니다." if limited_memory else
                        "동전이나 별도 저금통별 수량표로 카운팅하지 말고, 전달과 발언에 대한 기억을 바탕으로 판단하세요.")
                 )
@@ -188,10 +215,11 @@ def play(match: Match) -> dict:
         "여러 명이 선택하면 추첨 자리 순서로 한 명을 정합니다. 리셋은 매 전달 뒤 추첨 순서로 요청 기회를 주고 "
         "세 번째 요청 즉시 처리합니다. 리셋 뒤에도 선언 색은 이어집니다. 최하위 동점은 추첨 순서가 뒤인 사람이 "
         "탈락합니다. "
-        + ("선택하지 않은 저금통의 누적 수량표는 제공하지 않습니다." if limited_memory else
+        + ("참가자가 직접 갱신한 비공개 기억 요약만 다음 구간에 이어집니다." if free_memory else
+           "선택하지 않은 저금통의 누적 수량표는 제공하지 않습니다." if limited_memory else
            "참가자에게 자동 집계된 저금통별 수량표를 제공하지 않습니다.")
     )
-    if limited_memory:
+    if limited_memory and not free_memory:
         rules += (
             MEMORY_HEADING
             + "기억 용량을 제한하기 위해 각자 시작과 리셋 직후, 다음 추가·전달을 알기 전에 현재 다섯 저금통 중 "
@@ -202,6 +230,20 @@ def play(match: Match) -> dict:
             "전체 기록과 수량을 적은 행동·전략 메모·관계 평가 근거는 다시 제공하지 않습니다. "
             "선택하지 않은 저금통은 불확실한 상태에서 추정하거나, 이번 대화에서 다른 참가자에게 물어볼 수 있습니다. "
             "전체 관전 기록에는 실제 동전 수와 모든 행동을 그대로 보관합니다. 이 기억 슬롯은 시뮬레이션 규칙입니다."
+        )
+    if free_memory:
+        rules += (
+            FREE_MEMORY_HEADING
+            + f"각자 {MEMORY_SUMMARY_LIMIT}자 이내의 비공개 기억 요약 하나를 직접 작성합니다. "
+            "시작 전 대화가 끝난 뒤 처음 갱신하고, 이후 매 턴의 선언·의심·리셋 처리가 끝나면 동시에 갱신합니다. "
+            "경기가 종료되면 추가 갱신하지 않습니다. 저금통 번호나 주제의 제한 없이 관측한 수량, 자신의 추정, "
+            "발언, 약속, 전략 중 남길 내용을 고를 수 있습니다. 빈 요약으로 모두 잊는 것도 허용합니다. "
+            "틀린 내용과 누락을 실제 수량으로 자동 보정하지 않습니다. 응답이 없거나 길이 제한을 넘으면 직전 요약을 유지합니다. "
+            "리셋해도 기존 요약을 자동 수정하거나 지우지 않으며, 참가자가 공개된 리셋 사실을 보고 직접 갱신합니다. "
+            "모델에는 현재 위치·승점·리셋 요청자와 본인의 요약, 마지막 기억 갱신 뒤 새로 확인한 공개 사실·대화만 보여줍니다. "
+            "처음 작성한 전략도 첫 기억 갱신 이후에는 요약에 포함한 내용만 보존합니다. "
+            "별도 기록장이나 전체 관전 기록을 조회할 수 없으며 요약이 유일한 개인 기억입니다. "
+            "전체 관전 기록에는 실제 동전 수와 모든 행동을 그대로 보관합니다. 이 기억 요약은 시뮬레이션 규칙입니다."
         )
     match.event("rules", rules)
     distribute()
@@ -217,8 +259,10 @@ def play(match: Match) -> dict:
                 + ("의심·리셋·전체 도전의 이득과 위험을 정리하세요. " if step == 1 else
                    "직전 계획의 취약점과 협력이 거절될 때의 대안을 검토해 수정하세요. ")
                 + f"내 이전 전략 요약: {plans[name]}\n"
-                "저금통별 동전 수량표나 누적 카운터를 작성하지 마세요. 공개한 기억과 불확실성을 구분하세요. "
-                f"수정한 전략 요약만 한국어 {STRATEGY_NOTE_LIMIT}자 이내로 출력하세요.",
+                + ("관측한 수량과 추정, 발언, 전략을 자유롭게 정신적 기억 요약에 남길 수 있습니다. "
+                   "별도 기록장을 사용하지 말고 실제 사실과 불확실성을 구분하세요. " if free_memory else
+                   "저금통별 동전 수량표나 누적 카운터를 작성하지 마세요. 공개한 기억과 불확실성을 구분하세요. ")
+                + f"수정한 전략 요약만 한국어 {STRATEGY_NOTE_LIMIT}자 이내로 출력하세요.",
                 plans[name], valid=lambda action: 0 < len(action.strip()) <= STRATEGY_NOTE_LIMIT,
             ) for name in order
         }, record_actions=False)
@@ -229,6 +273,7 @@ def play(match: Match) -> dict:
         match.event("discussion_note", note, actor=name, private=[name])
     match.event("pig_preparation_end", {"steps": 2})
     talk("opening", OPENING_TURNS)
+    summarize_memory()
 
     while max(scores.values()) < WIN_SCORE:
         turn += 1
@@ -256,11 +301,14 @@ def play(match: Match) -> dict:
         match.event("pig_deposit", {"turn": turn, "player": acting, "to": recipient, "bank": bank,
                                     "black": deposit["black"], "white": deposit["white"], **locations()})
         contents()
-        remember()
+        if not free_memory:
+            remember()
         count = _count(match.decide(
             recipient, "pig_count",
             f"{turn}턴. 전달받은 위칸 {bank}번 저금통의 {'흑' if color == 'black' else '백'} 동전 총개수를 선언하세요. "
-            + ("선택한 세 저금통의 정확한 기억과 이번 턴에 들은 전달·발언으로 판단하세요. 선택하지 않은 저금통의 "
+            + ("본인의 기억 요약과 그 뒤 새로 확인한 전달·발언으로 판단하세요. 요약은 실제 수량을 보장하지 않습니다. "
+               if free_memory else
+               "선택한 세 저금통의 정확한 기억과 이번 턴에 들은 전달·발언으로 판단하세요. 선택하지 않은 저금통의 "
                "이전 누적 수량은 제공되지 않습니다. " if limited_memory else
                "지금까지 들은 전달·추가·개봉 기록을 기억해서 답하세요. 자동 수량표는 제공되지 않습니다. ")
             + "동전 수를 음이 아닌 정수 하나로 출력하세요.",
@@ -270,7 +318,8 @@ def play(match: Match) -> dict:
         answers = match.decide_together("pig_doubt", {
             name: Decision(
                 f"{recipient}가 {bank}번 저금통의 {'흑' if color == 'black' else '백'} 동전을 {count}개라고 선언했습니다. "
-                "기억한 전달 기록을 바탕으로 의심(doubt)하거나 통과(pass)하세요. 성공 +1, 실패 -1입니다.",
+                + ("본인의 기억 요약과 그 뒤 새로 확인한 사실을 바탕으로 " if free_memory else "기억한 전달 기록을 바탕으로 ")
+                + "의심(doubt)하거나 통과(pass)하세요. 성공 +1, 실패 -1입니다.",
                 match.policy.choice(("doubt", "pass", "pass")), options=("doubt", "pass"),
             ) for name in order if name != recipient
         })
@@ -296,7 +345,7 @@ def play(match: Match) -> dict:
                                         "bank": next_bank, "initial": banks[next_bank].copy(), **locations()})
             next_bank += 1
             contents()
-            if memory is not None:
+            if memory is not None and not free_memory:
                 memory_selection(memory.replace(bank, next_bank - 1))
                 remember()
         else:
@@ -326,7 +375,9 @@ def play(match: Match) -> dict:
                     f"세 명이 리셋을 요청했습니다. 당신만 현재 저금통 {encode(sorted(banks))}의 흑·백 개수를 모두 "
                     "맞히는 도전에 나설 수 있습니다. 성공 +3점, 실패 -2점입니다. 도전하지 않으면 pass를 출력하세요. "
                     '도전하려면 모든 번호를 포함한 JSON 객체를 출력하세요. 예: {"1":{"black":1,"white":2},...}. '
-                    + ("선택한 세 저금통의 정확한 기억과 이번 턴에 확인한 공개 사실·대화만 사용하세요. "
+                    + ("본인의 기억 요약과 그 뒤 새로 확인한 공개 사실·대화로 판단하세요. "
+                       "요약에 남지 않은 과거 기록은 다시 조회할 수 없습니다." if free_memory else
+                       "선택한 세 저금통의 정확한 기억과 이번 턴에 확인한 공개 사실·대화만 사용하세요. "
                        "나머지 저금통의 누적 수량은 추정해야 합니다." if limited_memory else
                        "지금까지 들은 공개 기록에 대한 기억만 사용하세요."),
                     "pass", valid=lambda action: _accepts(parse_challenge, action, banks),
@@ -341,6 +392,8 @@ def play(match: Match) -> dict:
                 if max(scores.values()) >= WIN_SCORE:
                     break
                 resets += 1
+                if free_memory:
+                    memory.reset(resets)
                 distribute()
                 next_bank = 6
                 voters.clear()
@@ -350,6 +403,8 @@ def play(match: Match) -> dict:
                 select_memory()
                 match.review_relationships(f"돼지 저금통 {turn}턴 리셋 완료")
                 break
+        if max(scores.values()) < WIN_SCORE:
+            summarize_memory()
 
     ranking = sorted(order, key=lambda name: -scores[name])
     winners = [name for name in ranking if scores[name] == scores[ranking[0]]]

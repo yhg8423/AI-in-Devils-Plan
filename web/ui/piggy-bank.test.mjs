@@ -113,6 +113,27 @@ function physicalBank(html, bank) {
   return html.slice(start, html.indexOf("</div>", start));
 }
 
+function freeMemorySequence() {
+  const text = "P04보다 P02 신뢰. 1·2·3·4·5·88번은 확신 없음. 1번 흑 7777? 🪙 <img src=x>";
+  const recall = (owner, text, reset = 0, updated_turn = 1) => event("pig_recall", {
+    reset, mode: "summary", updated_turn, text, limit: 300,
+  }, [owner], owner);
+  const steps = [
+    event("rules", "돼지 저금통 · 참가자 4명\n\n5. 비공개 기억 요약\n각자 300자 이내로 기억할 내용을 남깁니다."),
+    ...sequence(true).pending.slice(0, -1),
+    event("action", {phase: "pig_memory_update", action: '{"strategy":"summary-only","ids":[1,2,3,4,5]}'}, ["P01"], "P01"),
+    recall("P01", text), recall("P02", "다른 기억: P03에게 질문하기"),
+  ];
+  return {steps, text, recall};
+}
+
+function freeSummary(html) {
+  const tag = openingTag(html, "pig-free-memory");
+  assert(tag, "The chosen owner should have a private free-memory panel");
+  const start = html.indexOf(tag);
+  return html.slice(start, html.indexOf("</section>", start));
+}
+
 for (const language of ["ko", "en"]) {
   const savedLocation = Object.getOwnPropertyDescriptor(globalThis, "location");
   let render;
@@ -320,6 +341,89 @@ for (const language of ["ko", "en"]) {
       const scene = arena(replay(replaced, view, replaced.length, view === "operator" ? "P01" : ""));
       assert(physicalBank(scene, 6).includes(language === "en" ? "Black 1 · White 1" : "흑 1 · 백 1"));
       assert(!scene.includes("631") && !scene.includes("633"), "Retired memory counts cannot follow the replacement bank");
+    }
+  });
+
+  test(`${language}: model memory preserves wrong or uncertain estimates without exposing or substituting true counts`, () => {
+    const fixture = memorySequence();
+    const rules = event("rules", "돼지 저금통 · 참가자 4명\n\n5. 기억 슬롯\n저금통 3개를 선택합니다.\n\n6. 기억 직접 갱신\n모르는 개수는 null로 남깁니다.");
+    const update = event("pig_recall", {reset: 0, mode: "model", updated_turn: 4,
+      banks: {1: {black: 614, white: null}, 3: {black: null, white: null}, 5: {black: 0, white: 2}}}, ["P01"], "P01");
+    const steps = [rules, ...fixture.steps.slice(1), update];
+    for (const view of ["P01", "operator"]) {
+      const selected = view === "operator" ? "P01" : "P02";
+      const html = replay(steps, view, steps.length, selected);
+      const scene = arena(html);
+      const wrong = physicalBank(scene, 1);
+      assert(wrong.includes("614") && wrong.includes("?"));
+      assert(!wrong.includes("631") && !wrong.includes("633"), "Remembered estimates must not be corrected with hidden totals");
+      assert(physicalBank(scene, 3).includes(language === "en" ? "Black ? · White ?" : "흑 ? · 백 ?"),
+        "Unknown estimates must not fall back to publicly known starting counts");
+      assert(physicalBank(scene, 5).includes(language === "en" ? "Black 0 · White 2" : "흑 0 · 백 2"), "Zero is a remembered value, not uncertainty");
+      assert(wrong.includes(language === "en" ? "Memory estimate" : "기억 추정"));
+      const marker = openingTag(html, "pig-memory-summary");
+      assert.match(marker ?? "", /data-mode="model"/);
+      const start = html.indexOf(marker);
+      const memory = html.slice(start, html.indexOf("</section>", start));
+      assert(memory.includes(language === "en" ? "Last updated · Turn 4" : "마지막 갱신 · 4턴"));
+      assert(!memory.includes("null") && memory.includes("?"));
+    }
+    for (const view of ["public", "P02", "P03", "P04"]) {
+      assert(!replay(steps, view).includes("614"), `${view} cannot see another player’s memory estimates`);
+    }
+    const omniscient = arena(replay(steps, "operator"));
+    assert(omniscient.includes("631") && !omniscient.includes("614"), "Unfiltered operators retain the actual-count view");
+    const legacy = arena(replay(fixture.steps, "P01"));
+    assert(legacy.includes("631") && !legacy.includes(language === "en" ? "Memory estimate" : "기억 추정"),
+      "Previous exact-memory logs retain their original presentation");
+  });
+
+  test(`${language}: free memory accepts arbitrary text privately without selecting banks or creating bank tallies`, () => {
+    const {steps, text} = freeMemorySequence();
+    for (const view of ["P01", "operator"]) {
+      const selected = view === "operator" ? "P01" : "";
+      const html = replay(steps, view, steps.length, selected);
+      const memory = freeSummary(html);
+      assert.match(openingTag(memory, "pig-free-memory"), /data-owner="P01"/);
+      assert(memory.includes("7777") && memory.includes("88"), "Free memory can retain arbitrary banks, uncertainty, and social facts");
+      assert(memory.includes(`${Array.from(text).length} / 300`), "The length counter must count Unicode code points");
+      assert(memory.includes("&lt;img src=x&gt;") && !memory.includes("<img"), "Memory text must be rendered as text");
+      assert.equal(openingTag(html, "pig-memory-bank"), undefined, "Free summaries must not create fixed bank slots");
+      const scene = arena(html);
+      assert(!scene.includes("7777"), "Narrative memory must not be parsed into a bank tally");
+      assert(!scene.includes("991") && !scene.includes("993"), "A chosen owner’s arena must not show operator-only totals");
+    }
+    const own = replay(steps, "P01");
+    assert(own.includes("summary-only"), "A JSON-shaped memory action remains valid plain text");
+    assert.match(openingTag(freeSummary(replay(steps, "P01", steps.length, "P02")), "pig-free-memory"), /data-owner="P01"/);
+    for (const view of ["public", "P02", "P03", "P04"]) {
+      const html = replay(steps, view);
+      assert(!html.includes("7777") && !html.includes("summary-only"), `${view} cannot see another player’s memory or update`);
+    }
+    const other = freeSummary(replay(steps, "operator", steps.length, "P02"));
+    assert(!other.includes("7777") && other.includes("P03"));
+    const omniscient = arena(replay(steps, "operator"));
+    assert(omniscient.includes("993") && !omniscient.includes("7777"), "Unfiltered operator counts remain independent of free summaries");
+  });
+
+  test(`${language}: free memory survives reset until rewritten and supports forgetting, clearing, and rewind`, () => {
+    const {steps, recall} = freeMemorySequence();
+    const reset = event("pig_reset", {reset: 1, order: players, lower, upper, scores, next_player: "P01"});
+    const afterReset = [...steps, reset];
+    const rewritten = [...afterReset, recall("P01", "P02에게 묻기", 1, 2)];
+    const cleared = [...rewritten, recall("P01", "", 1, 3), recall("P01", "old-epoch-7777", 0, 1)];
+    for (const view of ["P01", "operator"]) {
+      const selected = view === "operator" ? "P01" : "";
+      const retained = freeSummary(replay(afterReset, view, afterReset.length, selected));
+      assert(retained.includes("7777"), "Reset retains the previous summary until its owner rewrites it");
+      assert(retained.includes(language === "en" ? "pre-reset" : "리셋 전"));
+      const changed = freeSummary(replay(rewritten, view, rewritten.length, selected));
+      assert(!changed.includes("7777") && changed.includes("P02에게 묻기"), "A new summary can discard every previous bank fact");
+      const empty = freeSummary(replay(cleared, view, cleared.length, selected));
+      assert.match(openingTag(empty, "pig-memory-text"), /data-empty="true"/);
+      assert(empty.includes("0 / 300") && !empty.includes("7777") && !empty.includes("P02에게 묻기"));
+      const beforeRecall = freeSummary(replay(cleared, view, 2, selected));
+      assert(beforeRecall.includes("0 / 300") && !beforeRecall.includes("7777"), "Future summaries cannot survive rewind");
     }
   });
 

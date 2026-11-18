@@ -78,6 +78,7 @@ const actions = {
   pig_preparation: tr("비공개 전략 준비", "Private preparation"), pig_talk: tr("저금통 대화", "Piggy Bank discussion"),
   pig_deposit: tr("입금과 전달", "Deposit and pass"), pig_count: tr("동전 개수 선언", "Coin count declaration"),
   pig_memory_select: tr("기억 슬롯 선택", "Choose memory slots"),
+  pig_memory_update: tr("기억 갱신", "Update memory"),
   pig_doubt: tr("의심 선언", "Call doubt"), pig_reset_vote: tr("리셋 버튼", "Reset button"),
   pig_challenge: tr("전체 저금통 도전", "All-bank challenge"),
 };
