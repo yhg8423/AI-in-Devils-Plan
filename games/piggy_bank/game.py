@@ -72,7 +72,7 @@ def play(match: Match) -> dict:
     discussion_turns = 1 if recorded_rules is not None and "전원에게 한 턴씩" in recorded_rules else 2
     discussion_enabled = recorded_rules is not None and NO_DISCUSSION_HEADING not in recorded_rules
     match.relationship_reviews_enabled = recorded_rules is not None and NO_RELATIONSHIP_HEADING not in recorded_rules
-    simultaneous_reset = recorded_rules is None or SIMULTANEOUS_RESET_HEADING in recorded_rules
+    simultaneous_reset = recorded_rules is not None and SIMULTANEOUS_RESET_HEADING in recorded_rules
     dynamic_memory = recorded_rules is None or DYNAMIC_MEMORY_HEADING in recorded_rules
     free_memory = recorded_rules is not None and FREE_MEMORY_HEADING in recorded_rules
     limited_memory = dynamic_memory or free_memory or MEMORY_HEADING in recorded_rules
