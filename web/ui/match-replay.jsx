@@ -35,7 +35,7 @@ const labels = {
   colors: tr("색 칩 공개", "Color chips revealed"), weights: tr("무게 공개", "Weights revealed"), placement: tr("큐브 배치", "Cube placement"), market: tr("시세", "Stock prices"), hints: tr("공개 단서", "Public clues"),
   market_tick: tr("거래 시간", "Trading time"), trade_fill: tr("주문 체결", "Trade filled"), seats: tr("자리 배정", "Seating"), inspection: tr("조사", "Inspection"), shift: tr("회전", "Rotation"), swap: tr("조작 · 두 칸 교환", "Manipulation · Two slots swapped"),
   gem_setup: tr("게임 준비", "Game setup"), gem_manito: tr("비공개 마니또", "Private manito"),
-  gem_discussion: tr("대화 시작", "Discussion begins"), gem_discussion_round: tr("대화 회전", "Discussion turn"),
+  gem_discussion: tr("대화 시작", "Discussion begins"), gem_discussion_round: tr("대화 턴", "Discussion turn"),
   gem_discussion_end: tr("대화 종료", "Discussion ends"), gem_strategy: tr("비공개 전략 정리", "Private planning"),
   gem_auction_round: tr("선 플레이어 경매", "Lead auction"), gem_auction: tr("경매 결과", "Auction results"),
   gem_round: tr("라운드 시작", "Round begins"), gem_turn: tr("카드 교환 차례", "Swap turn"),
@@ -127,6 +127,7 @@ function rouletteCreditAction(action) {
 }
 
 function ruleText(content) {
+  if (content.startsWith("보석 암시장")) content = content.replaceAll("회전", "턴");
   return content.replaceAll("경기 규칙", "게임 규칙")
     .replace(/(선택 5 전후로 각각 \d+)라운드 협상/g, "$1턴 협상")
     .replace(/(\d+)인 경기/g, "참가자 $1명")

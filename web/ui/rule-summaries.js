@@ -36,7 +36,7 @@ export function rulesSummary(heading, body) {
       "The three-minute turn becomes one discussion action per player.",
       "The simulation gives each player 12 opening discussion turns before bidding. Each swap and tied auction allows up to five discussion turns, ending early when everyone passes in one turn. All players may discuss auction ties before re-bidding or the final agreement vote. Tied bidders alone submit further bids or nominate the leader. After discussion and any paid inspection, the acting player privately plans the swap.",
     );
-    return body.includes("2회전") ? summary.replace(
+    return /2(?:회전|턴)/.test(body) ? summary.replace(
       "The three-minute turn becomes one discussion action per player.",
       "The simulation provides two opening discussion turns before bidding and two before each swap. After discussion and any paid inspection, the acting player privately plans the swap.",
     ) : summary;

@@ -28,8 +28,8 @@ export function gemDiscussionLabel({stage, round, pass, player}) {
 }
 
 function gemDiscussionProgress({turn, rounds}) {
-  return turn ? tr(`대화 ${turn} / ${rounds}회전`, `Discussion turn ${turn} of ${rounds}`) :
-    tr(`${rounds}회전 대화 시작`, `${rounds} discussion turns begin`);
+  return turn ? tr(`대화 ${turn} / ${rounds}턴`, `Discussion turn ${turn} of ${rounds}`) :
+    tr(`${rounds}턴 대화 시작`, `${rounds} discussion turns begin`);
 }
 
 export function gemActionText(phase, action) {
@@ -166,6 +166,18 @@ export function GemStage({state, players, selected, onChoose}) {
           result.final_scores?.[name] ?? final?.final_scores[name] ?? result.scores[name], result.pieces[name],
           result.eliminated.includes(name) ? tr("탈락", "Eliminated") : result.living.includes(name) ? tr("생활동", "Living Quarters") : tr("감옥동", "Prison Wing"),
         ])} />
+    </div>;
+  }
+  if (!round && !discussion && !state.gemAuctionRound && !auction) {
+    const rules = state.feed?.find((event) => event.msg_type === "rules");
+    const openingEnded = state.feed?.some((event) => event.msg_type === "gem_discussion_end" && event.data.stage === "opening");
+    const heading = openingEnded ? tr("시작 전 대화 종료", "Opening discussion complete") :
+      rules ? tr("게임 규칙", "Game rules") : tr("게임 시작 전", "Before the game");
+    return <div className="gem-stage">
+      <h2>{heading}</h2>
+      {openingEnded ? <p className="muted gem-status">{tr("선 플레이어 경매 준비", "Preparing the lead-player auction")}</p> :
+        rules ? <p className="choice-rules">{rules.text}</p> :
+          <p className="muted gem-status">{tr("게임 규칙 공개 대기", "Waiting for the game rules")}</p>}
     </div>;
   }
   return <div className="gem-stage">
