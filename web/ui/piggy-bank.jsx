@@ -402,6 +402,7 @@ export function PiggyStage({state, players, selected, onChoose}) {
   const {pigTurn: turn, pigClaim: claim, pigScores: scores = {}, pigLast: latest, pigVerdict: verdict, result} = state;
   const rules = state.feed.find((event) => event.msg_type === "rules");
   const rawRules = rules ? typeof rules.data === "string" ? rules.data : rules.content : "";
+  const turnLimit = result?.turn_limit ?? (rawRules.includes("\n\n100턴 상한\n") ? 100 : null);
   const [rulesTitle, ...rulesBody] = rawRules.split("\n");
   const explanation = en ? rulesSummary(rulesTitle, rulesBody.join("\n")) ?? rules?.text : rawRules;
   const order = result?.ranking ?? [...(state.pigOrder ?? players)].sort((a, b) => (scores[b] ?? 0) - (scores[a] ?? 0));
@@ -412,13 +413,17 @@ export function PiggyStage({state, players, selected, onChoose}) {
   </div>;
   if (result) return <div className="pig-stage">
     <h2>{tr("최종 결과", "Final results")}</h2>
+    {result.end_reason === "turn_limit" && <p className="muted">{tr(`${turnLimit}턴 상한 도달 · 최종 승점으로 순위 결정`,
+      `Reached the ${turnLimit}-turn limit · Ranked by final VP`)}</p>}
+    {result.end_reason === "win_score" && <p className="muted">{tr("5점 이상 달성으로 종료", "Ended after a player reached 5 VP")}</p>}
     <Table caption={tr("돼지 저금통 최종 순위", "Piggy Bank final standings")} headers={tr(["참가자", "승점", "획득 피스", "결과"], ["Player", "VP", "Pieces earned", "Result"])}
       rows={order.map((player, index) => [`${index + 1}. ${player}`, result.scores?.[player] ?? scores[player] ?? 0,
         result.pieces_awarded?.[player] ?? 0, result.eliminated.includes(player) ? tr("탈락", "Eliminated") : tr("생존", "Survived")])} />
     {verdict?.type === "pig_challenge" && <PiggyChallengeResult data={verdict.data} />}
   </div>;
   return <div className="pig-stage">
-    <h2>{turn ? tr(`${turn.turn}턴`, `Turn ${turn.turn}`) : tr("돼지 저금통 준비", "Preparing Piggy Bank")}</h2>
+    <h2>{turn ? tr(turnLimit ? `${turn.turn} / ${turnLimit}턴` : `${turn.turn}턴`,
+      turnLimit ? `Turn ${turn.turn} / ${turnLimit}` : `Turn ${turn.turn}`) : tr("돼지 저금통 준비", "Preparing Piggy Bank")}</h2>
     <p className="pig-stage-status">{latest ? pigEventText(latest.type, latest.data) : tr("규칙 공개 대기", "Awaiting the game rules")}</p>
     {claim && verdict?.type !== "pig_challenge" && <div className="pig-current-claim"><PigIcon bank={claim.bank} /><div><strong>{claim.player}</strong>
       <p>{tr(`${pigColorLabel(claim.color)} ${claim.count}개 선언`, `Claims ${claim.count} ${pigColorLabel(claim.color)} coins`)}</p>
@@ -434,7 +439,9 @@ export function PiggyStage({state, players, selected, onChoose}) {
         <span>{player}</span><strong>{scores[player] ?? 0}<small> / 5</small></strong>
         <span className="pig-score-track" aria-hidden="true">{Array.from({length: 5}, (_, index) => <i key={index} data-earned={index < (scores[player] ?? 0) || undefined} />)}</span>
       </button>)}</div>
-    <p className="muted">{tr("누군가 5점을 얻으면 종료 · 최하위 1명 탈락", "Ends when anyone reaches 5 VP · One last-place player is eliminated")}</p>
+    <p className="muted">{turnLimit ? tr(`5점 이상 달성 또는 ${turnLimit}턴 완료 시 종료 · 최하위 1명 탈락`,
+      `Ends at 5 VP or after Turn ${turnLimit} · One last-place player is eliminated`) :
+      tr("누군가 5점을 얻으면 종료 · 최하위 1명 탈락", "Ends when anyone reaches 5 VP · One last-place player is eliminated")}</p>
     <p className="pig-reset-status">{tr("리셋 요청", "Reset requests")} <strong>{state.pigVoters?.length > 3 ?
       tr(`${state.pigVoters.length}명 요청 · 기준 3명`, `${state.pigVoters.length} requests · 3 required`) : `${state.pigVoters?.length ?? 0} / 3`}</strong>
       {state.pigVoters?.length > 0 && <span>{state.pigVoters.join(" · ")}</span>}</p>

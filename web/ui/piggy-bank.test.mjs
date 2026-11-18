@@ -473,6 +473,31 @@ for (const language of ["ko", "en"]) {
     if (language === "en") assert(old.includes("four opening discussion turns"));
   });
 
+  test(`${language}: turn-limit rules show progress and the final reason without changing archived games`, () => {
+    const oldRules = "돼지 저금통 · 참가자 4명\n\n5. 변경 가능한 기억 슬롯\n기억할 번호를 바꿀 수 있습니다.";
+    const rules = oldRules + "\n\n100턴 상한\n5점 이상 달성 또는 100턴 완료 시 최종 승점으로 순위를 정합니다.";
+    const turn = event("pig_turn", {turn: 99, player: "P01", color: "black", lower, upper, scores});
+    const setup = sequence(true).pending[0];
+    const steps = [event("rules", rules), setup, turn];
+    const html = replay(steps, "public");
+    assert(html.includes(language === "en" ? "Turn 99 / 100" : "99 / 100턴"));
+    assert(html.includes(language === "en" ? "Ends at 5 VP or after Turn 100" : "5점 이상 달성 또는 100턴 완료 시 종료"));
+    const old = replay([event("rules", oldRules), setup, turn], "public");
+    assert(old.includes(language === "en" ? "Ends when anyone reaches 5 VP" : "누군가 5점을 얻으면 종료"));
+    assert(!old.includes(language === "en" ? "Turn 99 / 100" : "99 / 100턴"));
+    if (language === "en") {
+      assert(html.includes("after Turn 100, including its reset requests and any eligible all-bank challenge"));
+      assert(!old.includes("after Turn 100"), "Archived rules retain their original ending condition");
+    }
+    const result = {ranking: players, scores, pieces_awarded: {}, winners: players, eliminated: ["P04"],
+      turns: 100, turn_limit: 100, end_reason: "turn_limit"};
+    const final = replay([...steps, event("match_result", result)], "public");
+    assert(final.includes(language === "en" ? "Reached the 100-turn limit · Ranked by final VP" : "100턴 상한 도달 · 최종 승점으로 순위 결정"));
+    assert(final.includes(language === "en" ? "Eliminated" : "탈락"), "The tied last-place player is still eliminated");
+    const early = replay([...steps, event("match_result", {...result, turns: 99, end_reason: "win_score"})], "public");
+    assert(early.includes(language === "en" ? "Ended after a player reached 5 VP" : "5점 이상 달성으로 종료"));
+  });
+
   test(`${language}: simultaneous reset choices stay private until the final voter list is published and four requests display clearly`, () => {
     const previousRules = "돼지 저금통 · 참가자 4명\n\n5. 변경 가능한 기억 슬롯\n저금통 3개를 기억합니다.\n\n6. 대화 없는 진행\n대화를 생략합니다.\n\n7. 관계 평가 없음\n관계 평가를 생략합니다.";
     const rules = previousRules + "\n\n8. 리셋 동시 판단\n아직 누르지 않은 전원이 동시에 판단하며 4명이면 도전 없이 리셋합니다.";

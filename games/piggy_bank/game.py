@@ -15,12 +15,14 @@ from .memory import (
 
 
 WIN_SCORE = 5
+MAX_TURNS = 100
 OPENING_TURNS = 4
 NO_DISCUSSION_HEADING = "\n\n6. 대화 없는 진행\n"
 NO_RELATIONSHIP_HEADING = "\n\n7. 관계 평가 없음\n"
 SIMULTANEOUS_RESET_HEADING = "\n\n8. 리셋 동시 판단\n"
 SCORING_GOAL_HEADING = "\n\n득점 목표\n"
 INITIAL_MEMORY_SELECTION_HEADING = "\n\n초기 기억 선택\n"
+TURN_LIMIT_HEADING = "\n\n100턴 상한\n"
 COLORS = ("black", "white")
 PASS = '{"type":"pass"}'
 
@@ -71,6 +73,7 @@ def play(match: Match) -> dict:
     if match.resume_log is not None and match.resume_log.resume:
         recorded_rules = next((event["content"] for event in match.resume_log.events
                                if event["msg_type"] == "rules"), None)
+    turn_limit = MAX_TURNS if recorded_rules is None or TURN_LIMIT_HEADING in recorded_rules else None
     discussion_turns = 1 if recorded_rules is not None and "전원에게 한 턴씩" in recorded_rules else 2
     discussion_enabled = recorded_rules is not None and NO_DISCUSSION_HEADING not in recorded_rules
     match.relationship_reviews_enabled = recorded_rules is not None and NO_RELATIONSHIP_HEADING not in recorded_rules
@@ -348,6 +351,15 @@ def play(match: Match) -> dict:
             "끝나면 새 요청을 함께 공개합니다. 이전 요청은 유지되고 취소할 수 없습니다. 새 요청을 전부 반영한 "
             "누적 인원이 정확히 세 명이면 남은 한 명에게 전체 도전 기회를 주고, 네 명이면 도전 없이 바로 리셋합니다."
         )
+    if turn_limit is not None:
+        rules += (
+            TURN_LIMIT_HEADING
+            + f"누군가 {WIN_SCORE}점 이상을 얻으면 즉시 종료하며, 그렇지 않아도 {turn_limit}턴의 득점 판정까지 "
+            "마치면 경기를 종료합니다. 마지막 턴의 선언·의심과 리셋 전 전체 도전 기회는 정상 처리하고, "
+            "그 뒤 새 저금통 배분과 기억 갱신은 하지 않습니다. 종료 시 승점이 가장 높은 참가자가 1위이며 "
+            "최하위 한 명이 탈락합니다. 공동 1위의 피스 배분과 최하위 동점 판정은 기존 규칙을 따릅니다. "
+            "남은 턴과 현재 승점 격차를 고려해 득점 기회와 실패 손실을 판단하세요."
+        )
     rules += (
         SCORING_GOAL_HEADING
         + "5점 이상을 먼저 달성해 1위를 차지하도록 적극적으로 득점 기회를 찾으세요. "
@@ -548,6 +560,8 @@ def play(match: Match) -> dict:
                     match.review_relationships(f"돼지 저금통 {turn}턴 전체 도전 결과")
                 if max(scores.values()) >= WIN_SCORE:
                     break
+            if turn_limit is not None and turn >= turn_limit:
+                break
             resets += 1
             if free_memory:
                 memory.reset(resets)
@@ -563,12 +577,17 @@ def play(match: Match) -> dict:
                 remember()
             select_memory()
             match.review_relationships(f"돼지 저금통 {turn}턴 리셋 완료")
+        if turn_limit is not None and turn >= turn_limit:
+            break
         if max(scores.values()) < WIN_SCORE:
             update_memory()
 
     ranking = sorted(order, key=lambda name: -scores[name])
     winners = [name for name in ranking if scores[name] == scores[ranking[0]]]
     awards = {name: 3 // len(winners) if name in winners else 0 for name in players}
-    return {"turns": turn, "resets": resets, "ranking": ranking, "scores": scores,
-            "winners": winners, "survivors": ranking[:-1], "eliminated": ranking[-1:],
-            "pieces_awarded": awards, "pieces": {name: match.pieces[name] + awards[name] for name in players}}
+    result = {"turns": turn, "resets": resets, "ranking": ranking, "scores": scores,
+              "winners": winners, "survivors": ranking[:-1], "eliminated": ranking[-1:],
+              "pieces_awarded": awards, "pieces": {name: match.pieces[name] + awards[name] for name in players}}
+    if turn_limit is not None:
+        result.update(turn_limit=turn_limit, end_reason="win_score" if max(scores.values()) >= WIN_SCORE else "turn_limit")
+    return result

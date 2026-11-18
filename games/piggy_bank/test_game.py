@@ -286,12 +286,117 @@ class PiggyBankTest(unittest.TestCase):
         result = play(match)
         self.assertEqual(result["scores"], {"P01": 6, "P02": 0, "P03": 0, "P04": 0})
         self.assertEqual(result["turns"], 2)
+        self.assertEqual(result["turn_limit"], 100)
+        self.assertEqual(result["end_reason"], "win_score")
         self.assertEqual(result["resets"], 1)
         self.assertEqual(match.events[-1].msg_type, "pig_challenge")
         self.assertEqual(result["winners"], ["P01"])
         self.assertEqual(result["pieces_awarded"]["P01"], 3)
         order = next(json.loads(event.content)["order"] for event in match.events if event.msg_type == "pig_setup")
         self.assertEqual(result["eliminated"], [next(player for player in reversed(order) if player != "P01")])
+
+    def test_turn_limit_counts_final_verdicts_without_another_reset_or_memory_update(self):
+        class CappedMatch(Match):
+            current_turn = 0
+
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "pig_turn":
+                    self.current_turn = data["turn"]
+                elif kind == "pig_contents":
+                    self.banks = data["banks"]
+
+            def decide(self, name, phase, prompt, default, **kwargs):
+                if phase == "pig_deposit":
+                    default = json.dumps({"black": 1, "white": 0, "to": "P02" if name != "P02" else "P03"})
+                elif phase == "pig_count":
+                    default = "0"
+                elif phase == "pig_reset_vote":
+                    default = "reset" if self.current_turn == 100 and scenario.startswith("challenge") and name != "P01" else "pass"
+                elif phase == "pig_challenge":
+                    guesses = json.loads(json.dumps(self.banks))
+                    if scenario == "challenge_failure":
+                        guesses[next(iter(guesses))]["black"] += 1
+                    default = json.dumps(guesses)
+                return super().decide(name, phase, prompt, default, **kwargs)
+
+            def decide_together(self, phase, decisions, **kwargs):
+                if phase == "pig_doubt":
+                    decisions = {name: replace(decision, default="doubt" if self.current_turn == 100 and scenario == "doubt" and name == "P01" else "pass")
+                                 for name, decision in decisions.items()}
+                return super().decide_together(phase, decisions, **kwargs)
+
+        for scenario in ("pass", "doubt", "challenge_success", "challenge_failure"):
+            with self.subTest(scenario=scenario):
+                match = CappedMatch(PLAYERS, 23)
+                result = play(match)
+                self.assertEqual(result["turns"], 100)
+                self.assertEqual(result["turn_limit"], 100)
+                self.assertEqual(result["end_reason"], "turn_limit")
+                self.assertEqual(result["resets"], 0)
+                self.assertFalse(any(event.msg_type == "pig_reset" for event in match.events))
+                self.assertEqual(sum(event.msg_type == "pig_turn" for event in match.events), 100)
+                final_start = next(index for index, event in enumerate(match.events)
+                                   if event.msg_type == "pig_turn" and json.loads(event.content)["turn"] == 100)
+                final_actions = [json.loads(event.content)["phase"] for event in match.events[final_start:]
+                                 if event.msg_type == "action"]
+                self.assertNotIn("pig_memory_update", final_actions)
+                self.assertIn("pig_reset_vote", final_actions, "Reset and challenge decisions belong to the final turn")
+                memory_updates = [event for event in match.events if event.msg_type == "action"
+                                  and json.loads(event.content)["phase"] == "pig_memory_update"]
+                self.assertEqual(len(memory_updates), len(PLAYERS) * 100)
+
+                scores = dict.fromkeys(PLAYERS, 0)
+                if scenario == "doubt":
+                    verdict = next(json.loads(event.content) for event in reversed(match.events) if event.msg_type == "pig_doubt")
+                    self.assertEqual(verdict["turn"], 100)
+                    self.assertTrue(verdict["correct"])
+                    scores["P01"], scores[verdict["player"]] = 1, -1
+                elif scenario.startswith("challenge"):
+                    verdict = json.loads(match.events[-1].content)
+                    self.assertEqual(match.events[-1].msg_type, "pig_challenge")
+                    self.assertEqual(verdict["turn"], 100)
+                    self.assertEqual(verdict["correct"], scenario == "challenge_success")
+                    scores["P01"] = 3 if scenario == "challenge_success" else -2
+                self.assertEqual(result["scores"], scores)
+                order = next(json.loads(event.content)["order"] for event in match.events if event.msg_type == "pig_setup")
+                ranking = sorted(order, key=lambda name: -scores[name])
+                winners = [name for name in ranking if scores[name] == max(scores.values())]
+                self.assertEqual(result["ranking"], ranking)
+                self.assertEqual(result["eliminated"], ranking[-1:])
+                self.assertEqual(result["survivors"], ranking[:-1])
+                self.assertEqual(result["winners"], winners)
+                for name in PLAYERS:
+                    award = 3 // len(winners) if name in winners else 0
+                    self.assertEqual(result["pieces_awarded"][name], award)
+                    self.assertEqual(result["pieces"][name], match.pieces[name] + award)
+
+    def test_saved_games_without_turn_limit_can_continue_past_one_hundred_turns(self):
+        class PastLimit(Exception):
+            pass
+
+        class UncappedMatch(Match):
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "pig_turn" and data["turn"] == 101:
+                    raise PastLimit
+
+            def decide(self, name, phase, prompt, default, **kwargs):
+                if phase == "pig_reset_vote":
+                    default = "pass"
+                return super().decide(name, phase, prompt, default, **kwargs)
+
+            def decide_together(self, phase, decisions, **kwargs):
+                if phase == "pig_doubt":
+                    decisions = {name: replace(decision, default="pass") for name, decision in decisions.items()}
+                return super().decide_together(phase, decisions, **kwargs)
+
+        match = UncappedMatch(PLAYERS, 23)
+        match.resume_log = SimpleNamespace(resume=True, events=[{
+            "msg_type": "rules", "content": DYNAMIC_MEMORY_HEADING + NO_DISCUSSION_HEADING + NO_RELATIONSHIP_HEADING,
+        }])
+        with self.assertRaises(PastLimit):
+            play(match)
 
     def test_simultaneous_reset_queries_share_prior_votes_and_publish_all_current_requests(self):
         class TurnsComplete(Exception):

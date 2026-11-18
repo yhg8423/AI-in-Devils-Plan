@@ -34,6 +34,10 @@ export function rulesSummary(heading, body) {
         " Each player maintains their own black and white estimates for three chosen banks, updating those memories after each deposit. Estimates can be wrong, and uncertain counts may be left unknown; the engine never corrects them with hidden totals. Players choose banks at the start and after each reset, keeping those slots until the next reset. A retired selected bank is replaced by the fresh bank with one coin of each color. Earlier bank-count records are unavailable outside these memories." : body.includes("\n\n5. 기억 슬롯\n") ?
         " The simulation privately retains exact black and white counts for three chosen banks. Players choose at the start and after each reset; slots stay fixed between resets and follow fresh replacements, which start with one coin of each color. Earlier bank-count records are unavailable outside these slots." : "";
     let summary = summaries.find(([prefix]) => prefix === "돼지 저금통")[1];
+    if (body.includes("\n\n100턴 상한\n")) summary = summary.replace(
+      "End immediately when anyone reaches five points.",
+      "End immediately when anyone reaches five points, or after Turn 100, including its reset requests and any eligible all-bank challenge. At the turn limit, rank players by their current Victory Points without resetting banks or updating memory.",
+    );
     if (body.includes("\n\n8. 리셋 동시 판단\n")) summary = summary.replace(
       "Three reset requests trigger a reset. Before it, the remaining player may recall both colors in all five banks for +3 points or −2 on failure.",
       "A reset occurs when at least three players have requested it. Players who have not already requested one decide simultaneously in private, and all responses are collected before any new requests are announced. At exactly three cumulative requests, the sole non-requester may recall both colors in all five banks for +3 points or −2 on failure. If all four request a reset, reset directly without a challenge.",
