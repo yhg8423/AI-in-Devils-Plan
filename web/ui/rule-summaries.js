@@ -34,9 +34,11 @@ export function rulesSummary(heading, body) {
         " Each player maintains their own black and white estimates for three chosen banks, updating those memories after each deposit. Estimates can be wrong, and uncertain counts may be left unknown; the engine never corrects them with hidden totals. Players choose banks at the start and after each reset, keeping those slots until the next reset. A retired selected bank is replaced by the fresh bank with one coin of each color. Earlier bank-count records are unavailable outside these memories." : body.includes("\n\n5. 기억 슬롯\n") ?
         " The simulation privately retains exact black and white counts for three chosen banks. Players choose at the start and after each reset; slots stay fixed between resets and follow fresh replacements, which start with one coin of each color. Earlier bank-count records are unavailable outside these slots." : "";
     const summary = summaries.find(([prefix]) => prefix === "돼지 저금통")[1];
+    const relationships = body.includes("\n\n7. 관계 평가 없음\n") ?
+      " Relationship assessments are disabled during and at the end of this match." : "";
     return (silent ? summary.replace("discussion and decision windows replace the timers", "decision windows replace the timers") : summary) +
       (silent ? " There are no discussion or whisper phases. Players privately prepare and update their initial memory before the first deposit. Coin deposits, count declarations, and verdicts remain public." :
-        ` Each player has four opening discussion turns and ${turns} before each deposit.`) + memory;
+        ` Each player has four opening discussion turns and ${turns} before each deposit.`) + memory + relationships;
   }
   if (heading.startsWith("보석 암시장")) {
     const relationships = body.includes("\n\n8. 관계 평가 갱신\n") ?

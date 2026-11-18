@@ -17,6 +17,7 @@ from .memory import (
 WIN_SCORE = 5
 OPENING_TURNS = 4
 NO_DISCUSSION_HEADING = "\n\n6. 대화 없는 진행\n"
+NO_RELATIONSHIP_HEADING = "\n\n7. 관계 평가 없음\n"
 COLORS = ("black", "white")
 PASS = '{"type":"pass"}'
 
@@ -69,6 +70,7 @@ def play(match: Match) -> dict:
                                if event["msg_type"] == "rules"), None)
     discussion_turns = 1 if recorded_rules is not None and "전원에게 한 턴씩" in recorded_rules else 2
     discussion_enabled = recorded_rules is not None and NO_DISCUSSION_HEADING not in recorded_rules
+    match.relationship_reviews_enabled = recorded_rules is not None and NO_RELATIONSHIP_HEADING not in recorded_rules
     dynamic_memory = recorded_rules is None or DYNAMIC_MEMORY_HEADING in recorded_rules
     free_memory = recorded_rules is not None and FREE_MEMORY_HEADING in recorded_rules
     limited_memory = dynamic_memory or free_memory or MEMORY_HEADING in recorded_rules
@@ -294,7 +296,15 @@ def play(match: Match) -> dict:
             + "게임 시작 전과 매 턴에 참가자끼리 자유롭게 말하거나 귓속말·협상하는 시간과 행동은 없습니다. "
             "각자 두 단계의 비공개 전략 준비를 마치면 첫 기억 갱신을 하고 바로 동전 추가·전달을 시작합니다. "
             "추가한 흑·백 개수, 개수 선언, 의심과 리셋 요청·판정처럼 게임 진행에 필요한 공개 정보는 "
-            "계속 시스템으로 안내합니다. 비공개 전략 준비와 기억 갱신, 관계 평가는 유지합니다."
+            "계속 시스템으로 안내합니다. "
+            + ("비공개 전략 준비와 기억 갱신, 관계 평가는 유지합니다." if match.relationship_reviews_enabled else
+               "비공개 전략 준비와 기억 갱신은 유지합니다.")
+        )
+    if not match.relationship_reviews_enabled:
+        rules += (
+            NO_RELATIONSHIP_HEADING
+            + "이번 경기 중과 경기 종료 시 친밀도·신뢰도를 새로 평가하는 모델 호출은 하지 않습니다. "
+            "의심 판정과 리셋 처리 뒤에는 다음 게임 행동이나 기억 갱신으로 바로 넘어갑니다."
         )
     match.event("rules", rules)
     distribute()

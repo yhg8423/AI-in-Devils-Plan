@@ -11,8 +11,7 @@ import unittest
 from unittest.mock import patch
 
 from ..match import DAY_THREE_PRISON, Match, run_cli
-from ..models import CodexLanguageModel
-from .game import NO_DISCUSSION_HEADING, parse_challenge, parse_deposit, play
+from .game import NO_DISCUSSION_HEADING, NO_RELATIONSHIP_HEADING, parse_challenge, parse_deposit, play
 from .memory import DYNAMIC_MEMORY_HEADING, FREE_MEMORY_HEADING, MEMORY_HEADING, MEMORY_SUMMARY_LIMIT
 
 
@@ -303,8 +302,13 @@ class PiggyBankTest(unittest.TestCase):
         self.assertEqual(deposits, result["turns"])
         self.assertIsNone(window)
 
-    def test_new_game_never_requests_dialogue_even_when_models_would_speak(self):
+    def test_new_game_cli_never_requests_dialogue_or_relationship_assessments(self):
         prompts = []
+        matches = []
+
+        def capture_match(match):
+            matches.append(match)
+            return play(match)
 
         def reply(prompt):
             prompts.append(prompt)
@@ -319,16 +323,30 @@ class PiggyBankTest(unittest.TestCase):
                 action = json.dumps({"type": "speak", "channel": "public", "text": "WOULD_SPEAK94799"})
             return json.dumps({"action": action, "note": ""})
 
-        with TemporaryDirectory() as directory, patch("games.models.CodexLanguageModel._complete", side_effect=reply):
-            models = {name: CodexLanguageModel("test-model", Path(directory)) for name in PLAYERS}
-            match = Match(PLAYERS, 23, models=models, live_turns=5000, allow_review=False)
-            result = play(match)
+        with (TemporaryDirectory() as directory,
+              patch("games.models.CodexLanguageModel._complete", side_effect=reply),
+              redirect_stdout(StringIO()), redirect_stderr(StringIO())):
+            output = Path(directory) / "events.jsonl"
+            run_cli(capture_match, title=DAY_THREE_PRISON, seats=4,
+                    argv=["--seed", "23", "--model", "test-model", "--model-turns", "5000",
+                          "--no-allow-review", "--output", str(output)])
+            result = json.loads(output.read_text().splitlines()[-1])
+            keys = [json.loads(line)["key"] for line in output.with_name("events.decisions.jsonl").read_text().splitlines()]
+
+        match, = matches
+        self.assertFalse(match.relationship_reviews_enabled)
+        self.assertFalse(any(key[0] == "relationships" for key in keys))
+        self.assertTrue(all("비공개 관계 평가를 갱신하세요" not in prompt for prompt in prompts))
 
         kinds = {event.msg_type for event in match.events}
-        self.assertFalse(kinds & {"pig_discussion", "pig_discussion_end", "public", "whisper"})
-        self.assertIn(NO_DISCUSSION_HEADING, next(event.content for event in match.events if event.msg_type == "rules"))
+        self.assertFalse(kinds & {"pig_discussion", "pig_discussion_end", "public", "whisper", "relationship_update"})
+        rules = next(event.content for event in match.events if event.msg_type == "rules")
+        self.assertIn(NO_DISCUSSION_HEADING, rules)
+        self.assertIn(NO_RELATIONSHIP_HEADING, rules)
         phases = [json.loads(event.content)["phase"] for event in match.events if event.msg_type == "action"]
         self.assertNotIn("pig_talk", phases)
+        self.assertFalse(any(event.msg_type == "invalid_action" and json.loads(event.content)["phase"] == "relationship_review"
+                             for event in match.events))
         self.assertEqual(phases.count("pig_memory_update"), len(PLAYERS) * result["turns"])
         self.assertTrue({"pig_deposit", "pig_count", "pig_doubt", "pig_reset_vote"} <= set(phases))
         preparations = [event for event in match.events if event.msg_type == "decision_note"
@@ -507,9 +525,10 @@ class PiggyBankTest(unittest.TestCase):
             if kind == "pig_deposit":
                 raise RuntimeError("test interruption after legacy discussion")
 
-        for old_turns, mode in ((1, "none"), (2, "none"), (2, "exact"), (2, "summary"), (2, "dynamic")):
+        for old_turns, mode in ((1, "none"), (2, "none"), (2, "exact"), (2, "summary"), (2, "dynamic"), (2, "silent")):
             old_rules = f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩" + {
-                "none": "", "exact": MEMORY_HEADING, "summary": FREE_MEMORY_HEADING, "dynamic": DYNAMIC_MEMORY_HEADING,
+                "none": "", "exact": MEMORY_HEADING, "summary": FREE_MEMORY_HEADING,
+                "dynamic": DYNAMIC_MEMORY_HEADING, "silent": DYNAMIC_MEMORY_HEADING + NO_DISCUSSION_HEADING,
             }[mode]
             with (
                 self.subTest(turns=old_turns, mode=mode),
@@ -531,21 +550,30 @@ class PiggyBankTest(unittest.TestCase):
                 expected = [json.loads(line) for line in full.read_bytes().splitlines()]
                 actual = [json.loads(line) for line in resumed.read_bytes().splitlines()]
                 self.assertEqual(actual, expected)
+                expected_keys = [json.loads(line)["key"] for line in full.with_suffix(".decisions.jsonl").read_text().splitlines()]
+                actual_keys = [json.loads(line)["key"] for line in resumed.with_suffix(".decisions.jsonl").read_text().splitlines()]
+                self.assertEqual(actual_keys, expected_keys)
+                self.assertTrue(any(key[0] == "relationships" for key in expected_keys), "Saved games must keep relationship assessments")
                 self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
                 self.assertEqual(completion.call_count - calls_before,
                                  expected[-1]["model_calls"] - prefix[-1]["model_calls"])
                 rules = next(row["content"] for row in actual if row.get("msg_type") == "rules")
-                self.assertIn(f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩", rules)
+                if mode != "silent":
+                    self.assertIn(f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩", rules)
                 self.assertEqual(MEMORY_HEADING in rules, mode == "exact")
                 windows = [json.loads(row["content"]) for row in actual if row.get("msg_type") == "pig_discussion"]
-                self.assertEqual(windows[0]["turns"], 4)
-                self.assertTrue(all(window["turns"] == old_turns for window in windows[1:]))
+                if mode == "silent":
+                    self.assertFalse(windows)
+                else:
+                    self.assertEqual(windows[0]["turns"], 4)
+                    self.assertTrue(all(window["turns"] == old_turns for window in windows[1:]))
                 self.assertEqual(FREE_MEMORY_HEADING in rules, mode == "summary")
-                self.assertEqual(DYNAMIC_MEMORY_HEADING in rules, mode == "dynamic")
-                self.assertNotIn(NO_DISCUSSION_HEADING, rules)
+                self.assertEqual(DYNAMIC_MEMORY_HEADING in rules, mode in {"dynamic", "silent"})
+                self.assertEqual(NO_DISCUSSION_HEADING in rules, mode == "silent")
+                self.assertNotIn(NO_RELATIONSHIP_HEADING, rules)
                 self.assertEqual(any(row.get("msg_type") == "pig_memory_selection" for row in actual), mode == "exact")
                 self.assertEqual(any(row.get("msg_type") == "action" and
-                                     json.loads(row["content"])["phase"] == "pig_memory_update" for row in actual), mode in {"summary", "dynamic"})
+                                     json.loads(row["content"])["phase"] == "pig_memory_update" for row in actual), mode in {"summary", "dynamic", "silent"})
                 for row in actual:
                     if row.get("msg_type") == "pig_recall":
                         self.assertEqual(set(json.loads(row["content"])), {"reset", "banks"} if mode == "exact" else

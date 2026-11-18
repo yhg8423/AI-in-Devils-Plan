@@ -83,6 +83,7 @@ class Match:
         if models is not None:
             self.models.update(models)
         self.allow_review = allow_review
+        self.relationship_reviews_enabled = True
         self.on_event = on_event
         self.resume_log = resume_log
         self.count_calls = count_calls
@@ -136,7 +137,7 @@ class Match:
         return saved["value"]
 
     def review_relationships(self, checkpoint: str) -> None:
-        if not self.backends or not self.live_turns:
+        if not self.relationship_reviews_enabled or not self.backends or not self.live_turns:
             return
         through = len(self.events)
         prompts = {}
