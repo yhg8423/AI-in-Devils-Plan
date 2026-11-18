@@ -214,6 +214,7 @@ function record(event, step) {
       if (["gem_talk", "gem_opening_talk", "gem_auction_talk", "gem_after_auction_talk"].includes(data.phase)) {
         const action = parse(data.action);
         if (action?.type === "pass") return tr("패스", "Pass");
+        if (data.phase === "gem_talk" && action?.type === "swap_now") return tr("대화 종료 · 교환 진행", "End discussion and proceed to swap");
         if (action?.type === "peek") return tr(`${gemSlotLabel(action.slot)} 카드 확인`, `Inspect ${gemSlotLabel(action.slot)}`);
       }
       if (data.phase === "market_turn") {

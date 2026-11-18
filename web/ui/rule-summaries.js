@@ -29,10 +29,13 @@ export function rulesSummary(heading, body) {
       " Players review affinity and trust after discussions, auction results, swaps, card reveals, final scoring, and the Alliance Token decision. Updates require new evidence visible to that player." : "";
     const preparation = body.includes("\n\n9. 시작 전 비공개 전략 준비\n") ?
       " Each player privately plans, reviews, and finalizes a strategy in three steps before the 12 opening discussion turns. Each step retains the player's own previous summary. Manitos and cards remain unrevealed throughout preparation." : "";
+    const swapDiscussion = body.includes("\n\n10. 교환 전 대화 단축과 조기 종료\n") ?
+      "Pre-swap discussions allow up to four turns. The active player speaks first each turn and may immediately end the discussion to proceed to the swap. Tied-auction discussions allow up to five turns. Both windows also end when everyone passes in a turn." :
+      "Pre-swap and tied-auction discussions also allow up to five turns, ending early when everyone passes in one turn.";
     const summary = summaries.find(([prefix]) => prefix === "보석 암시장")[1] + relationships + preparation;
     if (body.includes("\n\n7. 시작 전 진행 순서\n")) return summary.replace(
       "The three-minute turn becomes one discussion action per player.",
-      "The opening discussion allows 12 turns per player before manitos are revealed. Players then privately learn whose score their points affect and submit simultaneous sealed Piece bids, with no discussion between revelation and the initial bids. After the auction winner is announced, players may discuss for up to five turns before cards are dealt. Pre-swap and tied-auction discussions also allow up to five turns, ending early when everyone passes in one turn. All players may discuss auction ties before re-bidding or the final agreement vote. Tied bidders alone submit further bids or nominate the leader. After pre-swap discussion and any paid inspection, the acting player privately plans the swap.",
+      "The opening discussion allows 12 turns per player before manitos are revealed. Players then privately learn whose score their points affect and submit simultaneous sealed Piece bids, with no discussion between revelation and the initial bids. After the auction winner is announced, players may discuss for up to five turns before cards are dealt. " + swapDiscussion + " All players may discuss auction ties before re-bidding or the final agreement vote. Tied bidders alone submit further bids or nominate the leader. After pre-swap discussion and any paid inspection, the acting player privately plans the swap.",
     );
     if (body.includes("\n\n6. 동률 경매 협상\n")) return summary.replace(
       "The three-minute turn becomes one discussion action per player.",

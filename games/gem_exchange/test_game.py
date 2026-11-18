@@ -379,7 +379,7 @@ class GemBlackMarketTest(unittest.TestCase):
                 ended = next(json.loads(candidate.content) for candidate in segment
                              if candidate.msg_type == "gem_discussion_end")
                 if acting == "P09":
-                    self.assertEqual(rounds, [1, 2, 3, 4, 5])
+                    self.assertEqual(rounds, [1, 2, 3, 4])
                     self.assertEqual(ended["reason"], "limit")
                 else:
                     self.assertEqual(rounds, [1, 2, 3])
@@ -406,6 +406,102 @@ class GemBlackMarketTest(unittest.TestCase):
         for event in updates:
             self.assertEqual(event.visible_to, ["P01"])
             self.assertFalse(event in match.observations("P02"))
+
+    def test_only_acting_player_can_finish_swap_discussion(self):
+        class FirstSwapComplete(Exception):
+            pass
+
+        class ReadyMatch(Match):
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "gem_turn" and any(event.msg_type == "gem_swap" for event in self.events):
+                    raise FirstSwapComplete
+
+            def review_relationships(self, checkpoint):
+                reviews.append((len(self.events), checkpoint))
+                return super().review_relationships(checkpoint)
+
+            def request_action(self, name, phase, prompt, default, **kwargs):
+                self.phase = phase
+                self.defaults = {name: default}
+                return super().request_action(name, phase, prompt, default, **kwargs)
+
+            def decide_together(self, phase, decisions, **kwargs):
+                self.phase = phase
+                self.defaults = {name: decision.default for name, decision in decisions.items()}
+                if phase == "gem_bid":
+                    self.defaults = {name: "1" if name == "P01" else "0" for name in decisions}
+                return super().decide_together(phase, decisions, **kwargs)
+
+            def _query(self, name, prompt, *args, **kwargs):
+                response = self.defaults[name]
+                if self.phase in {"gem_opening_talk", "gem_after_auction_talk", "gem_talk"}:
+                    context = next(json.loads(event.content) for event in reversed(self.events)
+                                   if event.msg_type == "gem_discussion_round")
+                    if self.phase != "gem_talk":
+                        if name == "P01" and context["turn"] == 1:
+                            response = '{"type":"swap_now"}'
+                    elif scenario == "valid" and name == "P01" and context["turn"] == finish_turn:
+                        response = '{"type":"swap_now"}'
+                    elif scenario == "unauthorized" and name == "P02":
+                        response = '{"type":"swap_now"}'
+                    elif scenario == "extra_fields" and name == "P01":
+                        response = '{"type":"swap_now","target":"buyer1"}'
+                    else:
+                        response = '{"type":"speak","channel":"public","text":"협상을 계속하자"}'
+                elif self.phase == "gem_peek":
+                    response = "buyer1"
+                elif self.phase == "gem_strategy":
+                    response = "확인한 카드와 대화를 바탕으로 P02와 교환한다."
+                elif self.phase == "gem_swap":
+                    response = "P02"
+                return response, StrategyNote()
+
+        players = tuple(f"P{index:02}" for index in range(1, 10))
+        for scenario, finish_turn in (("valid", 1), ("valid", 2), ("valid", 3), ("unauthorized", 1), ("extra_fields", 1)):
+            with self.subTest(scenario=scenario, finish_turn=finish_turn):
+                reviews = []
+                client = Mock()
+                client.responses.create.return_value = SimpleNamespace(status="completed", output_text='{"action":"{}"}', usage=None)
+                match = ReadyMatch(players, 8, pieces=[3] * 9, model=OpenAILanguageModel("test-model", client),
+                                   live_players=players, live_turns=1000)
+                with self.assertRaises(FirstSwapComplete):
+                    play(match)
+                events = match.events
+                beginning = next(event for event in events if event.msg_type == "gem_discussion"
+                                 and json.loads(event.content)["stage"] == "before_swap")
+                ending = next(event for event in events[beginning.turn + 1:] if event.msg_type == "gem_discussion_end")
+                context = json.loads(ending.content)
+                self.assertEqual(context["player"], "P01")
+                self.assertEqual(context["rounds"], 4)
+                turns = [json.loads(event.content)["turn"] for event in events[beginning.turn:ending.turn]
+                         if event.msg_type == "gem_discussion_round"]
+                actions = [event for event in events[beginning.turn:ending.turn] if event.msg_type == "action"
+                           and json.loads(event.content)["phase"] == "gem_talk"]
+                if scenario == "valid":
+                    self.assertEqual(context["reason"], "player_ready")
+                    self.assertEqual(turns, list(range(1, finish_turn + 1)))
+                    self.assertEqual(len(actions), 9 * (finish_turn - 1) + 1)
+                    self.assertEqual(actions[-1].agent_name, "P01")
+                else:
+                    self.assertEqual(context["reason"], "limit")
+                    self.assertEqual(turns, [1, 2, 3, 4])
+                    invalid = [event for event in events[beginning.turn:ending.turn] if event.msg_type == "invalid_action"]
+                    self.assertEqual(len(invalid), 4)
+                    self.assertTrue(all(event.visible_to == ["P02" if scenario == "unauthorized" else "P01"] for event in invalid))
+                self.assertEqual(actions[0].agent_name, "P01")
+                self.assertTrue(any(index == ending.turn + 1 and "교환 전 협상 종료" in checkpoint for index, checkpoint in reviews))
+                peek = next(event for event in events[ending.turn + 1:] if event.msg_type == "gem_peek")
+                strategy = next(event for event in events[peek.turn + 1:] if event.msg_type == "decision_note"
+                                and json.loads(event.content)["phase"] == "gem_strategy")
+                swap = next(event for event in events[strategy.turn + 1:] if event.msg_type == "gem_swap")
+                self.assertLess(ending.turn, peek.turn)
+                self.assertLess(peek.turn, strategy.turn)
+                self.assertLess(strategy.turn, swap.turn)
+                self.assertEqual(json.loads(swap.content)["target"], "P02")
+                self.assertEqual(strategy.visible_to, ["P01"])
+                invalid_phases = {json.loads(event.content)["phase"] for event in events if event.msg_type == "invalid_action"}
+                self.assertTrue({"gem_opening_talk", "gem_after_auction_talk"} <= invalid_phases)
 
     def test_tied_auction_negotiates_before_rebid_or_agreement(self):
         testcase = self
@@ -539,6 +635,8 @@ class GemBlackMarketTest(unittest.TestCase):
             action = "pass"
             if "비공개 관계 평가를 갱신하세요" in prompt:
                 action = json.dumps({"P02": {"affinity": 55, "trust": 60, "reason": "공개 결과를 확인함"}}, ensure_ascii=False)
+            elif "교환 전 대화입니다. 이번 교환자는 P01입니다." in prompt.rsplit("Exercise:", 1)[-1]:
+                action = '{"type":"swap_now"}'
             return json.dumps({"action": action, "note": "test"})
 
         with (
@@ -555,8 +653,13 @@ class GemBlackMarketTest(unittest.TestCase):
                         argv=[*arguments, "--output", str(uninterrupted)])
                 expected = [json.loads(line) for line in uninterrupted.read_bytes().splitlines()]
                 self.assertLessEqual(expected[-1]["model_calls"], budget)
-                for checkpoint in ("preparation_note", "gem_preparation_end", "auction_bid", "after_auction",
-                                   "relationship_update", "gem_swap", "gem_discussion_end", "gem_strategy_note"):
+                checkpoints = ("preparation_note", "gem_preparation_end", "auction_bid", "after_auction",
+                               "relationship_update", "gem_swap", "gem_discussion_end", "gem_strategy_note")
+                if budget == 300:
+                    self.assertTrue(any(row.get("msg_type") == "gem_discussion_end" and
+                                        json.loads(row["content"])["reason"] == "player_ready" for row in expected))
+                    checkpoints += ("player_ready",)
+                for checkpoint in checkpoints:
                     with self.subTest(budget=budget, checkpoint=checkpoint):
                         resumed = Path(directory) / f"resumed-{budget}-{checkpoint}.jsonl"
 
@@ -572,6 +675,8 @@ class GemBlackMarketTest(unittest.TestCase):
                                 reached = kind == "gem_discussion_end" and data["stage"] == "after_auction"
                             elif checkpoint == "relationship_update":
                                 reached = kind == "relationship_update"
+                            elif checkpoint == "player_ready":
+                                reached = kind == "gem_discussion_end" and data["reason"] == "player_ready"
                             elif checkpoint == "gem_strategy_note":
                                 reached = kind == "decision_note" and data.get("phase") == "gem_strategy"
                                 if reached:

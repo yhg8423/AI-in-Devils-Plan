@@ -52,6 +52,7 @@ export function gemEventText(type, data) {
       const reason = {
         all_passed: tr("전원 패스", "All players passed"),
         limit: tr("대화 한도 도달", "Discussion limit reached"),
+        player_ready: tr("교환자 요청", "Active player ready"),
       }[data.reason];
       return [tr(`${gemDiscussionLabel(data)} 종료`, `${gemDiscussionLabel(data)} ends`), reason].filter(Boolean).join(" · ");
     }

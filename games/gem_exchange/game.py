@@ -11,11 +11,13 @@ from ..models import STRATEGY_NOTE_LIMIT
 ROUNDS = 3
 OPENING_DISCUSSION_ROUNDS = 12
 DISCUSSION_ROUNDS = 5
+SWAP_DISCUSSION_ROUNDS = 4
 STRATEGY_HEADING = "\n\n5. 협상과 전략 정리\n"
 AUCTION_TALK_HEADING = "\n\n6. 동률 경매 협상\n"
 SETUP_ORDER_HEADING = "\n\n7. 시작 전 진행 순서\n"
 RELATIONSHIP_HEADING = "\n\n8. 관계 평가 갱신\n"
 PREPARATION_HEADING = "\n\n9. 시작 전 비공개 전략 준비\n"
+EARLY_SWAP_HEADING = "\n\n10. 교환 전 대화 단축과 조기 종료\n"
 PREPARATION_STEPS = (
     "초안 작성: 공개 규칙과 내 피스, 기존 관계 평가를 바탕으로 목표와 협력 기준을 정하세요.",
     "위험·대안 검토: 이전 계획의 약점과 불확실성을 점검하고, 협력이 거절되거나 정보가 틀릴 때의 대안을 반영하세요.",
@@ -117,8 +119,10 @@ def play(match: Match) -> dict:
     reordered_setup = recorded_rules is None or SETUP_ORDER_HEADING in recorded_rules
     event_relationships = recorded_rules is None or RELATIONSHIP_HEADING in recorded_rules
     private_preparation = recorded_rules is None or PREPARATION_HEADING in recorded_rules
+    early_swap = recorded_rules is None or EARLY_SWAP_HEADING in recorded_rules
     opening_rounds = OPENING_DISCUSSION_ROUNDS if expanded_discussion else 2
-    swap_rounds = DISCUSSION_ROUNDS if expanded_discussion else 2
+    discussion_rounds = DISCUSSION_ROUNDS if expanded_discussion else 2
+    swap_rounds = SWAP_DISCUSSION_ROUNDS if early_swap else discussion_rounds
     discussion_turns = "2회전" if enhanced_discussion else "한 번씩"
     if expanded_discussion:
         discussion_turns = f"최대 {swap_rounds}회전"
@@ -170,7 +174,7 @@ def play(match: Match) -> dict:
         rules += STRATEGY_HEADING + (
             opening_rule +
             f"각 교환 차례에도 전원이 {discussion_turns} 동안 대화할 수 있어 제안과 응답을 주고받습니다. "
-            "각 회전에서 모두가 한 번씩 대화 행동을 선택하며, 교환자는 마지막에 말합니다. "
+            f"각 회전에서 모두가 한 번씩 대화 행동을 선택하며, 교환자는 {'먼저' if early_swap else '마지막에'} 말합니다. "
             "유료 카드 확인 여부를 결정한 교환자는 자신의 카드와 지금까지 들은 대화를 바탕으로 비공개 전략 메모를 "
             "한 번 정리한 뒤 교환 대상을 결정합니다. 이 메모는 본인만 볼 수 있습니다."
         )
@@ -202,6 +206,13 @@ def play(match: Match) -> dict:
             "각 단계의 결과는 본인만 볼 수 있는 짧은 전략 요약으로 남깁니다. 마지막 요약은 이후 협상에서도 참고합니다. "
             "이때 마니또와 카드는 아직 공개되지 않았으며, 다른 사람의 준비 내용은 볼 수 없습니다."
         )
+    if early_swap:
+        rules += EARLY_SWAP_HEADING + (
+            "각 교환 전 대화는 참가자마다 최대 4턴입니다. 교환자가 각 대화 턴에서 먼저 행동하며, "
+            "첫 기회부터 대화를 끝내고 교환 진행을 선택할 수 있습니다. 이 경우 남은 사람의 발언과 대화 턴을 생략합니다. "
+            "교환자만 대화를 조기 종료할 수 있으며, 종료 뒤 유료 확인 여부를 정하고 비공개 전략을 정리한 다음 교환합니다. "
+            "시작 전 대화는 12턴, 경매 후 대화와 동률 협상은 최대 5턴을 유지합니다."
+        )
     match.event("rules", rules)
     match.event("gem_setup", {"base_order": base_order, "pieces": pieces.copy(), "rounds": ROUNDS, "card_count": len(deck)})
     if not reordered_setup:
@@ -225,6 +236,10 @@ def play(match: Match) -> dict:
 
         def parse(action):
             payload = json.loads(action)
+            if isinstance(payload, dict) and payload.get("type") == "swap_now":
+                if payload != {"type": "swap_now"} or not early_swap or stage != "before_swap" or name != acting:
+                    raise ValueError("교환자만 교환 전 대화를 종료할 수 있습니다.")
+                return "swap_now"
             if isinstance(payload, dict) and payload.get("type") == "peek":
                 if payload.keys() != {"type", "slot"} or not can_peek or payload["slot"] not in TABLE:
                     raise ValueError("유료 확인을 사용할 수 없습니다.")
@@ -254,6 +269,10 @@ def play(match: Match) -> dict:
                      "아직 카드는 배분되지 않았습니다. ")
         else:
             topic = f"{round_number}라운드 {pass_number}차 교환 전 대화입니다. 이번 교환자는 {acting}입니다. "
+            if early_swap:
+                topic += "교환자가 각 대화 턴에서 먼저 행동하며, 원하면 남은 대화 없이 교환 단계로 넘어갈 수 있습니다. "
+                if name == acting:
+                    topic += '지금 대화를 종료하고 교환하려면 {"type":"swap_now"}를 선택하세요. '
         request = discussion.request(
             name, turn, topic +
             f"공개 누적 승점 {encode(scores)}. 내 피스 {pieces[name]}. "
@@ -272,6 +291,8 @@ def play(match: Match) -> dict:
                  "after_auction": "gem_after_auction_talk"}.get(stage, "gem_talk")
         action = match.decide(name, phase, request.content, PASS, valid=valid, request_type=request.msg_type)
         decision = parse(action)
+        if decision == "swap_now":
+            return "swap_now"
         if isinstance(decision, str):
             peek(name, decision, round_number, cards)
         elif decision is not None:
@@ -282,7 +303,7 @@ def play(match: Match) -> dict:
 
     def discuss(speakers, acting, round_number, pass_number, cards=None, *, stage=None, bidders=(), bid=None):
         stage = stage or ("opening" if acting is None else "before_swap")
-        rounds = opening_rounds if stage == "opening" else swap_rounds
+        rounds = opening_rounds if stage == "opening" else swap_rounds if stage == "before_swap" else discussion_rounds
         discussion.rounds = rounds
         context = {"stage": stage, "round": round_number,
                    "pass": pass_number, "player": acting, "rounds": rounds}
@@ -295,8 +316,14 @@ def play(match: Match) -> dict:
             active = False
             for seat, speaker in enumerate(speakers):
                 if speaker in match.backends and match.live_turns > 0:
-                    active = talk(speaker, acting, round_number, pass_number, cards, stage=stage,
-                                  turn_number=turn_number, seat=seat, bidders=bidders, bid=bid) or active
+                    response = talk(speaker, acting, round_number, pass_number, cards, stage=stage,
+                                    turn_number=turn_number, seat=seat, bidders=bidders, bid=bid)
+                    if response == "swap_now":
+                        reason = "player_ready"
+                        break
+                    active = response or active
+            if reason == "player_ready":
+                break
             if expanded_discussion and stage != "opening" and not active:
                 reason = "all_passed"
                 break
@@ -363,6 +390,8 @@ def play(match: Match) -> dict:
                 match.event("gem_card", {"round": round_number, "slot": name, "card": cards[name]},
                             actor=name, private=[name])
                 speakers = [player for player in order if player != name] + [name]
+                if early_swap:
+                    speakers = [name, *speakers[:-1]]
                 if enhanced_discussion:
                     discuss(speakers, name, round_number, pass_number, cards)
                 else:
