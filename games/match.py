@@ -28,9 +28,13 @@ EFFORTS = ("low", "medium", "high", "xhigh")
 DAY_ONE_MAIN = "1일차 메인 매치 · 양자택일"
 DAY_ONE_PRISON = "1일차 감옥 매치 · 무거운 13"
 DAY_TWO_MAIN = "2일차 메인 매치 · 미스터리 거래소"
+DAY_TWO_PRISON = "2일차 감옥 매치 · 러시안 룰렛"
+DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
+PRISON_STAGES = {DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6)}
 RELATIONSHIP_EVIDENCE = {
     "room_move", "teams", "rectangle_result", "team_vote", "choice_4_result", "grass_choices", "grass_placement",
     "grass_bonus", "choice_9_result", "poker_ranking", "placement", "market", "trade_fill", "inspection", "shift", "swap",
+    "gem_auction", "gem_swap", "gem_bonus", "gem_reveal",
 }
 
 
@@ -365,12 +369,13 @@ def inherited_players(main_path: Path, main_title: str,
     if prison_path is None:
         return prison_players, [pieces[name] for name in prison_players], relationships
 
-    prison_start, prison, prison_relationships = read_completed_match(prison_path, DAY_ONE_PRISON)
+    prison_title, prison_seats = PRISON_STAGES[main_title]
+    prison_start, prison, prison_relationships = read_completed_match(prison_path, prison_title)
     expected_pieces = {name: pieces[name] for name in prison_players}
-    if (len(prison_players) != 7 or sorted(prison_start["players"]) != sorted(prison_players) or
-            prison_start["players"][0] != prison_players[0] or
+    if (len(prison_players) != prison_seats or sorted(prison_start["players"]) != sorted(prison_players) or
+            (main_title == DAY_ONE_MAIN and prison_start["players"][0] != prison_players[0]) or
             prison_start["pieces"] != expected_pieces):
-        raise ValueError("무거운 13의 참가자 7명, 첫 선과 시작 피스가 양자택일 결과와 일치해야 합니다.")
+        raise ValueError(f"{prison_title}의 참가자, 순서 규칙과 시작 피스가 메인 매치 결과와 일치해야 합니다.")
     eliminated = set(main["eliminated"]) | set(prison["eliminated"])
     players = [name for name in main["ranking"] if name not in eliminated]
     balances = {**pieces, **{name: prison["pieces"][name] for name in prison_players}}
@@ -412,7 +417,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
     if previous_main:
         parser.add_argument("--from-main", type=Path, help=f"완료된 {previous_main}의 events.jsonl")
     if after_prison:
-        parser.add_argument("--from-prison", type=Path, help="같은 1일차 무거운 13의 events.jsonl")
+        prison_title, _ = PRISON_STAGES[previous_main]
+        parser.add_argument("--from-prison", type=Path, help=f"같은 실행의 완료된 {prison_title} events.jsonl")
     parser.add_argument("--output", type=Path, help="플레이 기록을 담을 운영자용 events.jsonl 파일의 경로")
     parser.add_argument("--resume", action="store_true", help="--output에 지정한 중단된 매치의 기록에서 이어서 실행")
     parser.add_argument("--model", help="참가자에게 사용할 모델")
@@ -558,7 +564,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             label = None
             if event.msg_type in {"rules", "grass_phase"}:
                 label = event.content.split("\n", 1)[0]
-            elif event.msg_type in {"round", "market", "market_tick", "negotiation_round"}:
+            elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round"}:
                 data = json.loads(event.content)
                 label = f"{data['round']}라운드"
                 if event.msg_type == "negotiation_round":

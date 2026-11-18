@@ -12,6 +12,9 @@ export const phaseNames = {
   submit: tr("카드와 칩 제출", "Submit card and chip"), trade: tr("주문", "Place an order"),
   secret: tr("시크릿 예약", "Reserve a Secret"), piece: tr("피스 사용", "Use a Piece"), market_turn: tr("거래소", "Stock exchange"),
   credit: tr("크레딧 사용", "Spend credits"), swap: tr("조작 위치 선택", "Choose slots to swap"),
+  gem_bid: tr("선 플레이어 입찰", "Bid for the lead"), gem_auction_agreement: tr("경매 합의", "Auction agreement"),
+  gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_swap: tr("카드 교환", "Card swap"),
+  gem_talk: tr("보석 암시장 협상", "Gem Black Market negotiations"),
   roulette_talk: tr("러시안 룰렛 대화", "Russian Roulette conversation"), roulette_reflection: tr("행동 후 복기", "Post-action reflection"),
   before_choice: tr("선택 5 전 협상", "Talks before Choice 5"), choice_five: tr("선택 5 · 점수 또는 정보", "Choice 5 · Points or information"),
   plan: tr("미리보기 계획", "Preview plan"), talk: tr("미리보기 후 협상", "Talks after the preview"),
@@ -65,8 +68,8 @@ const relationshipCheckpoints = {
 
 export function checkpointLabel(checkpoint, translated) {
   if (!en || !checkpoint) return checkpoint;
-  const round = checkpoint.match(/^(거래소|러시안 룰렛) (\d+)라운드 종료$/);
-  if (round) return `End of round ${round[2]} · ${round[1] === "거래소" ? "Mystery Stock Exchange" : "Russian Roulette"}`;
+  const round = checkpoint.match(/^(거래소|러시안 룰렛|보석 암시장) (\d+)라운드 종료$/);
+  if (round) return `End of round ${round[2]} · ${{"거래소": "Mystery Stock Exchange", "러시안 룰렛": "Russian Roulette", "보석 암시장": "Gem Black Market"}[round[1]]}`;
   return relationshipCheckpoints[checkpoint] ?? translated ?? checkpoint;
 }
 

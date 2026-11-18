@@ -9,12 +9,18 @@ from .spectator import CASE_STAGES, case_catalog, find_matches, next_match, read
 
 class ExportReplaysTest(unittest.TestCase):
     def test_exports_portable_playable_matches_in_both_languages(self):
+        self.check_round_trip(STAGES[:-1])
+
+    def test_exports_day_three_after_its_day_two_predecessors(self):
+        self.check_round_trip(STAGES)
+
+    def check_round_trip(self, stages):
         with TemporaryDirectory() as directory:
             root = Path(directory)
             source = root / "runs"
             output = root / "play_results"
             campaign = source / "matches" / "example"
-            logs = [campaign / stage / "events.jsonl" for stage in STAGES]
+            logs = [campaign / stage / "events.jsonl" for stage in stages]
             for index, log in enumerate(logs):
                 log.parent.mkdir(parents=True)
                 header = {"type": "match", "game": CASE_STAGES[index], "players": ["P01"], "seed": 1,
@@ -32,7 +38,7 @@ class ExportReplaysTest(unittest.TestCase):
             self.assertEqual(export_replays([campaign], source, output), [output / "matches" / "example"])
             self.assertEqual([log.read_bytes() for log in logs], original)
             case, = case_catalog(output)
-            run_ids = [f"matches/example/{stage}" for stage in STAGES]
+            run_ids = [f"matches/example/{stage}" for stage in stages]
             self.assertEqual([match["id"] for match in case["matches"]], run_ids)
             exported = find_matches(output)
             for index, run_id in enumerate(run_ids):
@@ -47,7 +53,7 @@ class ExportReplaysTest(unittest.TestCase):
                 self.assertEqual(korean["content"], "계획")
                 self.assertEqual(english, {**korean, "translation": {"text": "Plan"}})
                 self.assertEqual(english["visible_to"], ["P01"])
-                if index < 3:
+                if index + 1 < len(run_ids):
                     self.assertEqual(next_match(output, exported, run_id)["id"], run_ids[index + 1])
 
             with self.assertRaises(FileExistsError):

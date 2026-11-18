@@ -159,9 +159,9 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/openai-smoke/day1-main/events.jsonl
 ```
 
-## Continue from the Day 1 main match through the Day 2 prison match
+## Continue from the Day 1 main match through the Day 3 main match
 
-Once Either/Or finishes, run the remaining three matches in order and keep their logs in the same run directory. If the web server is running, open a new terminal at the project root. This example picks up the log from **Run locally**.
+Once Either/Or finishes, run the remaining matches in order and keep their logs in the same run directory. If the web server is running, open a new terminal at the project root. This example picks up the log from **Run locally**.
 
 ```bash
 run_dir="runs/matches/demo-day1-day2"
@@ -178,6 +178,11 @@ uv run --locked --python 3.12 python -m games.mystery_stock_market \
 uv run --locked --python 3.12 python -m games.russian_roulette \
   --from-main "$run_dir/day2-main/events.jsonl" \
   --output "$run_dir/day2-prison/events.jsonl"
+
+uv run --locked --python 3.12 python -m games.gem_exchange \
+  --from-main "$run_dir/day2-main/events.jsonl" \
+  --from-prison "$run_dir/day2-prison/events.jsonl" \
+  --output "$run_dir/day3-main/events.jsonl"
 ```
 
 `--from-main` and `--from-prison` connect each match to the earlier result files it needs. To continue a match you ran with an LLM, set `run_dir` to that run’s folder. Pass the same model options to each match command to keep the same model lineup.
@@ -221,8 +226,11 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 1 prison match | Heavy 13 | 7 | Submit cards and chips privately, then place cubes. A stand with a total of 13 or more incurs a penalty. |
 | Day 2 main match | Mystery Stock Exchange | 12 or 13 | Use public clues to infer what moves each stock’s price. Negotiate and trade throughout the match. |
 | Day 2 prison match | Russian Roulette | 6 | Use public and private clues and conversations to deduce what is in the next chamber. |
+| Day 3 main match | Gem Black Market | 9 or 10 | Exchange hidden gem and bomb cards in forward and reverse order. Buyer cards determine Victory Points, which are multiplied by a secret Manito's points for the final ranking. |
 
-Each match can run on its own. In a linked run, players assigned to the Prison Wing enter that day’s prison match. The Day 2 main match begins with the survivors of both Day 1 matches. If the Piece contribution in Either/Or succeeds, 13 players advance. Otherwise, 12 advance. Each player’s ID, persona, Pieces, and saved relationship ratings also carry over. In the replay, use **Jump to section** to find when the match rules are revealed.
+Each match can run on its own. In a linked run, players assigned to the Prison Wing enter that day’s prison match. The next day’s main match starts with the previous day’s survivors and carries over their IDs, personas, Pieces, and saved relationship ratings. The outcome of the Piece contribution in Either/Or determines whether 13 or 12 players advance to Day 2 and whether 10 or 9 advance to Day 3. In the replay, use **Jump to section** to find the match rules.
+
+Gem Black Market follows the [broadcast rules summary](https://namu.wiki/w/데블스%20플랜:%20데드%20어게인/3일차) for nine players, thirteen cards, and three rounds. The ten-player continuation adds one Copper 1 card. Each three-minute exchange discussion becomes one discussion action per player, which may also be used to pay for a buyer or trash peek. Unresolved auction agreements and tied final scores use the drawn base order. Manitos form a directed cycle through a shuffled player list. These provisions define the simulator's extensions and turn handling.
 
 ## Read play logs on the website
 
@@ -235,7 +243,7 @@ Use **KO / EN** at the top to switch the website’s language. The Python game e
 
 ### Export play logs for the website
 
-The website reads only replays exported to `play_results/`. Each published run contains the four Day 1 and Day 2 main and prison matches. Each match directory contains the original log and its English translation.
+The website reads only replays exported to `play_results/`. Each published run contains the four Day 1 and Day 2 matches, plus the Day 3 main match if the run continued. Each match directory contains the original log and its English translation.
 
 ```text
 play_results/matches/<run>/<stage>/events.jsonl

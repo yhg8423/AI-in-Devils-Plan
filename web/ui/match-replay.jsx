@@ -1,9 +1,11 @@
-import React, {useEffect, useMemo, useState} from "react";
+import React, {useCallback, useEffect, useMemo, useState} from "react";
 import {Button} from "@astryxdesign/core/Button";
 import {Selector} from "@astryxdesign/core/Selector";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {choiceCountLabel, choiceOptionLabel, choiceResults, optionsByChoice} from "./choice-results.js";
 import {RouletteInspection, RouletteInspectionLegend, RouletteScene} from "./day-two-scenes.jsx";
+import {applyGemEvent, gemActionText, gemEventText, gemSlotLabel, GemStage} from "./gem-exchange.jsx";
+import {drawGemSet} from "./gem-floor.js";
 import {Heavy13Information} from "./heavy-13-info.jsx";
 import {chipColorLabel} from "./heavy-13.js";
 import {runHref} from "./home.jsx";
@@ -32,6 +34,13 @@ const labels = {
   poker_result: tr("기억 포커 대결", "Memory Poker duel"), poker_ranking: tr("기억 포커 순위", "Memory Poker rankings"),
   colors: tr("색 칩 공개", "Color chips revealed"), weights: tr("무게 공개", "Weights revealed"), placement: tr("큐브 배치", "Cube placement"), market: tr("시세", "Stock prices"), hints: tr("공개 단서", "Public clues"),
   market_tick: tr("거래 시간", "Trading time"), trade_fill: tr("주문 체결", "Trade filled"), seats: tr("자리 배정", "Seating"), inspection: tr("조사", "Inspection"), shift: tr("회전", "Rotation"), swap: tr("조작 · 두 칸 교환", "Manipulation · Two slots swapped"),
+  gem_setup: tr("게임 준비", "Game setup"), gem_manito: tr("비공개 마니또", "Private manito"),
+  gem_auction_round: tr("선 플레이어 경매", "Lead auction"), gem_auction: tr("경매 결과", "Auction results"),
+  gem_round: tr("라운드 시작", "Round begins"), gem_turn: tr("카드 교환 차례", "Swap turn"),
+  gem_card: tr("내 카드 확인", "Inspect own card"), gem_swap: tr("카드 교환", "Card swap"),
+  gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_bonus: tr("폭탄 보너스", "Bomb bonus"),
+  gem_piece: tr("피스 변동", "Piece balance"), gem_reveal: tr("카드·점수 공개", "Cards and scores revealed"),
+  gem_final: tr("마니또 최종 정산", "Final manito scoring"),
   pass: tr("자동 패스", "Automatic pass"), private_action: tr("비공개 행동", "Private action"), match_result: tr("최종 결과", "Final results"), match_interrupted: tr("플레이 중단", "Run interrupted"),
 };
 const legacyRelationshipCheckpoints = new Map([
@@ -45,6 +54,9 @@ const actions = {
   representative: tr("대표 투표", "Representative vote"), alliance: tr("연맹의 징표", "Alliance Token"), submit: tr("카드와 칩 제출", "Submit card and chip"), place: tr("배치 또는 패스", "Place or pass"),
   piece: tr("피스 사용", "Spend a Piece"), secret: tr("시크릿", "Secret"), trade: tr("주문", "Order"),
   market_turn: tr("거래소 행동", "Stock exchange action"), credit: tr("크레딧 사용", "Spend credits"),
+  gem_bid: tr("선 플레이어 입찰", "Bid for the lead"), gem_auction_agreement: tr("경매 합의", "Auction agreement"),
+  gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_swap: tr("교환 상대 선택", "Choose a swap target"),
+  gem_talk: tr("암시장 협상", "Black market negotiations"),
   swap: tr("조작 위치 선택", "Select slots to swap"),
 };
 const grassPhases = {
@@ -144,9 +156,14 @@ function ruleHeading(title) {
   if (title.startsWith("‘선택 5’의 5는")) return "Minigame 3 · Lay the Grass";
   if (Object.hasOwn(ruleHeadings, title)) return ruleHeadings[title];
   if (phaseNames[grassPhases[title]]) return phaseNames[grassPhases[title]];
-  const [name, details] = title.split(" · ");
+  const [name, details, rounds] = title.split(" · ");
   const count = details?.match(/^(?:참가자 )?(\d+)(?:명|인 경기), 총 (\d+)라운드$/);
   if (count) return `${gameTitle(name)} · ${count[1]} players, ${count[2]} rounds`;
+  if (name === "보석 암시장") {
+    const players = details?.match(/^참가자 (\d+)명$/)?.[1];
+    const total = rounds?.match(/^(\d+)라운드$/)?.[1];
+    if (players && total) return `${gameTitle(name)} · ${players} players, ${total} rounds`;
+  }
   if (name === "러시안 룰렛") return "Russian Roulette · A deduction game for six players";
   return gameTitle(title);
 }
@@ -185,6 +202,12 @@ function record(event, step) {
       .replace("기금은 초과분까지", "조작에 쓴 크레딧은 초과분까지").replace("납부 금액", "사용한 크레딧 수") : ruleText(content),
     action: () => {
       if (credit) return credit.text;
+      if (["gem_bid", "gem_auction_agreement", "gem_peek", "gem_swap"].includes(data.phase)) return gemActionText(data.phase, data.action);
+      if (data.phase === "gem_talk") {
+        const action = parse(data.action);
+        if (action?.type === "pass") return tr("패스", "Pass");
+        if (action?.type === "peek") return tr(`${gemSlotLabel(action.slot)} 카드 확인`, `Inspect ${gemSlotLabel(action.slot)}`);
+      }
       if (data.phase === "market_turn") {
         const action = parse(data.action);
         const label = marketActions[action.type];
@@ -280,12 +303,12 @@ function record(event, step) {
   }[type];
   const actor = ["inspection", "shift", "swap", "pass"].includes(type) ? data.player :
     type === "trade_fill" ? event.visible_to[0] : event.agent_name;
-  const fallback = text ? text() : typeof data === "string" ? content : readable(displayData);
+  const fallback = text ? text() : gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
   return {...event, agent_name: actor, step, label, creditCost: credit?.cost,
     text: type === "grass_phase" && fallback !== content ? fallback : eventText(event, fallback)};
 }
 
-function matchState(events, match, frame, perspective, isMarket) {
+function matchState(events, match, frame, perspective, isMarket, isGemExchange) {
   const state = {feed: [], stacks: {}, penalties: {}, rounds: 0};
   const sceneSteps = [];
   let grassNotes = 0;
@@ -309,8 +332,8 @@ function matchState(events, match, frame, perspective, isMarket) {
       sceneSteps.push({phase, step: index + 1, events: [event],
         round: state.negotiation?.round ?? Math.floor(grassNotes / match.players.length) + 1});
       if (type === "discussion_note" && !state.negotiation) grassNotes++;
-    } else if (isMarket) {
-      sceneSteps.push({phase: "market_turn", step: index + 1, events: [event]});
+    } else if (isMarket || isGemExchange) {
+      sceneSteps.push({phase: isGemExchange ? "gem_talk" : "market_turn", step: index + 1, events: [event]});
     }
     // Older logs saved the boards with the result. Rebuild each public reveal at its first recorded phase marker.
     if (state.pokerMode && (type === "action" || type === "decision_note") &&
@@ -326,6 +349,7 @@ function matchState(events, match, frame, perspective, isMarket) {
     }
     if (perspective !== "operator" && event.visible_to !== "all" && !event.visible_to.includes(perspective)) continue;
     state.feed.push({...record(event, index + 1), round: state.rounds});
+    if (isGemExchange) applyGemEvent(state, type, data, event);
     switch (type) {
       case "rules": {
         if (!match.board) break;
@@ -469,9 +493,10 @@ function matchState(events, match, frame, perspective, isMarket) {
       case "match_result": state.result = data; break;
     }
   }
-  if (match.board || isMarket) {
+  if (match.board || isMarket || isGemExchange) {
     const scores = match.board ? Object.fromEntries(match.players.map((name) => [name, 0])) : {};
     state.scene = snapshot({scores, steps: sceneSteps}, sceneSteps.length, perspective);
+    if (isGemExchange) state.scene.scores = state.gemScores ?? {};
     const roomLabels = new Map(state.scene.feed.filter((event) => event.msg_type === "room")
       .map(({step, label}) => [step, label]));
     for (const event of state.feed) {
@@ -959,8 +984,9 @@ function RouletteInformation({state, replay}) {
   </aside>;
 }
 
-function Stage({state, replay, choiceResult}) {
+function Stage({state, replay, choiceResult, gemExchange}) {
   const {match} = replay;
+  if (gemExchange) return <GemStage state={state} players={match.players} selected={replay.selected} onChoose={replay.choosePlayer} />;
   if (state.result) return <Result result={state.result} players={match.players} view={replay.view} />;
   if (state.market) return <MarketStage state={state} view={replay.view} />;
   if (Object.keys(state.stacks).length) {
@@ -1060,6 +1086,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const isMarket = name === "미스터리 거래소";
   const isRoulette = name === "러시안 룰렛";
   const isHeavy13 = name === "무거운 13";
+  const isGemExchange = name === "보석 암시장";
   const [tab, setTab] = useState("all");
   const events = useMemo(() => match.steps.map(({events: [event]}) => {
     const data = parse(event.content);
@@ -1068,12 +1095,14 @@ export function MatchReplay({replay, transport, caseName}) {
     }
     return {...event, data};
   }), [match]);
-  const state = useMemo(() => matchState(events, match, frame, view, isMarket), [events, match, frame, view, isMarket]);
+  const state = useMemo(() => matchState(events, match, frame, view, isMarket, isGemExchange), [events, match, frame, view, isMarket, isGemExchange]);
+  const {gemCards} = state;
+  const drawGemMap = useCallback((canvas) => drawGemSet(canvas, gemCards), [gemCards]);
   const choices = useMemo(() => match.board ? choiceResults(state, match.players, view) : [], [state, match, view]);
   const choiceResult = choices.find(({value}) => value === state.choice?.number);
   const chapterOptions = events.flatMap(({msg_type: type, data}, index) => {
     const label = (type === "rules" ? (index === 0 ? tr("게임 규칙", "Game rules") : ruleHeading(ruleText(data.split("\n", 1)[0]))) : chapters[type]) ??
-      (["round", "market"].includes(type) ? roundLabel(data.round) : null) ??
+      (["round", "market", "gem_round"].includes(type) ? roundLabel(data.round) : null) ??
       (type === "negotiation_start" ? (data.choice === 2 ? tr("선택 2 팀 구성 협상", "Choice 2 team negotiations") : tr(`선택 ${data.choice} 전 협상`, `Negotiation before Choice ${data.choice}`)) : null) ??
       (type === "grass_phase" && grassPhases[data] === "place" ? tr("잔디 타일 배치", "Grass tile placement") : null);
     return label ? [{value: String(index + 1), label}] : [];
@@ -1082,7 +1111,7 @@ export function MatchReplay({replay, transport, caseName}) {
     ...match.players.map((name) => ({value: name, label: tr(`${name} 시점`, `${name}’s view`)}))];
   const Venue = matchVenues[name];
   const dialogueTabs = state.scene || isRoulette;
-  const ranking = isMarket ? state.result?.ranking ?? state.market?.ranking : null;
+  const ranking = isMarket || isGemExchange ? state.result?.ranking ?? state.market?.ranking : null;
   const playerDetails = ranking && new Map(ranking.map((player, index) => [player, {
     rank: tr(`${index + 1}위`, `Rank ${index + 1}`), status: state.result?.eliminated.includes(player) ? "탈락" :
       state.result?.living.includes(player) ? "생활동" : state.result?.prison.includes(player) ? "감옥동" : null,
@@ -1117,17 +1146,20 @@ export function MatchReplay({replay, transport, caseName}) {
         {nextMatch ?
           <Button label={`${tr("다음 매치 보기", "Watch next match")} · ${gameTitle(nextMatch.game)}`}
             href={runHref(nextMatch.id, caseRecord?.id)} variant="primary" size="sm" /> :
-          state.result && caseRecord && <p className="muted">{caseRecord.matches.length === 4 ?
-            tr("2일차까지 마쳤어요.", "End of Day 2.") : tr("이어지는 매치 기록이 아직 없어요.", "No follow-up match has been recorded yet.")}</p>}
+          state.result && caseRecord && <p className="muted">{isGemExchange ?
+            tr("3일차 메인 매치를 마쳤어요.", "End of Day 3 Main Match.") : caseRecord.matches.length === 4 ?
+              tr("2일차까지 마쳤어요.", "End of Day 2.") : tr("이어지는 매치 기록이 아직 없어요.", "No follow-up match has been recorded yet.")}</p>}
         <p className="muted match-models">{modelLabel(match)}</p>
       </div>
     </div>
-    <div className={match.board ? "either-or-stage" : isMarket || Venue ? "venue-stage" : undefined}>
+    <div className={match.board ? "either-or-stage" : isMarket || isGemExchange || Venue ? "venue-stage" : undefined}>
       {state.scene && <RoomScene state={state.scene} players={match.players} frame={frame} following={replay.mode === "follow"}
           row={latest?.step === frame ? {player: latest.agent_name} : undefined} selected={selected}
-          onChoose={replay.choosePlayer} playerDetails={playerDetails} label={isMarket ? tr("미스터리 거래소 메인홀", "Mystery Stock Exchange main hall") : tr("전체 세트장", "Full set")} />}
+          onChoose={replay.choosePlayer} playerDetails={playerDetails} drawMap={isGemExchange ? drawGemMap : undefined}
+          label={isGemExchange ? tr("보석 암시장 메인홀", "Gem Black Market main hall") :
+            isMarket ? tr("미스터리 거래소 메인홀", "Mystery Stock Exchange main hall") : tr("전체 세트장", "Full set")} />}
       {Venue && <Venue players={match.players} state={state} frame={frame} selected={selected} onChoose={replay.choosePlayer} />}
-      <section className="match-state" aria-label={tr("현재 판세", "Current game state")}><Stage state={state} replay={replay} choiceResult={choiceResult} /></section>
+      <section className="match-state" aria-label={tr("현재 판세", "Current game state")}><Stage state={state} replay={replay} choiceResult={choiceResult} gemExchange={isGemExchange} /></section>
     </div>
     {transport}
     <div className="context">

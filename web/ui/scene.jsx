@@ -65,7 +65,7 @@ function walk(button, points, width, height) {
   animation.oncancel = settle;
 }
 
-export function RoomScene({state, players, row, frame, following, selected, onChoose, playerDetails, label, standalone}) {
+export function RoomScene({state, players, row, frame, following, selected, onChoose, playerDetails, label, standalone, drawMap = drawSet}) {
   const floor = useRef(null);
   const map = useRef(null);
   const previous = useRef({frame: -1, locations: {}, points: {}, pair: []});
@@ -92,7 +92,7 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
     points[partner] = [centerX + direction * gap / 2, centerY];
   }
 
-  useLayoutEffect(() => drawSet(map.current), []);
+  useLayoutEffect(() => drawMap(map.current), [drawMap]);
   useLayoutEffect(() => {
     const scene = floor.current;
     const {width, height} = scene.getBoundingClientRect();
@@ -120,7 +120,7 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
   }, [frame, following, players, state.locations, pair, points]);
 
   return <div className="arena">
-    <section className={`stage-window pixel-frame${standalone ? "" : " match-set"}`} aria-label={label}>
+    <section className={`stage-window pixel-frame${standalone ? "" : " match-set"}${drawMap === drawSet ? "" : " pixel-map"}`} aria-label={label}>
       <div className="floor" ref={floor} aria-label={tr("네 개의 룸과 복도", "Four rooms and a hallway")}>
         <canvas ref={map} className="set-map" width={setWidth * 2} height={setHeight * 2} aria-hidden="true" />
         {rooms.map(({x, y}, index) => <span key={index} className="zone-label room-label"

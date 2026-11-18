@@ -30,7 +30,7 @@ EVENT_TYPES = {
     "grass_tile", "grass_choices", "grass_obstacle", "grass_placement", "grass_bonus",
 }
 EVENT_FIELDS = ("msg_type", "agent_name", "content", "visible_to")
-CASE_STAGES = ("1일차 메인 매치", "1일차 감옥 매치", "2일차 메인 매치", "2일차 감옥 매치")
+CASE_STAGES = ("1일차 메인 매치", "1일차 감옥 매치", "2일차 메인 매치", "2일차 감옥 매치", "3일차 메인 매치")
 
 
 def find_matches(root: Path) -> dict[str, Path]:
@@ -151,7 +151,7 @@ def case_catalog(root: Path) -> list[dict]:
 
     for run_id, (_, header, _, _) in records.items():
         main = source_run(header.get("from_main"))
-        if header["game"].split(" · ", 1)[0] == CASE_STAGES[2]:
+        if header["game"].split(" · ", 1)[0] in CASE_STAGES[2::2]:
             earlier_main[run_id] = main
             parent = source_run(header.get("from_prison"))
         else:
@@ -159,7 +159,7 @@ def case_catalog(root: Path) -> list[dict]:
         if parent is not None:
             children.setdefault(parent, []).append(run_id)
 
-    def chain(run_id: str, stage: int, first: str) -> list[dict]:
+    def chain(run_id: str, stage: int, previous: str | None = None) -> list[dict]:
         _, header, _, status = records[run_id]
         counts = model_counts(header)
         match = {"id": run_id, "game": header["game"], "status": status,
@@ -172,9 +172,9 @@ def case_catalog(root: Path) -> list[dict]:
         if stage == len(CASE_STAGES) - 1 or status != "complete":
             return path
         next_stage = CASE_STAGES[stage + 1]
-        branches = (chain(child, stage + 1, first) for child in children.get(run_id, [])
+        branches = (chain(child, stage + 1, run_id) for child in children.get(run_id, [])
                     if records[child][1]["game"].split(" · ", 1)[0] == next_stage
-                    and (stage != 1 or earlier_main.get(child) == first))
+                    and (stage % 2 == 0 or earlier_main.get(child) == previous))
         path.extend(max(branches, key=lambda branch: (len(branch), sum(match["status"] == "complete" for match in branch)),
                         default=[]))
         return path
@@ -185,7 +185,7 @@ def case_catalog(root: Path) -> list[dict]:
             continue
         model = header.get("model") if header.get("model_players") != [] else None
         cases.append({
-            "id": run_id, "started_at": started_at, "matches": chain(run_id, 0, run_id), "model": model,
+            "id": run_id, "started_at": started_at, "matches": chain(run_id, 0), "model": model,
             **{key: header[key] for key in ("provider", "effort", "image_model", "model_overrides") if header.get(key)},
         })
     real = [case for case in cases if case["model"]]
@@ -297,7 +297,7 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="데블스 플랜 1·2일차 플레이 관전과 다시 보기")
+    parser = argparse.ArgumentParser(description="데블스 플랜 플레이 관전과 다시 보기")
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     asset_lock = Lock()
