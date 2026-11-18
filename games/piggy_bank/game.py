@@ -16,6 +16,7 @@ from .memory import (
 
 WIN_SCORE = 5
 OPENING_TURNS = 4
+NO_DISCUSSION_HEADING = "\n\n6. 대화 없는 진행\n"
 COLORS = ("black", "white")
 PASS = '{"type":"pass"}'
 
@@ -67,6 +68,7 @@ def play(match: Match) -> dict:
         recorded_rules = next((event["content"] for event in match.resume_log.events
                                if event["msg_type"] == "rules"), None)
     discussion_turns = 1 if recorded_rules is not None and "전원에게 한 턴씩" in recorded_rules else 2
+    discussion_enabled = recorded_rules is not None and NO_DISCUSSION_HEADING not in recorded_rules
     dynamic_memory = recorded_rules is None or DYNAMIC_MEMORY_HEADING in recorded_rules
     free_memory = recorded_rules is not None and FREE_MEMORY_HEADING in recorded_rules
     limited_memory = dynamic_memory or free_memory or MEMORY_HEADING in recorded_rules
@@ -231,9 +233,11 @@ def play(match: Match) -> dict:
         "누군가 5점 이상을 얻는 즉시 최종 승점을 비교합니다. 최하위 한 명이 탈락하고 1위는 피스 3개를 받습니다. "
         "공동 1위는 피스 3개를 같은 정수 몫으로 나누고 나머지는 버립니다. 동전으로 카운팅하는 행위는 금지합니다.\n\n"
         "시뮬레이션 진행\n"
-        "게임 전 비공개 전략 준비 두 단계와 참가자별 네 턴의 대화가 있습니다. "
-        f"추가 행동 전에는 전원에게 {'한' if discussion_turns == 1 else '두'} 턴씩 "
-        "대화 기회를 줍니다. 20초 선언과 10초 의심은 각각 한 번의 응답으로 진행합니다. 의심은 동시에 제출하며 "
+        + ("게임 전 비공개 전략 준비 두 단계와 참가자별 네 턴의 대화가 있습니다. "
+           f"추가 행동 전에는 전원에게 {'한' if discussion_turns == 1 else '두'} 턴씩 "
+           "대화 기회를 줍니다. " if discussion_enabled else
+           "게임 전 비공개 전략 준비 두 단계가 있으며 참가자 간 대화 없이 진행합니다. ")
+        + "20초 선언과 10초 의심은 각각 한 번의 응답으로 진행합니다. 의심은 동시에 제출하며 "
         "여러 명이 선택하면 추첨 자리 순서로 한 명을 정합니다. 리셋은 매 전달 뒤 추첨 순서로 요청 기회를 주고 "
         "세 번째 요청 즉시 처리합니다. 리셋 뒤에도 선언 색은 이어집니다. 최하위 동점은 추첨 순서가 뒤인 사람이 "
         "탈락합니다. "
@@ -271,8 +275,9 @@ def play(match: Match) -> dict:
     if dynamic_memory:
         rules += (
             DYNAMIC_MEMORY_HEADING
-            + "각자 현재 저금통 중 정확히 세 개의 흑·백 개수에 대한 기억만 보존합니다. 시작 전 대화가 끝난 뒤 "
-            "처음 갱신하고, 이후 매 턴의 선언·의심·리셋 처리가 끝나면 동시에 갱신합니다. 경기가 종료되면 "
+            + "각자 현재 저금통 중 정확히 세 개의 흑·백 개수에 대한 기억만 보존합니다. "
+            + ("시작 전 대화가 끝난 뒤 " if discussion_enabled else "비공개 전략 준비가 끝난 뒤 ")
+            + "처음 갱신하고, 이후 매 턴의 선언·의심·리셋 처리가 끝나면 동시에 갱신합니다. 경기가 종료되면 "
             "추가 갱신하지 않습니다. 갱신할 때마다 번호를 자유롭게 바꿀 수 있지만 선택에서 뺀 저금통의 과거 "
             "수량은 사라집니다. 새로 고른 번호의 실제 수량이나 예전 기억을 자동 복구하지 않으며 참가자가 "
             "새로 확인한 사실과 자신의 추정으로 값을 직접 답합니다. 틀린 값은 그대로 남고 모르는 값은 null로 둡니다. "
@@ -282,6 +287,14 @@ def play(match: Match) -> dict:
             "새로 확인한 공개 사실·대화만 보여줍니다. 첫 전략도 첫 기억 갱신 이후에는 원문을 다시 제공하지 않습니다. "
             "별도 자유 메모·기록장이나 전체 관전 기록을 조회할 수 없습니다. 전체 관전 기록에는 실제 동전 수와 "
             "모든 행동을 그대로 보관합니다. 이 기억 슬롯은 시뮬레이션 규칙입니다."
+        )
+    if not discussion_enabled:
+        rules += (
+            NO_DISCUSSION_HEADING
+            + "게임 시작 전과 매 턴에 참가자끼리 자유롭게 말하거나 귓속말·협상하는 시간과 행동은 없습니다. "
+            "각자 두 단계의 비공개 전략 준비를 마치면 첫 기억 갱신을 하고 바로 동전 추가·전달을 시작합니다. "
+            "추가한 흑·백 개수, 개수 선언, 의심과 리셋 요청·판정처럼 게임 진행에 필요한 공개 정보는 "
+            "계속 시스템으로 안내합니다. 비공개 전략 준비와 기억 갱신, 관계 평가는 유지합니다."
         )
     match.event("rules", rules)
     distribute()
@@ -293,13 +306,16 @@ def play(match: Match) -> dict:
         remember()
     select_memory()
     match.event("pig_preparation", {"steps": 2})
-    plans = dict.fromkeys(players, "전달과 공개 발언을 기억하고, 확신할 때만 의심하거나 전체 도전을 시도한다.")
+    plans = dict.fromkeys(players, "전달과 공개 발언을 기억하고, 확신할 때만 의심하거나 전체 도전을 시도한다."
+                          if discussion_enabled else
+                          "전달·추가·개봉의 공개 사실을 기억하고, 확신할 때만 의심하거나 전체 도전을 시도한다.")
     for step in (1, 2):
         plans = match.decide_together("pig_preparation", {
             name: Decision(
                 f"돼지 저금통 비공개 전략 준비 {step}/2단계입니다. "
                 + ("의심·리셋·전체 도전의 이득과 위험을 정리하세요. " if step == 1 else
-                   "직전 계획의 취약점과 협력이 거절될 때의 대안을 검토해 수정하세요. ")
+                   "직전 계획의 취약점과 협력이 거절될 때의 대안을 검토해 수정하세요. " if discussion_enabled else
+                   "직전 계획의 취약점과 기억이 불확실할 때의 대안을 검토해 수정하세요. ")
                 + f"내 이전 전략 요약: {plans[name]}\n"
                 + ("이 준비 전략은 첫 기억 갱신 뒤 원문이 사라집니다. 이후에는 저금통 세 개의 흑·백 수량에 대한 "
                    "기억만 보존되며 기억할 번호는 갱신 때마다 바꿀 수 있습니다. 별도 자유 메모나 기록장을 만들지 마세요. "
@@ -317,7 +333,8 @@ def play(match: Match) -> dict:
     for name, note in plans.items():
         match.event("discussion_note", note, actor=name, private=[name])
     match.event("pig_preparation_end", {"steps": 2})
-    talk("opening", OPENING_TURNS)
+    if discussion_enabled:
+        talk("opening", OPENING_TURNS)
     update_memory()
 
     while max(scores.values()) < WIN_SCORE:
@@ -325,7 +342,8 @@ def play(match: Match) -> dict:
         color = COLORS[(turn - 1) % 2]
         match.event("pig_turn", {"turn": turn, "player": acting, "color": color,
                                  **locations(), "scores": scores.copy()})
-        talk("before_turn", discussion_turns)
+        if discussion_enabled:
+            talk("before_turn", discussion_turns)
         black = match.policy.randrange(6)
         white = match.policy.randint(0 if black else 1, 5 - black)
         default = encode({"black": black, "white": white,

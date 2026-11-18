@@ -47,6 +47,11 @@ function hasFreeMemory(state) {
     (typeof event.data === "string" ? event.data : event.content)?.includes("\n\n5. 비공개 기억 요약\n"));
 }
 
+function hasSilentRules(state) {
+  return state.feed.some((event) => event.msg_type === "rules" &&
+    (typeof event.data === "string" ? event.data : event.content)?.includes("\n\n6. 대화 없는 진행\n"));
+}
+
 export function pigActionText(phase, action) {
   let data;
   try { data = JSON.parse(action); } catch { data = action; }
@@ -367,7 +372,7 @@ export function PiggyScene({players, state, frame, selected, onChoose}) {
           tr(`다음 선언 · ${pigColorLabel(state.pigTurn.color)} 동전`, `Next claim · ${pigColorLabel(state.pigTurn.color)} coins`) : tr("기억하고, 의심하세요", "Remember. Then call doubt.")}</span>
       </div>
     </section>
-    <ArenaSpeech speech={speech} recipients={recipients} />
+    {!hasSilentRules(state) && <ArenaSpeech speech={speech} recipients={recipients} />}
   </div>;
 }
 

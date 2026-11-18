@@ -75,7 +75,8 @@ function challengeSequence(correct) {
 
 function arena(html) {
   const start = html.indexOf('class="arena pig-arena"');
-  const end = html.indexOf('class="arena-speech"', start);
+  const speech = html.indexOf('class="arena-speech"', start);
+  const end = speech >= 0 ? speech : html.indexOf('class="match-state"', start);
   assert(start >= 0 && end > start, "The integrated replay should contain the Piggy Bank arena");
   return html.slice(start, end);
 }
@@ -444,6 +445,25 @@ for (const language of ["ko", "en"]) {
       assert(!html.includes("2222") && !html.includes("3333"), `${view} must not see another player's past memory`);
       assert.deepEqual(bankIds(html), []);
     }
+  });
+
+  test(`${language}: silent rules omit conversation guidance and speech boxes while retaining private dynamic memory`, () => {
+    const oldRules = "돼지 저금통 · 참가자 4명\n\n5. 변경 가능한 기억 슬롯\n저금통 3개를 기억합니다.";
+    const silentRules = oldRules + "\n\n6. 대화 없는 진행\n비공개 준비와 기억 갱신 뒤 입금을 시작합니다.";
+    const recall = event("pig_recall", {reset: 0, mode: "dynamic", updated_turn: 0,
+      banks: {1: {black: 77, white: null}, 3: {black: 1, white: 1}, 4: {black: 1, white: 1}}}, ["P01"], "P01");
+    const steps = [event("rules", silentRules), ...sequence(true).pending.slice(0, -1), recall];
+    const html = replay(steps, "P01");
+    assert.equal(openingTag(html, "arena-speech"), undefined, "New silent games should not reserve an empty conversation panel");
+    assert(physicalBank(arena(html), 1).includes("77"), "Private memory still works without conversation");
+    assert.match(openingTag(html, "pig-memory-summary"), /data-mode="dynamic"/);
+    if (language === "en") {
+      assert(html.includes("Players privately prepare and update their initial memory before the first deposit."));
+      assert(!html.includes("four opening discussion turns") && !html.includes("two discussion turns"));
+    } else assert(html.includes("대화 없는 진행"));
+    const old = replay([event("rules", oldRules), ...steps.slice(1)], "P01");
+    assert(openingTag(old, "arena-speech"), "Previously saved games retain their conversation panel");
+    if (language === "en") assert(old.includes("four opening discussion turns"));
   });
 
   test(`${language}: free memory survives reset until rewritten and supports forgetting, clearing, and rewind`, () => {

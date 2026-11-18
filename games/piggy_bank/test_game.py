@@ -11,7 +11,8 @@ import unittest
 from unittest.mock import patch
 
 from ..match import DAY_THREE_PRISON, Match, run_cli
-from .game import parse_challenge, parse_deposit, play
+from ..models import CodexLanguageModel
+from .game import NO_DISCUSSION_HEADING, parse_challenge, parse_deposit, play
 from .memory import DYNAMIC_MEMORY_HEADING, FREE_MEMORY_HEADING, MEMORY_HEADING, MEMORY_SUMMARY_LIMIT
 
 
@@ -272,8 +273,9 @@ class PiggyBankTest(unittest.TestCase):
         order = next(json.loads(event.content)["order"] for event in match.events if event.msg_type == "pig_setup")
         self.assertEqual(result["eliminated"], [next(player for player in reversed(order) if player != "P01")])
 
-    def test_opening_has_four_discussion_rounds_and_each_deposit_has_two(self):
+    def test_saved_dynamic_game_keeps_four_opening_and_two_pre_deposit_discussions(self):
         match = Match(PLAYERS, 23)
+        match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": DYNAMIC_MEMORY_HEADING}])
         result = play(match)
         order = next(json.loads(event.content)["order"] for event in match.events if event.msg_type == "pig_setup")
         window = completed = None
@@ -300,6 +302,50 @@ class PiggyBankTest(unittest.TestCase):
                 deposits += 1
         self.assertEqual(deposits, result["turns"])
         self.assertIsNone(window)
+
+    def test_new_game_never_requests_dialogue_even_when_models_would_speak(self):
+        prompts = []
+
+        def reply(prompt):
+            prompts.append(prompt)
+            if "다음 구간에 남길 기억 세 개를 갱신하세요" in prompt:
+                current = json.loads(prompt.rsplit("현재 저금통 번호: ", 1)[1].split(". 기존 기억:", 1)[0])
+                action = json.dumps({str(bank): {"black": 77, "white": None} for bank in current[::2]})
+            elif "비공개 관계 평가를 갱신하세요" in prompt:
+                action = "{}"
+            elif any(f"비공개 전략 준비 {step}/2단계" in prompt for step in (1, 2)):
+                action = "개인적으로 판단하고 확신이 있을 때 의심한다."
+            else:
+                action = json.dumps({"type": "speak", "channel": "public", "text": "WOULD_SPEAK94799"})
+            return json.dumps({"action": action, "note": ""})
+
+        with TemporaryDirectory() as directory, patch("games.models.CodexLanguageModel._complete", side_effect=reply):
+            models = {name: CodexLanguageModel("test-model", Path(directory)) for name in PLAYERS}
+            match = Match(PLAYERS, 23, models=models, live_turns=5000, allow_review=False)
+            result = play(match)
+
+        kinds = {event.msg_type for event in match.events}
+        self.assertFalse(kinds & {"pig_discussion", "pig_discussion_end", "public", "whisper"})
+        self.assertIn(NO_DISCUSSION_HEADING, next(event.content for event in match.events if event.msg_type == "rules"))
+        phases = [json.loads(event.content)["phase"] for event in match.events if event.msg_type == "action"]
+        self.assertNotIn("pig_talk", phases)
+        self.assertEqual(phases.count("pig_memory_update"), len(PLAYERS) * result["turns"])
+        self.assertTrue({"pig_deposit", "pig_count", "pig_doubt", "pig_reset_vote"} <= set(phases))
+        preparations = [event for event in match.events if event.msg_type == "decision_note"
+                        and json.loads(event.content)["phase"] == "pig_preparation"]
+        self.assertCountEqual([(event.agent_name, json.loads(event.content)["step"]) for event in preparations],
+                              [(name, step) for name in PLAYERS for step in (1, 2)])
+        self.assertTrue(all(event.visible_to == [event.agent_name] for event in preparations))
+        self.assertEqual(sum(any(f"비공개 전략 준비 {step}/2단계" in prompt for step in (1, 2)) for prompt in prompts), 8)
+        self.assertEqual(sum("다음 구간에 남길 기억 세 개를 갱신하세요" in prompt for prompt in prompts),
+                         len(PLAYERS) * result["turns"])
+        self.assertTrue(all("모두 같은 테이블에 앉아 있습니다. 공개 발언이나" not in prompt for prompt in prompts))
+        prep_end = next(index for index, event in enumerate(match.events) if event.msg_type == "pig_preparation_end")
+        first_turn = next(index for index, event in enumerate(match.events) if event.msg_type == "pig_turn")
+        initial = [json.loads(event.content) for event in match.events[prep_end + 1:first_turn] if event.msg_type == "action"]
+        self.assertEqual([action["phase"] for action in initial], ["pig_memory_update"] * len(PLAYERS))
+        self.assertTrue(all(set(json.loads(action["action"])) == {"1", "3", "5"} for action in initial))
+        self.assertGreaterEqual(max(result["scores"].values()), 5)
 
     def test_legacy_memory_selections_are_private_fixed_per_reset_and_limit_exact_recalls(self):
         match = Match(PLAYERS, 23)
@@ -367,7 +413,7 @@ class PiggyBankTest(unittest.TestCase):
 
         match = SummaryMatch(PLAYERS, 23)
         match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": FREE_MEMORY_HEADING}])
-        self._assert_end_turn_memory(match, "summary")
+        self._assert_end_turn_memory(match, "summary", discussion=True)
 
     def test_dynamic_slot_updates_can_change_ids_at_every_end_of_turn(self):
         class DynamicMatch(Match):
@@ -384,7 +430,7 @@ class PiggyBankTest(unittest.TestCase):
 
         self._assert_end_turn_memory(DynamicMatch(PLAYERS, 23), "dynamic")
 
-    def _assert_end_turn_memory(self, match, mode):
+    def _assert_end_turn_memory(self, match, mode, *, discussion=False):
         result = play(match)
         updates = {}
         recalls = set()
@@ -393,10 +439,11 @@ class PiggyBankTest(unittest.TestCase):
         turn = update_count = 0
         for event in match.events:
             self.assertNotEqual(event.msg_type, "pig_memory_selection")
-            if event.msg_type not in {"pig_turn", "pig_deposit", "pig_discussion_end", "pig_doubt", "pig_pass", "action", "pig_recall"}:
+            if event.msg_type not in {"pig_turn", "pig_deposit", "pig_preparation_end", "pig_discussion_end", "pig_doubt", "pig_pass", "action", "pig_recall"}:
                 continue
             data = json.loads(event.content)
-            if event.msg_type == "pig_discussion_end" and data["stage"] == "opening":
+            if ((discussion and event.msg_type == "pig_discussion_end" and data["stage"] == "opening")
+                    or (not discussion and event.msg_type == "pig_preparation_end")):
                 opening_done = True
             elif event.msg_type == "pig_turn":
                 self.assertEqual(set(updates), set(PLAYERS), "Everyone must compress opening/previous-turn observations before the next turn")
@@ -460,9 +507,9 @@ class PiggyBankTest(unittest.TestCase):
             if kind == "pig_deposit":
                 raise RuntimeError("test interruption after legacy discussion")
 
-        for old_turns, mode in ((1, "none"), (2, "none"), (2, "exact"), (2, "summary")):
+        for old_turns, mode in ((1, "none"), (2, "none"), (2, "exact"), (2, "summary"), (2, "dynamic")):
             old_rules = f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩" + {
-                "none": "", "exact": MEMORY_HEADING, "summary": FREE_MEMORY_HEADING,
+                "none": "", "exact": MEMORY_HEADING, "summary": FREE_MEMORY_HEADING, "dynamic": DYNAMIC_MEMORY_HEADING,
             }[mode]
             with (
                 self.subTest(turns=old_turns, mode=mode),
@@ -494,14 +541,16 @@ class PiggyBankTest(unittest.TestCase):
                 self.assertEqual(windows[0]["turns"], 4)
                 self.assertTrue(all(window["turns"] == old_turns for window in windows[1:]))
                 self.assertEqual(FREE_MEMORY_HEADING in rules, mode == "summary")
-                self.assertNotIn(DYNAMIC_MEMORY_HEADING, rules)
+                self.assertEqual(DYNAMIC_MEMORY_HEADING in rules, mode == "dynamic")
+                self.assertNotIn(NO_DISCUSSION_HEADING, rules)
                 self.assertEqual(any(row.get("msg_type") == "pig_memory_selection" for row in actual), mode == "exact")
                 self.assertEqual(any(row.get("msg_type") == "action" and
-                                     json.loads(row["content"])["phase"] == "pig_memory_update" for row in actual), mode == "summary")
+                                     json.loads(row["content"])["phase"] == "pig_memory_update" for row in actual), mode in {"summary", "dynamic"})
                 for row in actual:
                     if row.get("msg_type") == "pig_recall":
                         self.assertEqual(set(json.loads(row["content"])), {"reset", "banks"} if mode == "exact" else
-                                         {"reset", "mode", "updated_turn", "text", "limit"})
+                                         {"reset", "mode", "updated_turn", "text", "limit"} if mode == "summary" else
+                                         {"reset", "mode", "updated_turn", "banks"})
 
     def test_interrupted_model_decisions_resume_to_the_same_record(self):
         def reply(prompt):
