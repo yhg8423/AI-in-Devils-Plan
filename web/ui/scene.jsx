@@ -15,13 +15,14 @@ export function Sprite({player}) {
   return <canvas ref={canvas} width={32} height={46} aria-hidden="true" />;
 }
 
-export function whisperRecipient(speech, players) {
+export function whisperRecipients(speech, players) {
   if (speech?.msg_type === "whisper" && Array.isArray(speech.visible_to)) {
-    return speech.visible_to.find((name) => name !== speech.agent_name && players.includes(name));
+    return speech.visible_to.filter((name) => name !== speech.agent_name && players.includes(name));
   }
+  return [];
 }
 
-export function ArenaSpeech({speech, recipient}) {
+export function ArenaSpeech({speech, recipients = []}) {
   const panel = useRef(null);
   const [scrollable, setScrollable] = useState(false);
   useLayoutEffect(() => {
@@ -37,7 +38,7 @@ export function ArenaSpeech({speech, recipient}) {
   const text = speech?.text ?? speech?.content;
   return <section className="arena-speech" ref={panel} aria-label={tr("세트장 대화", "Arena conversation")} tabIndex={scrollable ? 0 : undefined}>
     {speech ? <>
-      <strong>{speech.agent_name}{recipient && ` → ${recipient}`} · {speech.label}</strong>
+      <strong>{speech.agent_name}{recipients.length > 0 && ` → ${recipients.join(", ")}`} · {speech.label}</strong>
       <p lang={/[가-힣]/.test(text) ? "ko" : undefined}>{text}</p>
     </> : <p className="muted">{tr("이 시점에 볼 수 있는 대화가 없어요.", "No conversation to show at this point.")}</p>}
   </section>;
@@ -74,10 +75,11 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
   const speech = state.lastSpeech;
   const showSpeech = speech && frame - speech.step <= 5 &&
     (state.locations[speech.agent_name] ?? 0) === speech.room;
-  const recipient = whisperRecipient(speech, players);
-  const partner = recipient && (state.locations[recipient] ?? 0) === speech.room &&
-    (state.locations[speech.agent_name] ?? 0) === speech.room ? recipient : undefined;
-  const pair = partner ? [speech.agent_name, partner] : [];
+  const recipients = whisperRecipients(speech, players);
+  const whispering = recipients.length > 0 && recipients.every((name) => (state.locations[name] ?? 0) === speech.room) &&
+    (state.locations[speech.agent_name] ?? 0) === speech.room ? [speech.agent_name, ...recipients] : [];
+  const pair = whispering.length === 2 ? whispering : [];
+  const partner = pair[1];
   const points = Object.fromEntries(players.map((name, index) => [name, getPoint(state.locations[name] ?? 0, index, players.length)]));
   if (partner) {
     const speaker = speech.agent_name;
@@ -137,7 +139,7 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
             return <button key={player} className={row?.player === player ? "token acting" : "token"}
               type="button" data-player={player} data-room={room} data-status={status} aria-pressed={player === selected}
               data-speaking={showSpeech && player === speech.agent_name ? "true" : undefined}
-              data-whispering={showSpeech && pair.includes(player) ? "true" : undefined}
+              data-whispering={showSpeech && whispering.includes(player) ? "true" : undefined}
               aria-label={label} title={label} style={{...position(x, y), zIndex: Math.floor(y)}}
               onClick={() => onChoose(player)}>
               <Sprite player={player} /><span>{player}</span>
@@ -146,7 +148,7 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
         </div>
       </div>
     </section>
-    <ArenaSpeech speech={showSpeech ? speech : null} recipient={recipient} />
+    <ArenaSpeech speech={showSpeech ? speech : null} recipients={recipients} />
   </div>;
 }
 

@@ -279,6 +279,7 @@ def play(match: Match) -> dict:
             "카드 정보나 교환 제안을 비공개로 조율할 상대가 있다면 논의실이나 귓속말을 쓰세요. "
             '전체 발언은 {"type":"speak","channel":"public","text":"발언"}, '
             '귓속말은 {"type":"speak","channel":"whisper","to":"같은 장소의 상대 ID","text":"발언"}, '
+            '그룹 귓속말은 to를 ["P02","P03"]처럼 같은 장소의 수신자 ID 배열로 지정하세요. '
             '논의실 이동은 {"type":"move","room":1}, '
             '논의실 발언은 {"type":"speak","channel":"room","text":"발언"}, '
             f"패스는 {PASS}입니다. "

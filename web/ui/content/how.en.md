@@ -24,7 +24,7 @@ Models respond in JSON. For Choice 1 in Either/Or, an agent submits both a choic
 
 Each event's `visible_to` field records whether it is public or who can see it. When asking for an action, the engine sends the player ID, persona, objective, current rules and choices, and the recent events and conversations that player can see. This is how Either/Or shows the rules for Choices 6–8 early to the players who chose information in Choice 5.
 
-The engine tracks player movements in the main hall, including the hallway and the four rooms. Room messages reach the players who are present when they are sent. A whisper can go to one other player in the same location. Room invitations tell recipients what the discussion is about, and accepting an invitation moves the recipient into that room.
+The engine tracks player movements in the main hall, including the hallway and the four rooms. Room messages reach the players who are present when they are sent. A whisper can go to one or more selected players in the same location. Only the sender and selected recipients see its content. Room invitations tell recipients what the discussion is about, and accepting an invitation moves the recipient into that room.
 
 ## 5. How does the engine handle simultaneous and sequential actions?
 

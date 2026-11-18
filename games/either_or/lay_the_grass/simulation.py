@@ -34,7 +34,7 @@ def parallel_actions(names: Sequence[str], ask: Callable):
 DISCUSSION_PROMPT = (
     "자기 차례에 할 행동을 JSON 객체 하나로 출력하세요. 아래는 대화와 이동에 쓸 수 있는 행동입니다. "
     "협력하면 나와 상대가 각각 무엇을 얻고 순위에 어떤 영향이 있는지, 상대가 약속을 지킬 유인이 있는지 따져보세요. "
-    "계획이나 정보를 공개하면 경쟁자도 들을 수 있습니다. 한 명과 비공개로 조율하려면 귓속말을 쓸 수 있습니다. "
+    "계획이나 정보를 공개하면 경쟁자도 들을 수 있습니다. 한 명 또는 지정한 여러 명과 비공개로 조율하려면 귓속말을 쓸 수 있습니다. "
     "논의실에서는 여러 참가자와 비공개로 전략을 나눌 수 있습니다. 한 번 말하면 같은 방의 모두가 듣고, "
     "각자 차례에 답하며 함께 계획을 조정할 수 있습니다. "
     "함께 조율할 이득이 있으면 논의실 초대를 보내거나, 받은 초대에 응할 수 있습니다. "
@@ -42,7 +42,9 @@ DISCUSSION_PROMPT = (
     "같은 차례에 이동하고 말하려면 speak 객체에 room을 추가하세요. 방 인원은 모두에게 보입니다. "
     '전체 발언은 {"type":"speak","channel":"public","text":"..."}를 사용하세요. '
     '귓속말은 같은 논의실 또는 복도에 있는 한 명에게 {"type":"speak","channel":"whisper","to":"참가자 ID","text":"..."}로 보냅니다. '
-    "다른 장소에 있는 사람에게 귓속말을 하려면 speak에 상대의 위치를 room으로 지정해 그곳으로 이동하세요. "
+    '여러 명에게 같은 내용을 보내려면 to를 ["P02","P03"]처럼 수신자 ID 배열로 지정하세요. '
+    "본인과 중복 ID는 넣지 않으며, 지정한 수신자만 내용을 봅니다. 수신자 모두 발신자와 같은 장소에 있어야 합니다. "
+    "다른 장소의 수신자에게 보내려면 모두가 모인 장소를 room으로 지정해 이동하세요. "
     '논의실 발언은 {"type":"speak","channel":"room","text":"..."}을 사용하세요. '
     "room을 함께 지정하면 이동 직후 새 방에 있는 사람에게 바로 전달됩니다. "
     '논의실 초대는 {"type":"speak","channel":"room_invite","to":"참가자 ID","room":null,"text":"안건"}을 사용하세요. '
@@ -52,7 +54,7 @@ DISCUSSION_PROMPT = (
     "수락하면 초대받은 방으로 이동합니다. 수락과 동시에 방에서 말하려면 text도 넣으세요. "
     f'발언은 {MAX_SPEECH_LENGTH}자까지 가능합니다. 패스할 때는 type을 "pass"로 지정하세요.'
 )
-DiscussionAction = dict[str, str | int]
+DiscussionAction = dict[str, str | int | list[str]]
 
 
 class ConcordiaBackend(IntelligenceBackend):
