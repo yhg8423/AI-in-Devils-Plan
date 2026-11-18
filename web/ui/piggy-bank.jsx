@@ -62,6 +62,13 @@ export function applyPigEvent(state, type, data, event = {}) {
     const {player, bank, color, count} = state.pigClaim;
     state.pigDoubtCue = {challenger: event.agent_name, player, bank, color, claimed: count, step: event.step};
   }
+  if (type === "action" && data.phase === "pig_challenge") {
+    state.pigChallengeCue = data.action === "pass" ? null : {player: event.agent_name, step: event.step};
+    if (state.pigChallengeCue) {
+      state.pigDoubtCue = null;
+      state.pigVerdict = null;
+    }
+  }
   if (!type.startsWith("pig_")) return;
   if (data.scores) state.pigScores = {...data.scores};
   if (data.lower) state.pigLower = {...data.lower};
@@ -76,6 +83,7 @@ export function applyPigEvent(state, type, data, event = {}) {
       state.pigClaim = null;
       state.pigVerdict = null;
       state.pigDoubtCue = null;
+      state.pigChallengeCue = null;
       state.pigDeposit = null;
       state.pigContents = {};
       state.pigActive = data.next_player ?? Object.keys(data.upper).find((player) => data.upper[player] != null);
@@ -89,12 +97,14 @@ export function applyPigEvent(state, type, data, event = {}) {
       state.pigClaim = null;
       state.pigVerdict = null;
       state.pigDoubtCue = null;
+      state.pigChallengeCue = null;
       break;
     case "pig_deposit":
       state.pigDeposit = data;
       state.pigActive = data.to;
       state.pigClaim = null;
       state.pigDoubtCue = null;
+      state.pigChallengeCue = null;
       delete state.pigKnown?.[data.bank];
       delete state.pigContents?.[data.bank];
       break;
@@ -113,7 +123,12 @@ export function applyPigEvent(state, type, data, event = {}) {
       state.pigActive = data.next_player ?? data.player;
       break;
     case "pig_reset_vote": state.pigVoters = data.voters; break;
-    case "pig_challenge": state.pigKnown = {...state.pigKnown, ...data.actual}; state.pigVerdict = {type, data}; break;
+    case "pig_challenge":
+      state.pigKnown = {...state.pigKnown, ...data.actual};
+      state.pigVerdict = {type, data};
+      state.pigDoubtCue = null;
+      state.pigChallengeCue = {player: data.player, correct: data.correct, step: event.step};
+      break;
     case "pig_contents": state.pigContents = {...data.banks}; break;
   }
   if (type !== "pig_contents") state.pigLast = {type, data};
@@ -162,6 +177,7 @@ export function PiggyScene({players, state, frame, selected, onChoose}) {
   const order = state.pigOrder ?? players;
   const active = state.pigActive;
   const cue = state.pigDoubtCue;
+  const challenge = state.pigChallengeCue;
   const deposit = state.pigDeposit;
   const from = deposit && order.indexOf(deposit.player);
   const to = deposit && order.indexOf(deposit.to);
@@ -176,15 +192,22 @@ export function PiggyScene({players, state, frame, selected, onChoose}) {
           <path d={`M${piggySeats[from]} 290V309H${piggySeats[to]}V290`} markerEnd="url(#pig-pass-arrow)" />
         </svg>}
         {order.map((player, index) => <React.Fragment key={player}>
-          {cue?.challenger === player && <div className="pig-doubt-bubble" style={position(piggySeats[index], 83)}
+          {cue?.challenger === player && <div className="pig-action-bubble pig-doubt-bubble" style={position(piggySeats[index], 83)}
             data-player={player} data-correct={cue.correct} key={`${player}-doubt-${cue.step}`} role="status">
             <strong>{tr("의심!", "Doubt!")}</strong>
-            {cue.correct != null && <span className="pig-doubt-badge" data-correct={cue.correct}>
+            {cue.correct != null && <span className="pig-action-badge pig-doubt-badge" data-correct={cue.correct}>
               {cue.correct ? tr("성공 +1", "SUCCESS +1") : tr("실패 −1", "FAIL −1")}</span>}
+          </div>}
+          {challenge?.player === player && <div className="pig-action-bubble pig-challenge-bubble" style={position(piggySeats[index], 83)}
+            data-player={player} data-correct={challenge.correct} key={`${player}-challenge-${challenge.step}`} role="status">
+            <strong>{tr("도전!", "Challenge!")}</strong>
+            {challenge.correct != null && <span className="pig-action-badge pig-challenge-badge" data-correct={challenge.correct}>
+              {challenge.correct ? tr("성공 +3", "SUCCESS +3") : tr("실패 −2", "FAIL −2")}</span>}
           </div>}
           <button type="button" className={`token pig-seat${active === player ? " acting" : ""}`} style={position(piggySeats[index], 134)}
             aria-label={tr(`${player} · 승점 ${state.pigScores?.[player] ?? 0}`, `${player} · ${state.pigScores?.[player] ?? 0} VP`)} aria-pressed={selected === player}
             data-doubt-caller={cue?.challenger === player || undefined}
+            data-challenge-caller={challenge?.player === player || undefined}
             data-status={state.result?.eliminated.includes(player) ? "탈락" : undefined} data-speaking={speech?.agent_name === player || undefined}
             onClick={() => onChoose(player)}><Sprite player={player} /><span>{player} · {state.pigScores?.[player] ?? 0}</span></button>
           <div className="pig-station" style={position(piggySeats[index], 153)} data-active={active === player || undefined}>
@@ -221,6 +244,23 @@ export function PiggyScene({players, state, frame, selected, onChoose}) {
   </div>;
 }
 
+function PiggyChallengeResult({data}) {
+  if (!data.guesses || !data.actual) return null;
+  const banks = Object.keys(data.actual).sort((left, right) => Number(left) - Number(right));
+  const matches = (bank) => data.guesses[bank]?.black === data.actual[bank].black &&
+    data.guesses[bank]?.white === data.actual[bank].white;
+  const correct = banks.filter(matches).length;
+  return <section className="pig-challenge-result" aria-label={tr("저금통별 도전 결과", "Bank-by-bank challenge results")}>
+    <p><strong>{tr(`${data.player} · ${banks.length}개 저금통 중 ${correct}개 정답`,
+      `${data.player} · ${correct} of ${banks.length} banks correct`)}</strong></p>
+    <Table caption={tr("제출 개수와 실제 개수", "Submitted and actual counts")}
+      headers={tr(["저금통", "제출", "실제", "판정"], ["Bank", "Submitted", "Actual", "Result"])}
+      rows={banks.map((bank) => [<span className="pig-challenge-bank" data-bank={bank} data-correct={matches(bank)}>{bankLabel(bank)}</span>,
+        data.guesses[bank] ? coinText(data.guesses[bank]) : "–", coinText(data.actual[bank]),
+        <span className="pig-challenge-match" data-correct={matches(bank)}>{matches(bank) ? tr("정답", "Correct") : tr("오답", "Incorrect")}</span>])} />
+  </section>;
+}
+
 export function PiggyStage({state, players, selected, onChoose}) {
   const {pigTurn: turn, pigClaim: claim, pigScores: scores = {}, pigLast: latest, pigVerdict: verdict, result} = state;
   const rules = state.feed.find((event) => event.msg_type === "rules");
@@ -238,17 +278,19 @@ export function PiggyStage({state, players, selected, onChoose}) {
     <Table caption={tr("돼지 저금통 최종 순위", "Piggy Bank final standings")} headers={tr(["참가자", "승점", "획득 피스", "결과"], ["Player", "VP", "Pieces earned", "Result"])}
       rows={order.map((player, index) => [`${index + 1}. ${player}`, result.scores?.[player] ?? scores[player] ?? 0,
         result.pieces_awarded?.[player] ?? 0, result.eliminated.includes(player) ? tr("탈락", "Eliminated") : tr("생존", "Survived")])} />
+    {verdict?.type === "pig_challenge" && <PiggyChallengeResult data={verdict.data} />}
   </div>;
   return <div className="pig-stage">
     <h2>{turn ? tr(`${turn.turn}턴`, `Turn ${turn.turn}`) : tr("돼지 저금통 준비", "Preparing Piggy Bank")}</h2>
     <p className="pig-stage-status">{latest ? pigEventText(latest.type, latest.data) : tr("규칙 공개 대기", "Awaiting the game rules")}</p>
-    {claim && <div className="pig-current-claim"><PigIcon bank={claim.bank} /><div><strong>{claim.player}</strong>
+    {claim && verdict?.type !== "pig_challenge" && <div className="pig-current-claim"><PigIcon bank={claim.bank} /><div><strong>{claim.player}</strong>
       <p>{tr(`${pigColorLabel(claim.color)} ${claim.count}개 선언`, `Claims ${claim.count} ${pigColorLabel(claim.color)} coins`)}</p>
       <small>{verdict?.type === "pig_doubt" && verdict.data.bank === claim.bank ? coinText(verdict.data.actual) :
         tr("선언은 개봉 전까지 확인되지 않은 값입니다.", "The claim remains unverified until the bank opens.")}</small></div></div>}
     {verdict && <div className="pig-verdict" data-correct={verdict.data.correct}>
       <strong>{verdict.type === "pig_doubt" ? tr("의심 판정", "Doubt verdict") : tr("전체 암기 판정", "Full-memory verdict")}</strong>
       <p>{pigEventText(verdict.type, verdict.data)}</p>
+      {verdict.type === "pig_challenge" && <PiggyChallengeResult data={verdict.data} />}
     </div>}
     <div className="pig-scoreboard" aria-label={tr("현재 승점", "Current scores")}>{order.map((player) =>
       <button type="button" key={player} aria-pressed={player === selected} onClick={() => onChoose(player)}>
@@ -290,7 +332,9 @@ export function PiggyInformation({state, replay}) {
     <div id="pig-history-panel" className="match-info-scroll" role="tabpanel" aria-labelledby="pig-history" hidden={tab !== "history"} tabIndex={0}>
       {history.length ? <Table caption={tr("동전 전달과 의심·리셋 판정", "Coin passes, doubts, and reset verdicts")} headers={tr(["기록", "행동", "내용"], ["Event", "Action", "Details"])}
         rows={history.map(({msg_type, data, step}) => [<button type="button" className="result-link" onClick={() => seek(step)}>{step}</button>,
-          ({pig_deposit: tr("전달", "Pass"), pig_claim: tr("개수 선언", "Claim"), pig_pass: tr("의심 없음", "No doubt"), pig_doubt: tr("의심 판정", "Doubt verdict"), pig_replace: tr("교체", "Replace"), pig_reset: tr("리셋", "Reset"), pig_challenge: tr("전체 암기", "Full recall")})[msg_type], pigEventText(msg_type, data)])} /> :
+          ({pig_deposit: tr("전달", "Pass"), pig_claim: tr("개수 선언", "Claim"), pig_pass: tr("의심 없음", "No doubt"), pig_doubt: tr("의심 판정", "Doubt verdict"), pig_replace: tr("교체", "Replace"), pig_reset: tr("리셋", "Reset"), pig_challenge: tr("전체 암기", "Full recall")})[msg_type],
+          msg_type === "pig_challenge" ? <details className="pig-challenge-details"><summary>{pigEventText(msg_type, data)}</summary>
+            <PiggyChallengeResult data={data} /></details> : pigEventText(msg_type, data)])} /> :
         <p className="empty">{tr("이 조건에 해당하는 기록이 없어요.", "No records match these filters.")}</p>}
     </div>
     <div id="pig-banks-panel" className="match-info-scroll" role="tabpanel" aria-labelledby="pig-banks" hidden={tab !== "banks"} tabIndex={0}>

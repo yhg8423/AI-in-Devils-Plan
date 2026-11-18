@@ -3,14 +3,14 @@
 .pig-route > path { fill: none; stroke: #ebbb76; stroke-width: 2; stroke-dasharray: 5 3; }
 .pig-seat { translate: -50% -100%; }
 .pig-seat canvas { width: clamp(14px, 1.9vw, 26px); }
-.pig-seat[data-doubt-caller] canvas { filter: drop-shadow(-1px 0 #f2cd81) drop-shadow(1px 0 #f2cd81); }
-.pig-seat[data-doubt-caller] span { outline: 2px solid #eac181; outline-offset: 1px; }
-.pig-doubt-bubble { position: absolute; z-index: 4; translate: -50% -100%; display: grid; justify-items: center; gap: 3px; max-width: 21%; padding: 5px 7px; border: 2px solid #f0c685; background: #352d31; color: #ffdfa6; box-shadow: 3px 3px #0c1018; font: 700 clamp(8px, 1vw, 12px)/1.3 var(--pixel-font); text-align: center; pointer-events: none; animation: pig-doubt-pop .24s steps(3, end); }
-.pig-doubt-bubble::after { content: ""; position: absolute; left: calc(50% - 3px); bottom: -6px; width: 6px; height: 6px; background: #f0c685; clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 50%, 50% 100%, 0 100%); }
-.pig-doubt-badge { display: block; white-space: nowrap; padding: 1px 3px; color: #ffe5da; background: #77424b; font-size: .85em; }
-.pig-doubt-badge[data-correct="true"] { color: #dff3cc; background: #405e48; }
-.pig-doubt-bubble[data-correct="true"] { border-color: #b4d09b; }
-.pig-doubt-bubble[data-correct="false"] { border-color: #ec9c99; }
+.pig-seat:is([data-doubt-caller], [data-challenge-caller]) canvas { filter: drop-shadow(-1px 0 #f2cd81) drop-shadow(1px 0 #f2cd81); }
+.pig-seat:is([data-doubt-caller], [data-challenge-caller]) span { outline: 2px solid #eac181; outline-offset: 1px; }
+.pig-action-bubble { position: absolute; z-index: 4; translate: -50% -100%; display: grid; justify-items: center; gap: 3px; max-width: 21%; padding: 5px 7px; border: 2px solid #f0c685; background: #352d31; color: #ffdfa6; box-shadow: 3px 3px #0c1018; font: 700 clamp(8px, 1vw, 12px)/1.3 var(--pixel-font); text-align: center; pointer-events: none; animation: pig-doubt-pop .24s steps(3, end); }
+.pig-action-bubble::after { content: ""; position: absolute; left: calc(50% - 3px); bottom: -6px; width: 6px; height: 6px; background: #f0c685; clip-path: polygon(0 0, 100% 0, 100% 50%, 50% 50%, 50% 100%, 0 100%); }
+.pig-action-badge { display: block; white-space: nowrap; padding: 1px 3px; color: #ffe5da; background: #77424b; font-size: .85em; }
+.pig-action-badge[data-correct="true"] { color: #dff3cc; background: #405e48; }
+.pig-action-bubble[data-correct="true"] { border-color: #b4d09b; }
+.pig-action-bubble[data-correct="false"] { border-color: #ec9c99; }
 .pig-station { position: absolute; width: 15.6%; height: 35%; display: grid; grid-template-rows: 43% 43% 14%; translate: -50%; text-align: center; font-family: var(--pixel-font); }
 .pig-tier { position: relative; display: flex; align-items: center; justify-content: center; gap: 3px; min-height: 0; }
 .pig-physical-bank { display: flex; align-items: center; justify-content: center; gap: 3px; height: 100%; min-width: 0; }
@@ -60,6 +60,13 @@
 .pig-verdict { padding: 10px; margin-bottom: 12px; border-inline-start: 3px solid #e5ab79; background: #302b2c; font-size: 12px; }
 .pig-verdict[data-correct="true"] { border-color: #9cbf9f; background: #27332f; }
 .pig-verdict p { margin-block: 5px 0; }
+.pig-challenge-result { margin-block: 10px; }
+.pig-challenge-result .match-table { font-size: 11px; }
+.pig-challenge-result .match-table :is(th, td) { padding: 5px 6px; }
+.pig-challenge-result .match-table td { white-space: nowrap; }
+.pig-challenge-match { color: #e9a6a2; font-weight: 700; }
+.pig-challenge-match[data-correct="true"] { color: #bad3a7; }
+.pig-challenge-details > summary { cursor: pointer; }
 .pig-scoreboard { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
 .pig-scoreboard > button { display: grid; justify-items: center; gap: 6px; padding: 8px 3px; background: #202b35; border: 1px solid #45515c; color: #e7e1d5; cursor: pointer; font-family: var(--pixel-font); }
 .pig-scoreboard > button:is(:hover, [aria-pressed="true"]) { border-color: #d0a977; }
@@ -74,7 +81,7 @@
 .pig-reset-status span { color: #a0aeb9; }
 .pig-info .match-info-games { margin-bottom: 5px; }
 @media (max-width: 720px) {
-  .pig-doubt-bubble { padding: 3px 4px; gap: 2px; font-size: clamp(7px, 1.9vw, 11px); }
+  .pig-action-bubble { padding: 3px 4px; gap: 2px; font-size: clamp(7px, 1.9vw, 11px); }
   .pig-icon.compact svg { width: 5.2vw; }
   .pig-tier-label { font-size: 1.4vw; }
   .pig-icon.compact strong, .pig-tier .pig-coins { font-size: 1.9vw; }
@@ -82,7 +89,7 @@
   .pig-floor-caption { font-size: 2vw; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .pig-doubt-bubble, .pig-tier[data-suspected], .pig-shell-left, .pig-shell-right, .pig-spilled-coins { animation: none; }
+  .pig-action-bubble, .pig-tier[data-suspected], .pig-shell-left, .pig-shell-right, .pig-spilled-coins { animation: none; }
   .pig-shell-left { transform: translate(-3px, 1px) rotate(-12deg); }
   .pig-shell-right { transform: translate(3px, 1px) rotate(12deg); }
 }

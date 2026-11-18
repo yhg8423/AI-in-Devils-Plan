@@ -375,10 +375,13 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange) 
     if (perspective !== "operator" && event.visible_to !== "all" && !event.visible_to.includes(perspective)) continue;
     state.feed.push({...record(event, index + 1), round: state.rounds});
     if (isGemExchange) applyGemEvent(state, type, data, event);
-    if (type.startsWith("pig_") || (type === "action" && data.phase === "pig_doubt")) {
+    if (type.startsWith("pig_") || (type === "action" && ["pig_doubt", "pig_challenge"].includes(data.phase))) {
       applyPigEvent(state, type, data, state.feed.at(-1));
     }
-    if (type === "match_result") state.pigDoubtCue = null;
+    if (type === "match_result") {
+      state.pigDoubtCue = null;
+      state.pigChallengeCue = null;
+    }
     switch (type) {
       case "rules": {
         if (!match.board) break;

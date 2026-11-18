@@ -61,6 +61,18 @@ function sequence(correct) {
   return {pending, verdict, replacement, nextTurn, reset, result, penalized};
 }
 
+function challengeSequence(correct) {
+  const doubt = sequence(true);
+  const before = doubt.pending.slice(0, -1);
+  const totals = Object.fromEntries([1, 2, 3, 4, 5].map((bank) => [bank, bank === 1 ? actual : {black: 1, white: 1}]));
+  const guesses = structuredClone(totals);
+  if (!correct) guesses[1].black++;
+  const attempt = event("action", {phase: "pig_challenge", action: JSON.stringify(guesses)}, ["P02"], "P02");
+  const verdict = event("pig_challenge", {turn: 1, player: "P02", guesses, actual: totals, correct,
+    scores: {...scores, P02: correct ? 3 : -2}});
+  return {...doubt, before, attempt, verdict};
+}
+
 function arena(html) {
   const start = html.indexOf('class="arena pig-arena"');
   const end = html.indexOf('class="arena-speech"', start);
@@ -143,6 +155,102 @@ for (const language of ["ko", "en"]) {
       const scene = arena(replay(resolved, view, pending.length - 1));
       assert.equal(openingTag(scene, "pig-doubt-bubble"), undefined, "Future verdicts must not survive rewind");
       assert.equal(openingTag(scene, "pig-opened-bank"), undefined);
+    }
+  });
+
+  test(`${language}: a private full-bank challenge and its guesses remain private`, () => {
+    const {before, attempt} = challengeSequence(false);
+    for (const view of views) {
+      const html = replay([...before, attempt], view);
+      const scene = arena(html);
+      const bubble = openingTag(scene, "pig-challenge-bubble");
+      if (view === "operator" || view === "P02") {
+        assert.match(bubble ?? "", /data-player="P02"/);
+        assert(scene.includes(language === "en" ? "Challenge!" : "도전!"));
+      } else {
+        assert.equal(bubble, undefined, `${view} must not learn a private challenge choice`);
+        assert(!html.includes("992") && !html.includes("993"), `${view} must not see private guesses or totals`);
+      }
+      assert.equal(openingTag(scene, "pig-challenge-badge"), undefined, "A pending challenge has no verdict yet");
+      assert.equal(openingTag(html, "pig-challenge-result"), undefined, "A pending private answer has no public comparison");
+      const skipped = arena(replay([...before, event("action", {phase: "pig_challenge", action: "pass"}, ["P02"], "P02")], view));
+      assert.equal(openingTag(skipped, "pig-challenge-bubble"), undefined, "Skipping is not a challenge announcement");
+    }
+  });
+
+  test(`${language}: challenge verdicts announce the challenger and correct point change to everyone`, () => {
+    for (const correct of [true, false]) {
+      const {before, attempt, verdict} = challengeSequence(correct);
+      for (const view of views) {
+        const scene = arena(replay([...before, attempt, verdict], view));
+        assert.match(openingTag(scene, "pig-challenge-bubble") ?? "", /data-player="P02"/);
+        assert.match(openingTag(scene, "pig-challenge-badge") ?? "", new RegExp(`data-correct="${correct}"`));
+        assert(scene.includes(language === "en" ? "Challenge!" : "도전!"));
+        assert(scene.includes(correct ? language === "en" ? "SUCCESS +3" : "성공 +3" : language === "en" ? "FAIL −2" : "실패 −2"));
+        assert.equal(openingTag(scene, "pig-doubt-bubble"), undefined, "The new announcement must not show an old doubt");
+      }
+    }
+  });
+
+  test(`${language}: challenge cues replace doubts and clear at boundaries or when rewinding`, () => {
+    const doubt = sequence(true);
+    const challenge = challengeSequence(true);
+    const oldDoubt = [...doubt.pending, doubt.verdict, doubt.replacement];
+    for (const view of views) {
+      const pending = arena(replay([...oldDoubt, challenge.attempt], view));
+      if (view === "operator" || view === "P02") {
+        assert(openingTag(pending, "pig-challenge-bubble"));
+        assert.equal(openingTag(pending, "pig-doubt-bubble"), undefined);
+      }
+      const announced = arena(replay([...oldDoubt, challenge.attempt, challenge.verdict], view));
+      assert.equal(openingTag(announced, "pig-doubt-bubble"), undefined);
+      for (const boundary of [challenge.nextTurn, challenge.reset, challenge.before[0], challenge.before[2], challenge.result]) {
+        const cleared = arena(replay([...challenge.before, challenge.attempt, challenge.verdict, boundary], view));
+        assert.equal(openingTag(cleared, "pig-challenge-bubble"), undefined);
+        assert.equal(openingTag(cleared, "pig-challenge-badge"), undefined);
+      }
+      const rewound = arena(replay([...challenge.before, challenge.attempt, challenge.verdict], view, challenge.before.length));
+      assert.equal(openingTag(rewound, "pig-challenge-bubble"), undefined, "A future challenge must not survive rewind");
+    }
+  });
+
+  test(`${language}: bank comparisons show submitted and actual colors, numeric order, and retained results`, () => {
+    const {before, attempt, reset, result} = challengeSequence(true);
+    const totals = Object.fromEntries([11, 2, 1, 12, 10].map((bank) => [bank, bank === 1 ? actual : {black: 1, white: 1}]));
+    for (const mismatch of [null, "black", "white"]) {
+      const guesses = structuredClone(totals);
+      if (mismatch) guesses[1][mismatch]++;
+      const verdict = event("pig_challenge", {turn: 1, player: "P02", guesses, actual: totals,
+        correct: !mismatch, scores: {...scores, P02: mismatch ? -2 : 3}});
+      for (const view of views) {
+        const steps = [...before, attempt, verdict];
+        const html = replay(steps, view);
+        const tag = openingTag(html, "pig-challenge-result");
+        assert(tag, "A public verdict should include bank-by-bank answers");
+        const start = html.indexOf(tag);
+        const table = html.slice(start, html.indexOf("</table>", start));
+        const rows = [...table.matchAll(/<tr\b[^>]*>([\s\S]*?)<\/tr>/g)]
+          .map(([, body]) => ({body, marker: openingTag(body, "pig-challenge-bank")})).filter(({marker}) => marker);
+        assert.deepEqual(rows.map(({marker}) => marker.match(/data-bank="([^"]+)"/)[1]), ["1", "2", "10", "11", "12"]);
+        assert.deepEqual(rows.map(({marker}) => marker.match(/data-correct="([^"]+)"/)[1]), [String(!mismatch), "true", "true", "true", "true"]);
+        const cells = [...rows[0].body.matchAll(/<td\b[^>]*>([\s\S]*?)<\/td>/g)];
+        const numbers = (cell) => cell.replace(/<[^>]*>/g, " ").match(/\d+/g).map(Number);
+        assert.deepEqual(numbers(cells[0][1]), [guesses[1].black, guesses[1].white], "Submitted colors should preserve the player's answer");
+        assert.deepEqual(numbers(cells[1][1]), [actual.black, actual.white], "Actual colors should come from the public reveal");
+        assert(table.includes(language === "en" ? `${mismatch ? 4 : 5} of 5 banks correct` : `5개 저금통 중 ${mismatch ? 4 : 5}개 정답`),
+          "Both colors must match for a bank to count as correct");
+
+        const afterReset = replay([...steps, reset], view);
+        const panelStart = afterReset.indexOf('class="match-state"');
+        const panel = afterReset.slice(panelStart, afterReset.indexOf("</section>", panelStart));
+        assert.equal(openingTag(panel, "pig-challenge-result"), undefined, "Reset should clear the current comparison");
+        assert(openingTag(afterReset, "pig-challenge-result"), "History should retain publicly revealed answers after reset");
+
+        const final = replay([...steps, result], view);
+        const finalStart = final.indexOf('class="match-state"');
+        const finalPanel = final.slice(finalStart, final.indexOf("</section>", finalStart));
+        assert(openingTag(finalPanel, "pig-challenge-result"), "A match-ending challenge should retain its comparison beside the final result");
+      }
     }
   });
 }
