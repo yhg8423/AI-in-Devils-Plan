@@ -58,6 +58,11 @@ def play(match: Match) -> dict:
     players = match.players
     if len(players) != 4 or "__operator__" in players:
         raise ValueError("돼지 저금통은 4명이 필요하며 __operator__는 참가자 ID로 쓸 수 없습니다.")
+    recorded_rules = None
+    if match.resume_log is not None and match.resume_log.resume:
+        recorded_rules = next((event["content"] for event in match.resume_log.events
+                               if event["msg_type"] == "rules"), None)
+    discussion_turns = 1 if recorded_rules is not None and "전원에게 한 턴씩" in recorded_rules else 2
     order = match.rng.sample(list(players), 4)
     scores = dict.fromkeys(players, 0)
     acting = order[0]
@@ -139,7 +144,8 @@ def play(match: Match) -> dict:
         "누군가 5점 이상을 얻는 즉시 최종 승점을 비교합니다. 최하위 한 명이 탈락하고 1위는 피스 3개를 받습니다. "
         "공동 1위는 피스 3개를 같은 정수 몫으로 나누고 나머지는 버립니다. 동전으로 카운팅하는 행위는 금지합니다.\n\n"
         "시뮬레이션 진행\n"
-        "게임 전 비공개 전략 준비 두 단계와 참가자별 네 턴의 대화가 있습니다. 추가 행동 전에는 전원에게 한 턴씩 "
+        "게임 전 비공개 전략 준비 두 단계와 참가자별 네 턴의 대화가 있습니다. "
+        f"추가 행동 전에는 전원에게 {'한' if discussion_turns == 1 else '두'} 턴씩 "
         "대화 기회를 줍니다. 20초 선언과 10초 의심은 각각 한 번의 응답으로 진행합니다. 의심은 동시에 제출하며 "
         "여러 명이 선택하면 추첨 자리 순서로 한 명을 정합니다. 리셋은 매 전달 뒤 추첨 순서로 요청 기회를 주고 "
         "세 번째 요청 즉시 처리합니다. 리셋 뒤에도 선언 색은 이어집니다. 최하위 동점은 추첨 순서가 뒤인 사람이 "
@@ -176,7 +182,7 @@ def play(match: Match) -> dict:
         color = COLORS[(turn - 1) % 2]
         match.event("pig_turn", {"turn": turn, "player": acting, "color": color,
                                  **locations(), "scores": scores.copy()})
-        talk("before_turn", 1)
+        talk("before_turn", discussion_turns)
         black = match.policy.randrange(6)
         white = match.policy.randint(0 if black else 1, 5 - black)
         default = encode({"black": black, "white": white,

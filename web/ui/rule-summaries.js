@@ -25,6 +25,11 @@ const summaries = [
 ];
 
 export function rulesSummary(heading, body) {
+  if (heading.startsWith("돼지 저금통")) {
+    const turns = body.includes("전원에게 두 턴씩") ? "two discussion turns" : "one discussion turn";
+    return summaries.find(([prefix]) => prefix === "돼지 저금통")[1] +
+      ` Each player has four opening discussion turns and ${turns} before each deposit.`;
+  }
   if (heading.startsWith("보석 암시장")) {
     const relationships = body.includes("\n\n8. 관계 평가 갱신\n") ?
       " Players review affinity and trust after discussions, auction results, swaps, card reveals, final scoring, and the Alliance Token decision. Updates require new evidence visible to that player." : "";

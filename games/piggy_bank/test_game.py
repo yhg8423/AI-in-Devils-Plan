@@ -6,6 +6,7 @@ from io import StringIO
 import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
@@ -269,6 +270,86 @@ class PiggyBankTest(unittest.TestCase):
         self.assertEqual(result["pieces_awarded"]["P01"], 3)
         order = next(json.loads(event.content)["order"] for event in match.events if event.msg_type == "pig_setup")
         self.assertEqual(result["eliminated"], [next(player for player in reversed(order) if player != "P01")])
+
+    def test_opening_has_four_discussion_rounds_and_each_deposit_has_two(self):
+        match = Match(PLAYERS, 23)
+        result = play(match)
+        order = next(json.loads(event.content)["order"] for event in match.events if event.msg_type == "pig_setup")
+        window = completed = None
+        speakers = []
+        deposits = 0
+        for event in match.events:
+            if event.msg_type not in {"pig_discussion", "pig_discussion_end", "action", "pig_deposit"}:
+                continue
+            data = json.loads(event.content)
+            if event.msg_type == "pig_discussion":
+                self.assertIsNone(window)
+                window = data
+                speakers = []
+                self.assertEqual(data["turns"], 4 if data["stage"] == "opening" else 2)
+            elif event.msg_type == "action" and data["phase"] == "pig_talk":
+                self.assertIsNotNone(window)
+                speakers.append(event.agent_name)
+            elif event.msg_type == "pig_discussion_end":
+                self.assertEqual(speakers, order * window["turns"])
+                self.assertEqual((data["stage"], data["turn"]), (window["stage"], window["turn"]))
+                completed, window = window, None
+            elif event.msg_type == "pig_deposit":
+                self.assertEqual((completed["stage"], completed["turn"]), ("before_turn", data["turn"]))
+                deposits += 1
+        self.assertEqual(deposits, result["turns"])
+        self.assertIsNone(window)
+
+    def test_saved_one_round_discussions_resume_without_changing_the_record(self):
+        def previous_play(match):
+            current_log = match.resume_log
+            match.resume_log = SimpleNamespace(
+                resume=True, events=[{"msg_type": "rules", "content": "추가 행동 전에는 전원에게 한 턴씩"}],
+                journal=current_log.journal,
+            )
+            try:
+                return play(match)
+            finally:
+                match.resume_log = current_log
+
+        def reply(prompt):
+            action = "{}" if "비공개 관계 평가를 갱신하세요" in prompt else "pass"
+            return json.dumps({"action": action, "note": ""})
+
+        original_event = Match.event
+
+        def interrupt(match, kind, data, **kwargs):
+            original_event(match, kind, data, **kwargs)
+            if kind == "pig_deposit":
+                raise RuntimeError("test interruption after legacy discussion")
+
+        with (
+            TemporaryDirectory() as directory,
+            redirect_stdout(StringIO()),
+            redirect_stderr(StringIO()),
+            patch("games.models.CodexLanguageModel._complete", side_effect=reply) as completion,
+        ):
+            full = Path(directory) / "old-full.jsonl"
+            resumed = Path(directory) / "old-resumed.jsonl"
+            arguments = ["--seed", "23", "--model", "test-model", "--model-player", "P01",
+                         "--model-turns", "30", "--no-allow-review"]
+            run_cli(previous_play, title=DAY_THREE_PRISON, seats=4, argv=[*arguments, "--output", str(full)])
+            with patch.object(Match, "event", interrupt), self.assertRaisesRegex(RuntimeError, "legacy discussion"):
+                run_cli(previous_play, title=DAY_THREE_PRISON, seats=4, argv=[*arguments, "--output", str(resumed)])
+            prefix = [json.loads(line) for line in resumed.read_bytes().splitlines()]
+            calls_before = completion.call_count
+            run_cli(play, title=DAY_THREE_PRISON, seats=4, argv=["--resume", "--output", str(resumed)])
+            expected = [json.loads(line) for line in full.read_bytes().splitlines()]
+            actual = [json.loads(line) for line in resumed.read_bytes().splitlines()]
+            self.assertEqual(actual, expected)
+            self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
+            self.assertEqual(completion.call_count - calls_before,
+                             expected[-1]["model_calls"] - prefix[-1]["model_calls"])
+            rules = next(row["content"] for row in actual if row.get("msg_type") == "rules")
+            self.assertIn("추가 행동 전에는 전원에게 한 턴씩", rules)
+            windows = [json.loads(row["content"]) for row in actual if row.get("msg_type") == "pig_discussion"]
+            self.assertEqual(windows[0]["turns"], 4)
+            self.assertTrue(all(window["turns"] == 1 for window in windows[1:]))
 
     def test_interrupted_model_decisions_resume_to_the_same_record(self):
         def reply(prompt):
