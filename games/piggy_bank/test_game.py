@@ -1,6 +1,6 @@
 """Checks for bank routing, scoring, visibility, and deterministic resumption."""
 
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from dataclasses import replace
 from io import StringIO
 import json
@@ -402,6 +402,80 @@ class PiggyBankTest(unittest.TestCase):
                 deposits += 1
         self.assertEqual(deposits, result["turns"])
         self.assertIsNone(window)
+
+    def test_players_choose_private_initial_and_reset_slots_without_preselected_banks(self):
+        for valid_reply in (True, False):
+            with self.subTest(valid_reply=valid_reply):
+                self._assert_initial_memory_choices(valid_reply)
+
+    def _assert_initial_memory_choices(self, valid_reply):
+        class ResetChoicesComplete(Exception):
+            pass
+
+        class ChoosingMatch(Match):
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "pig_turn" and data["turn"] == 2:
+                    raise ResetChoicesComplete
+
+        choices = ((2, 4, 5), (1, 4, 5), (1, 2, 5), (2, 3, 4))
+        inputs = {}
+        expected = {}
+
+        def reply(name, prompt):
+            if "다음 구간에 남길 기억 세 개를 갱신하세요" in prompt:
+                epoch = sum(event.msg_type == "pig_reset" for event in match.events)
+                previous = json.loads(prompt.rsplit("기존 기억: ", 1)[1].split("\n", 1)[0])
+                inputs[epoch, name] = previous["banks"]
+                selected = choices[(PLAYERS.index(name) + epoch) % len(PLAYERS)]
+                expected[epoch, name] = {str(bank): {"black": 1, "white": 1} for bank in selected}
+                action = json.dumps(expected[epoch, name]) if valid_reply else "INVALID_MEMORY_SELECTION"
+            elif "현재 리셋 요청자 " in prompt:
+                action = "reset"
+            elif "전달받은 위칸 " in prompt:
+                action = "0"
+            elif "동전을 추가하고 다른 참가자에게 전달하세요" in prompt:
+                recipient = PLAYERS[(PLAYERS.index(name) + 1) % len(PLAYERS)]
+                action = json.dumps({"black": 0, "white": 1, "to": recipient})
+            else:
+                action = "pass"
+            return json.dumps({"action": action, "note": ""})
+
+        with TemporaryDirectory() as directory, ExitStack() as patches:
+            models = {name: CodexLanguageModel("test-model", Path(directory)) for name in PLAYERS}
+            for name, model in models.items():
+                patches.enter_context(patch.object(model, "_complete", side_effect=lambda prompt, name=name: reply(name, prompt)))
+            match = ChoosingMatch(PLAYERS, 23, models=models, live_turns=200, allow_review=False)
+            with self.assertRaises(ResetChoicesComplete):
+                play(match)
+
+        self.assertEqual(set(inputs), {(epoch, name) for epoch in (0, 1) for name in PLAYERS})
+        self.assertTrue(all(value == {} for value in inputs.values()), "No participant should start with preset bank IDs")
+        epoch = 0
+        recalls = {}
+        for event in match.events:
+            if event.msg_type == "pig_reset":
+                epoch += 1
+            elif event.msg_type == "pig_recall":
+                data = json.loads(event.content)
+                if valid_reply:
+                    self.assertEqual(data["banks"], expected[epoch, event.agent_name])
+                else:
+                    self.assertEqual(len(data["banks"]), 3)
+                    self.assertTrue(set(data["banks"]) <= {str(bank) for bank in range(1, 6)})
+                    self.assertTrue(all(value == {"black": 1, "white": 1} for value in data["banks"].values()))
+                self.assertEqual(event.visible_to, [event.agent_name])
+                recalls[epoch, event.agent_name] = data["banks"]
+                for other in PLAYERS:
+                    if other != event.agent_name:
+                        self.assertNotIn(event, match.observations(other))
+        if valid_reply:
+            self.assertEqual(recalls, expected)
+        else:
+            self.assertEqual(set(recalls), set(expected))
+            for epoch in (0, 1):
+                self.assertGreater(len({tuple(sorted(recalls[epoch, name])) for name in PLAYERS}), 1,
+                                   "Invalid replies must not assign everyone the same fixed bank IDs")
 
     def test_new_game_cli_never_requests_dialogue_or_relationship_assessments(self):
         prompts = []

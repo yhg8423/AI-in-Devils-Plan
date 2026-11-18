@@ -165,6 +165,27 @@ class PiggyMemoryTest(unittest.TestCase):
                 for token in ("94601", "94603", "94761", "94729"):
                     self.assertNotIn(token, prompt, "True counts, another player's summary, and rating reasons must stay private")
 
+    def test_dynamic_initial_choices_start_empty_and_reset_without_restoring_old_slots(self):
+        banks = {bank: {"black": 991, "white": 993} for bank in range(1, 6)}
+        memory = PiggyMemory(PLAYERS, banks, mode="dynamic", auto_select=False)
+        self.assertTrue(all(memory.recall(name)["banks"] == {} for name in PLAYERS))
+        choices = {"2": {"black": 1, "white": 1}, "4": {"black": 77, "white": None},
+                   "5": {"black": None, "white": 3}}
+        memory.update("P01", choices, 0, 12)
+        self.assertEqual(memory.recall("P01")["banks"], choices)
+        self.assertEqual(memory.recall("P02")["banks"], {})
+        self.assertEqual(memory.selections["P01"], [2, 4, 5])
+
+        memory.reset(1, turn=4)
+        for name in PLAYERS:
+            self.assertEqual(memory.recall(name), {"reset": 1, "mode": "dynamic", "updated_turn": 4,
+                                                 "banks": {}})
+            self.assertEqual(memory.selections[name], [])
+        reset_choices = {str(bank): {"black": 1, "white": 1} for bank in (1, 3, 5)}
+        memory.update("P01", reset_choices, 4, 24)
+        self.assertEqual(memory.recall("P01")["banks"], reset_choices)
+        self.assertNotIn("77", json.dumps(memory.recall("P01")))
+
     def test_dynamic_slots_accept_any_three_live_ids_without_restoring_dropped_counts(self):
         banks = {bank: {"black": 991, "white": 993} for bank in range(1, 6)}
         first = {"1": {"black": 77, "white": None}, "2": {"black": 2222, "white": 2223}, "3": {"black": 3333, "white": 3334}}

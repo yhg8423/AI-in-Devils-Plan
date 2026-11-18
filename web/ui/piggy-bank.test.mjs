@@ -464,6 +464,9 @@ for (const language of ["ko", "en"]) {
       assert(html.includes("Relationship assessments are disabled during and at the end of this match."));
       const previous = replay([event("rules", silentRules), ...steps.slice(1)], "P01");
       assert(!previous.includes("Relationship assessments are disabled"), "Older silent rules do not gain the new assessment policy");
+      const initialSelection = replay([event("rules", currentRules + "\n\n초기 기억 선택\n각자 기억할 저금통 세 개를 선택합니다."), ...steps.slice(1)], "P01");
+      assert(initialSelection.includes("Memory slots start empty. At the start and after each reset, each player independently chooses three current banks in private."));
+      assert(!html.includes("Memory slots start empty"), "Older dynamic-memory rules keep their original initialization summary");
     } else assert(html.includes("대화 없는 진행"));
     const old = replay([event("rules", oldRules), ...steps.slice(1)], "P01");
     assert(openingTag(old, "arena-speech"), "Previously saved games retain their conversation panel");

@@ -74,7 +74,7 @@ def parse_memory_update(action, bank_ids):
 
 
 class PiggyMemory:
-    def __init__(self, players, banks, *, mode="exact"):
+    def __init__(self, players, banks, *, mode="exact", auto_select=True):
         if mode not in {"exact", "summary", "dynamic"}:
             raise ValueError("지원하지 않는 기억 방식입니다.")
         self.players = tuple(players)
@@ -82,6 +82,7 @@ class PiggyMemory:
         self.selections = {name: [] for name in players}
         self.epoch = 0
         self.mode = mode
+        self.auto_select = auto_select
         if mode == "summary":
             self.summaries = dict.fromkeys(self.players, "")
         elif mode == "dynamic":
@@ -120,7 +121,7 @@ class PiggyMemory:
     def reset(self, epoch, turn=0):
         self.epoch = epoch
         if self.mode == "dynamic":
-            selected = sorted(self.banks)[:MEMORY_CAPACITY]
+            selected = sorted(self.banks)[:MEMORY_CAPACITY] if self.auto_select else []
             self.selections = {name: selected.copy() for name in self.players}
             self.beliefs = {name: {str(bank): {"black": 1, "white": 1} for bank in selected}
                            for name in self.players}

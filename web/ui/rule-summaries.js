@@ -40,9 +40,11 @@ export function rulesSummary(heading, body) {
     );
     const relationships = body.includes("\n\n7. 관계 평가 없음\n") ?
       " Relationship assessments are disabled during and at the end of this match." : "";
+    const initialMemory = body.includes("\n\n초기 기억 선택\n") ?
+      " Memory slots start empty. At the start and after each reset, each player independently chooses three current banks in private." : "";
     return (silent ? summary.replace("discussion and decision windows replace the timers", "decision windows replace the timers") : summary) +
       (silent ? " There are no discussion or whisper phases. Players privately prepare and update their initial memory before the first deposit. Coin deposits, count declarations, and verdicts remain public." :
-        ` Each player has four opening discussion turns and ${turns} before each deposit.`) + memory + relationships;
+        ` Each player has four opening discussion turns and ${turns} before each deposit.`) + memory + initialMemory + relationships;
   }
   if (heading.startsWith("보석 암시장")) {
     const relationships = body.includes("\n\n8. 관계 평가 갱신\n") ?
