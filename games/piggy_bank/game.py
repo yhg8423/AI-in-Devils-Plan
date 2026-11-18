@@ -19,6 +19,7 @@ OPENING_TURNS = 4
 NO_DISCUSSION_HEADING = "\n\n6. 대화 없는 진행\n"
 NO_RELATIONSHIP_HEADING = "\n\n7. 관계 평가 없음\n"
 SIMULTANEOUS_RESET_HEADING = "\n\n8. 리셋 동시 판단\n"
+SCORING_GOAL_HEADING = "\n\n득점 목표\n"
 COLORS = ("black", "white")
 PASS = '{"type":"pass"}'
 
@@ -219,8 +220,9 @@ def play(match: Match) -> dict:
         "돼지 저금통 · 4인 기억 게임\n\n"
         "1. 시작과 전달\n"
         "추첨으로 자리와 첫 선을 정합니다. 1~4번 저금통을 각자 아래칸에 놓고, 선의 위칸에 5번을 놓습니다. "
-        "저금통에는 처음에 흑동전과 백동전이 하나씩 들어 있습니다. 선은 아래칸 저금통에 두 색 동전을 "
-        "합계 1~5개 넣고 추가한 흑·백 개수를 사실대로 공개한 뒤 다른 참가자에게 전달합니다. "
+        "저금통에는 처음에 흑동전과 백동전이 하나씩 들어 있습니다. 선은 아래칸 저금통에 흑·백 동전을 "
+        "섞거나 한 색만 넣을 수 있습니다. 각 색은 0개 이상, 두 색 합계는 1~5개이며 이번 선언 색과 관계없이 "
+        "두 색 모두 추가할 수 있습니다. 추가한 흑·백 개수를 사실대로 공개한 뒤 다른 참가자에게 전달합니다. "
         "자신의 위칸 저금통은 아래칸으로 내리고, 받은 사람은 전달된 저금통을 위칸에 놓습니다.\n\n"
         "2. 개수 선언과 의심\n"
         "받은 사람은 위칸 저금통의 특정 색 동전 수를 선언합니다. 첫 선언은 흑, 다음은 백으로 계속 번갈아 바뀝니다. "
@@ -323,7 +325,15 @@ def play(match: Match) -> dict:
             "끝나면 새 요청을 함께 공개합니다. 이전 요청은 유지되고 취소할 수 없습니다. 새 요청을 전부 반영한 "
             "누적 인원이 정확히 세 명이면 남은 한 명에게 전체 도전 기회를 주고, 네 명이면 도전 없이 바로 리셋합니다."
         )
-    match.event("rules", rules)
+    rules += (
+        SCORING_GOAL_HEADING
+        + "5점 이상을 먼저 달성해 1위를 차지하도록 적극적으로 득점 기회를 찾으세요. "
+        "동전 추가량과 전달 대상, 의심·리셋·전체 도전을 고를 때 현재 승점과 상대와의 격차, 성공 가능성, "
+        "성공 시 이익과 실패 시 손실을 함께 고려하세요. 의심은 성공 +1점·실패 -1점, 전체 도전은 성공 "
+        "+3점·실패 -2점입니다. 완전한 확신이 없어도 이익과 손실을 따져 유리한 기회는 활용하고, "
+        "불리한 경우에는 패스하세요. 기억에 대한 추정을 확인된 사실로 간주하지 마세요."
+    )
+    match.event("rules", recorded_rules if recorded_rules is not None else rules)
     distribute()
     if dynamic_memory:
         memory.reset(0)
@@ -336,11 +346,14 @@ def play(match: Match) -> dict:
     plans = dict.fromkeys(players, "전달과 공개 발언을 기억하고, 확신할 때만 의심하거나 전체 도전을 시도한다."
                           if discussion_enabled else
                           "전달·추가·개봉의 공개 사실을 기억하고, 확신할 때만 의심하거나 전체 도전을 시도한다.")
+    if recorded_rules is None or SCORING_GOAL_HEADING in recorded_rules:
+        plans = dict.fromkeys(players, "5점 선점을 위해 현재 승점과 기억을 바탕으로 성공 가능성·득점 이익·실패 손실을 "
+                              "비교하고 유리한 기회에 의심하거나 전체 도전한다.")
     for step in (1, 2):
         plans = match.decide_together("pig_preparation", {
             name: Decision(
                 f"돼지 저금통 비공개 전략 준비 {step}/2단계입니다. "
-                + ("의심·리셋·전체 도전의 이득과 위험을 정리하세요. " if step == 1 else
+                + ("의심·리셋·전체 도전으로 5점 이상을 먼저 달성할 계획을 세우고 성공 가능성과 실패 손실을 비교하세요. " if step == 1 else
                    "직전 계획의 취약점과 협력이 거절될 때의 대안을 검토해 수정하세요. " if discussion_enabled else
                    "직전 계획의 취약점과 기억이 불확실할 때의 대안을 검토해 수정하세요. ")
                 + f"내 이전 전략 요약: {plans[name]}\n"
@@ -378,7 +391,9 @@ def play(match: Match) -> dict:
         deposit = parse_deposit(match.decide(
             acting, "pig_deposit",
             f"{turn}턴. 아래칸 {lower[acting]}번에 동전을 추가하고 다른 참가자에게 전달하세요. {seating()}\n"
-            'JSON 예: {"black":2,"white":1,"to":"상대 ID"}. 합계 1~5개이며 추가 개수는 그대로 공개됩니다. '
+            'JSON 예: {"black":2,"white":1,"to":"상대 ID"}. 흑·백을 섞거나 한 색만 넣을 수 있습니다. '
+            '각 색은 0개 이상, 두 색 합계는 1~5개이며 이번 선언 색과 관계없이 두 색 모두 추가할 수 있습니다. '
+            '추가 개수는 그대로 공개됩니다. '
             f"받는 사람은 {'흑' if color == 'black' else '백'} 동전의 총개수를 선언합니다.",
             default, valid=lambda action: _accepts(parse_deposit, action, players, acting),
         ), players, acting)
