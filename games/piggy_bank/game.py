@@ -18,6 +18,7 @@ WIN_SCORE = 5
 OPENING_TURNS = 4
 NO_DISCUSSION_HEADING = "\n\n6. 대화 없는 진행\n"
 NO_RELATIONSHIP_HEADING = "\n\n7. 관계 평가 없음\n"
+SIMULTANEOUS_RESET_HEADING = "\n\n8. 리셋 동시 판단\n"
 COLORS = ("black", "white")
 PASS = '{"type":"pass"}'
 
@@ -71,6 +72,7 @@ def play(match: Match) -> dict:
     discussion_turns = 1 if recorded_rules is not None and "전원에게 한 턴씩" in recorded_rules else 2
     discussion_enabled = recorded_rules is not None and NO_DISCUSSION_HEADING not in recorded_rules
     match.relationship_reviews_enabled = recorded_rules is not None and NO_RELATIONSHIP_HEADING not in recorded_rules
+    simultaneous_reset = recorded_rules is None or SIMULTANEOUS_RESET_HEADING in recorded_rules
     dynamic_memory = recorded_rules is None or DYNAMIC_MEMORY_HEADING in recorded_rules
     free_memory = recorded_rules is not None and FREE_MEMORY_HEADING in recorded_rules
     limited_memory = dynamic_memory or free_memory or MEMORY_HEADING in recorded_rules
@@ -227,9 +229,13 @@ def play(match: Match) -> dict:
         "감점받은 참가자가 흑·백 하나씩 든 새 번호 저금통을 위칸에 받아 다음 동전 추가자가 됩니다. "
         "의심이 없으면 저금통을 받은 사람이 다음 추가자가 됩니다.\n\n"
         "3. 리셋과 전체 도전\n"
-        "누구나 리셋을 요청할 수 있고, 서로 다른 세 명이 요청하면 리셋합니다. 리셋 전 요청하지 않은 한 명은 "
-        "현재 다섯 저금통의 흑·백 개수를 모두 맞히는 도전을 하거나 패스할 수 있습니다. 모두 맞히면 3점, "
-        "하나라도 틀리면 -2점입니다. 리셋하면 저금통은 흑·백 하나씩 든 1~5번으로 교체하고 요청을 지웁니다. "
+        + ("아직 요청하지 않은 참가자 전원이 리셋 여부를 동시에 비공개로 결정합니다. 기존 요청은 유지되며 누적 "
+           "요청자가 세 명 이상이면 리셋합니다. 정확히 세 명일 때 요청하지 않은 한 명은 " if simultaneous_reset else
+           "누구나 리셋을 요청할 수 있고, 서로 다른 세 명이 요청하면 리셋합니다. 리셋 전 요청하지 않은 한 명은 ")
+        + "현재 다섯 저금통의 흑·백 개수를 모두 맞히는 도전을 하거나 패스할 수 있습니다. 모두 맞히면 3점, "
+        "하나라도 틀리면 -2점입니다. "
+        + ("네 명이 모두 요청하면 전체 도전 없이 바로 리셋합니다. " if simultaneous_reset else "")
+        + "리셋하면 저금통은 흑·백 하나씩 든 1~5번으로 교체하고 요청을 지웁니다. "
         "누적 승점과 다음 추가자는 유지됩니다.\n\n"
         "4. 종료와 보상\n"
         "누군가 5점 이상을 얻는 즉시 최종 승점을 비교합니다. 최하위 한 명이 탈락하고 1위는 피스 3개를 받습니다. "
@@ -240,8 +246,11 @@ def play(match: Match) -> dict:
            "대화 기회를 줍니다. " if discussion_enabled else
            "게임 전 비공개 전략 준비 두 단계가 있으며 참가자 간 대화 없이 진행합니다. ")
         + "20초 선언과 10초 의심은 각각 한 번의 응답으로 진행합니다. 의심은 동시에 제출하며 "
-        "여러 명이 선택하면 추첨 자리 순서로 한 명을 정합니다. 리셋은 매 전달 뒤 추첨 순서로 요청 기회를 주고 "
-        "세 번째 요청 즉시 처리합니다. 리셋 뒤에도 선언 색은 이어집니다. 최하위 동점은 추첨 순서가 뒤인 사람이 "
+        "여러 명이 선택하면 추첨 자리 순서로 한 명을 정합니다. "
+        + ("리셋은 매 전달 뒤 아직 요청하지 않은 참가자 전원의 판단을 동시에 받아 모두 제출한 뒤 처리합니다. "
+           if simultaneous_reset else
+           "리셋은 매 전달 뒤 추첨 순서로 요청 기회를 주고 세 번째 요청 즉시 처리합니다. ")
+        + "리셋 뒤에도 선언 색은 이어집니다. 최하위 동점은 추첨 순서가 뒤인 사람이 "
         "탈락합니다. "
         + ("참가자가 직접 고른 세 저금통의 기억만 다음 구간에 이어집니다." if dynamic_memory else
            "참가자가 직접 갱신한 비공개 기억 요약만 다음 구간에 이어집니다." if free_memory else
@@ -305,6 +314,14 @@ def play(match: Match) -> dict:
             NO_RELATIONSHIP_HEADING
             + "이번 경기 중과 경기 종료 시 친밀도·신뢰도를 새로 평가하는 모델 호출은 하지 않습니다. "
             "의심 판정과 리셋 처리 뒤에는 다음 게임 행동이나 기억 갱신으로 바로 넘어갑니다."
+        )
+    if simultaneous_reset:
+        rules += (
+            SIMULTANEOUS_RESET_HEADING
+            + "아직 리셋을 요청하지 않은 참가자 전원이 같은 시점의 요청자 목록을 보고 동시에 비공개로 reset 또는 "
+            "pass를 제출합니다. 이번 응답을 결정할 때 다른 참가자의 이번 응답을 볼 수 없으며 모두의 제출이 "
+            "끝나면 새 요청을 함께 공개합니다. 이전 요청은 유지되고 취소할 수 없습니다. 새 요청을 전부 반영한 "
+            "누적 인원이 정확히 세 명이면 남은 한 명에게 전체 도전 기회를 주고, 네 명이면 도전 없이 바로 리셋합니다."
         )
     match.event("rules", rules)
     distribute()
@@ -432,20 +449,41 @@ def play(match: Match) -> dict:
         if max(scores.values()) >= WIN_SCORE:
             break
 
-        for name in order:
-            if name in voters:
-                continue
-            request = match.decide(
-                name, "pig_reset_vote",
-                f"{turn}턴 전달과 의심이 끝났습니다. 현재 리셋 요청자 {encode(voters)}. {seating()}\n"
-                "리셋을 요청하려면 reset, 아니면 pass입니다. 요청은 취소할 수 없으며 세 명이면 리셋합니다. "
-                "나머지 한 명은 그 전에 전체 동전 수 맞추기에 도전할 수 있습니다.",
-                "reset" if match.policy.randrange(8) == 0 else "pass", options=("reset", "pass"), private=False,
-            )
-            if request != "reset":
-                continue
-            voters.append(name)
-            match.event("pig_reset_vote", {"turn": turn, "player": name, "voters": voters.copy()})
+        if simultaneous_reset:
+            responses = match.decide_together("pig_reset_vote", {
+                name: Decision(
+                    f"{turn}턴 전달과 의심이 끝났습니다. 현재 리셋 요청자 {encode(voters)}. {seating()}\n"
+                    "아직 요청하지 않은 참가자 전원이 동시에 비공개로 판단합니다. 이번 다른 참가자의 응답을 "
+                    "볼 수 없으며 모두 제출한 뒤 새 요청을 함께 공개합니다. 리셋을 요청하려면 reset, 아니면 "
+                    "pass입니다. 이전 요청은 유지되고 취소할 수 없습니다. 새 요청까지 전부 반영한 누적 인원이 "
+                    "세 명 이상이면 리셋하며, 정확히 세 명이면 남은 한 명만 전체 도전을 선택할 수 있습니다. "
+                    "네 명 모두 요청하면 전체 도전 없이 바로 리셋합니다.",
+                    "reset" if match.policy.randrange(8) == 0 else "pass", options=("reset", "pass"),
+                ) for name in order if name not in voters
+            })
+            new_voters = [name for name in order if responses.get(name) == "reset"]
+            voters.extend(new_voters)
+            for name in new_voters:
+                match.event("pig_reset_vote", {"turn": turn, "player": name, "voters": voters.copy(),
+                                              "simultaneous": True})
+        else:
+            for name in order:
+                if name in voters:
+                    continue
+                request = match.decide(
+                    name, "pig_reset_vote",
+                    f"{turn}턴 전달과 의심이 끝났습니다. 현재 리셋 요청자 {encode(voters)}. {seating()}\n"
+                    "리셋을 요청하려면 reset, 아니면 pass입니다. 요청은 취소할 수 없으며 세 명이면 리셋합니다. "
+                    "나머지 한 명은 그 전에 전체 동전 수 맞추기에 도전할 수 있습니다.",
+                    "reset" if match.policy.randrange(8) == 0 else "pass", options=("reset", "pass"), private=False,
+                )
+                if request != "reset":
+                    continue
+                voters.append(name)
+                match.event("pig_reset_vote", {"turn": turn, "player": name, "voters": voters.copy()})
+                if len(voters) == 3:
+                    break
+        if len(voters) >= 3:
             if len(voters) == 3:
                 challenger = next(name for name in order if name not in voters)
                 guess = parse_challenge(match.decide(
@@ -471,22 +509,21 @@ def play(match: Match) -> dict:
                     match.review_relationships(f"돼지 저금통 {turn}턴 전체 도전 결과")
                 if max(scores.values()) >= WIN_SCORE:
                     break
-                resets += 1
-                if free_memory:
-                    memory.reset(resets)
-                distribute()
-                if dynamic_memory:
-                    memory.reset(resets, turn)
-                next_bank = 6
-                voters.clear()
-                match.event("pig_reset", {"turn": turn, "reset": resets, "order": order, "scores": scores.copy(),
-                                          "next_player": acting, **locations()})
-                contents()
-                if dynamic_memory:
-                    remember()
-                select_memory()
-                match.review_relationships(f"돼지 저금통 {turn}턴 리셋 완료")
-                break
+            resets += 1
+            if free_memory:
+                memory.reset(resets)
+            distribute()
+            if dynamic_memory:
+                memory.reset(resets, turn)
+            next_bank = 6
+            voters.clear()
+            match.event("pig_reset", {"turn": turn, "reset": resets, "order": order, "scores": scores.copy(),
+                                      "next_player": acting, **locations()})
+            contents()
+            if dynamic_memory:
+                remember()
+            select_memory()
+            match.review_relationships(f"돼지 저금통 {turn}턴 리셋 완료")
         if max(scores.values()) < WIN_SCORE:
             update_memory()
 

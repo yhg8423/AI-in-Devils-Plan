@@ -33,7 +33,11 @@ export function rulesSummary(heading, body) {
         " Each player maintains a private summary of at most 300 characters, choosing which facts, doubts, or plans to retain. There are no fixed banks or slots. The summary is rewritten after opening discussions and completed turns; it can omit facts, contain mistakes, or be cleared. Resets retain the previous summary until the player rewrites it. The engine supplies no hidden totals, automatic correction, or earlier transcript beyond the retained summary." : body.includes("\n\n6. 기억 직접 갱신\n") ?
         " Each player maintains their own black and white estimates for three chosen banks, updating those memories after each deposit. Estimates can be wrong, and uncertain counts may be left unknown; the engine never corrects them with hidden totals. Players choose banks at the start and after each reset, keeping those slots until the next reset. A retired selected bank is replaced by the fresh bank with one coin of each color. Earlier bank-count records are unavailable outside these memories." : body.includes("\n\n5. 기억 슬롯\n") ?
         " The simulation privately retains exact black and white counts for three chosen banks. Players choose at the start and after each reset; slots stay fixed between resets and follow fresh replacements, which start with one coin of each color. Earlier bank-count records are unavailable outside these slots." : "";
-    const summary = summaries.find(([prefix]) => prefix === "돼지 저금통")[1];
+    let summary = summaries.find(([prefix]) => prefix === "돼지 저금통")[1];
+    if (body.includes("\n\n8. 리셋 동시 판단\n")) summary = summary.replace(
+      "Three reset requests trigger a reset. Before it, the remaining player may recall both colors in all five banks for +3 points or −2 on failure.",
+      "A reset occurs when at least three players have requested it. Players who have not already requested one decide simultaneously in private, and all responses are collected before any new requests are announced. At exactly three cumulative requests, the sole non-requester may recall both colors in all five banks for +3 points or −2 on failure. If all four request a reset, reset directly without a challenge.",
+    );
     const relationships = body.includes("\n\n7. 관계 평가 없음\n") ?
       " Relationship assessments are disabled during and at the end of this match." : "";
     return (silent ? summary.replace("discussion and decision windows replace the timers", "decision windows replace the timers") : summary) +

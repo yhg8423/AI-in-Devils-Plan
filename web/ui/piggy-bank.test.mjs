@@ -470,6 +470,37 @@ for (const language of ["ko", "en"]) {
     if (language === "en") assert(old.includes("four opening discussion turns"));
   });
 
+  test(`${language}: simultaneous reset choices stay private until the final voter list is published and four requests display clearly`, () => {
+    const previousRules = "돼지 저금통 · 참가자 4명\n\n5. 변경 가능한 기억 슬롯\n저금통 3개를 기억합니다.\n\n6. 대화 없는 진행\n대화를 생략합니다.\n\n7. 관계 평가 없음\n관계 평가를 생략합니다.";
+    const rules = previousRules + "\n\n8. 리셋 동시 판단\n아직 누르지 않은 전원이 동시에 판단하며 4명이면 도전 없이 리셋합니다.";
+    const setup = event("pig_setup", {order: players, lower, upper, scores});
+    const pending = [event("rules", rules), setup, ...players.map((player) =>
+      event("action", {phase: "pig_reset_vote", action: "reset"}, [player], player))];
+    const vote = event("pig_reset_vote", {turn: 1, player: "P01", voters: players, simultaneous: true});
+    for (const view of views) {
+      const before = replay(pending, view);
+      assert.equal([...arena(before).matchAll(/data-voted="true"/g)].length, 0, "Private submissions must not light any public reset buttons");
+      assert(!before.includes(language === "en" ? "Simultaneous submission" : "동시 제출"));
+      const html = replay([...pending, vote], view);
+      assert.equal([...arena(html).matchAll(/data-voted="true"/g)].length, 4, "The final public list marks all four requesters");
+      assert(html.includes(language === "en" ? "Simultaneous submission" : "동시 제출"));
+      const tag = openingTag(html, "pig-reset-status");
+      const start = html.indexOf(tag);
+      const status = html.slice(start, html.indexOf("</p>", start));
+      assert(status.includes(language === "en" ? "4 requests · 3 required" : "4명 요청 · 기준 3명"));
+      assert(players.every((player) => status.includes(player)), "The current status lists every requester");
+      assert(!status.includes("4 / 3"));
+      if (language === "en") assert(html.includes("If all four request a reset, reset directly without a challenge."));
+    }
+    const old = replay([event("rules", previousRules), setup,
+      event("pig_reset_vote", {turn: 1, player: "P03", voters: players.slice(0, 3)})], "public");
+    assert(old.includes("3 / 3"));
+    assert(!old.includes(language === "en" ? "Simultaneous submission" : "동시 제출"));
+    if (language === "en") assert(old.includes("Before it, the remaining player may recall both colors"), "Saved sequential rules keep their original translation");
+    const reset = event("pig_reset", {reset: 1, order: players, lower, upper, scores, next_player: "P01"});
+    assert.equal([...arena(replay([...pending, vote, reset], "public")).matchAll(/data-voted="true"/g)].length, 0);
+  });
+
   test(`${language}: free memory survives reset until rewritten and supports forgetting, clearing, and rewind`, () => {
     const {steps, recall} = freeMemorySequence();
     const reset = event("pig_reset", {reset: 1, order: players, lower, upper, scores, next_player: "P01"});

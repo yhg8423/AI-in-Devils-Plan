@@ -5,13 +5,18 @@ from dataclasses import replace
 from io import StringIO
 import json
 from pathlib import Path
+import re
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
 from ..match import DAY_THREE_PRISON, Match, run_cli
-from .game import NO_DISCUSSION_HEADING, NO_RELATIONSHIP_HEADING, parse_challenge, parse_deposit, play
+from ..models import CodexLanguageModel
+from .game import (
+    NO_DISCUSSION_HEADING, NO_RELATIONSHIP_HEADING, SIMULTANEOUS_RESET_HEADING,
+    parse_challenge, parse_deposit, play,
+)
 from .memory import DYNAMIC_MEMORY_HEADING, FREE_MEMORY_HEADING, MEMORY_HEADING, MEMORY_SUMMARY_LIMIT
 
 
@@ -131,6 +136,11 @@ class PiggyBankTest(unittest.TestCase):
         self.assertCountEqual(result["ranking"], PLAYERS)
         self.assertEqual([scores[name] for name in result["ranking"]], sorted(scores.values(), reverse=True))
         self.assertEqual(result["eliminated"], result["ranking"][-1:])
+        terminal = next(index for index, event in enumerate(match.events)
+                        if event.msg_type in {"pig_doubt", "pig_challenge"}
+                        and max(json.loads(event.content)["scores"].values()) >= 5)
+        self.assertFalse(any(event.msg_type == "action" for event in match.events[terminal + 1:]),
+                         "A winning verdict skips reset voting and further memory-update actions")
         winners = [name for name in PLAYERS if scores[name] == max(scores.values())]
         for name in PLAYERS:
             reward = 3 // len(winners) if name in winners else 0
@@ -148,8 +158,6 @@ class PiggyBankTest(unittest.TestCase):
                                           "to": next(player for player in PLAYERS if player != name)})
                 elif phase == "pig_count":
                     default = "0" if wrong else "1"
-                elif phase == "pig_reset_vote":
-                    default = "pass"
                 return super().decide(name, phase, prompt, default, **kwargs)
 
             def decide_together(self, phase, decisions, **kwargs):
@@ -157,6 +165,8 @@ class PiggyBankTest(unittest.TestCase):
                     first = next(iter(decisions))
                     decisions = {name: replace(decision, default="doubt" if doubt and name == first else "pass")
                                  for name, decision in decisions.items()}
+                elif phase == "pig_reset_vote":
+                    decisions = {name: replace(decision, default="pass") for name, decision in decisions.items()}
                 return super().decide_together(phase, decisions, **kwargs)
 
             def event(self, kind, data, **kwargs):
@@ -210,14 +220,18 @@ class PiggyBankTest(unittest.TestCase):
                     raise ResetComplete
 
             def decide(self, name, phase, prompt, default, **kwargs):
-                if phase == "pig_reset_vote":
-                    default = "reset"
-                elif phase == "pig_challenge":
+                if phase == "pig_challenge":
                     guesses = json.loads(json.dumps(self.banks))
                     if not correct:
                         guesses[next(iter(guesses))]["black"] += 1
                     default = json.dumps(guesses)
                 return super().decide(name, phase, prompt, default, **kwargs)
+
+            def decide_together(self, phase, decisions, **kwargs):
+                if phase == "pig_reset_vote":
+                    decisions = {name: replace(decision, default="pass" if name == "P01" else "reset")
+                                 for name, decision in decisions.items()}
+                return super().decide_together(phase, decisions, **kwargs)
 
         for correct in (True, False):
             with self.subTest(correct=correct):
@@ -250,15 +264,16 @@ class PiggyBankTest(unittest.TestCase):
                     self.banks = json.loads(json.dumps(data["banks"]))
 
             def decide(self, name, phase, prompt, default, **kwargs):
-                if phase == "pig_reset_vote":
-                    default = "pass" if name == "P01" else "reset"
-                elif phase == "pig_challenge":
+                if phase == "pig_challenge":
                     default = json.dumps(self.banks)
                 return super().decide(name, phase, prompt, default, **kwargs)
 
             def decide_together(self, phase, decisions, **kwargs):
                 if phase == "pig_doubt":
                     decisions = {name: replace(decision, default="pass") for name, decision in decisions.items()}
+                elif phase == "pig_reset_vote":
+                    decisions = {name: replace(decision, default="pass" if name == "P01" else "reset")
+                                 for name, decision in decisions.items()}
                 return super().decide_together(phase, decisions, **kwargs)
 
         match = ChallengeMatch(PLAYERS, 23)
@@ -271,6 +286,80 @@ class PiggyBankTest(unittest.TestCase):
         self.assertEqual(result["pieces_awarded"]["P01"], 3)
         order = next(json.loads(event.content)["order"] for event in match.events if event.msg_type == "pig_setup")
         self.assertEqual(result["eliminated"], [next(player for player in reversed(order) if player != "P01")])
+
+    def test_simultaneous_reset_queries_share_prior_votes_and_publish_all_current_requests(self):
+        class TurnsComplete(Exception):
+            pass
+
+        class ResetMatch(Match):
+            current_turn = 0
+
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "pig_turn":
+                    self.current_turn = data["turn"]
+                    if self.current_turn > len(requests):
+                        raise TurnsComplete
+
+        scenarios = ((set(),), ({"P01"}, {"P02", "P03"}),
+                     ({"P01", "P02"}, {"P03", "P04"}), (set(PLAYERS),))
+        for requests in scenarios:
+            with self.subTest(requests=requests), TemporaryDirectory() as directory:
+                models = {name: CodexLanguageModel("test-model", Path(directory)) for name in PLAYERS}
+                owners = {id(model): name for name, model in models.items()}
+                match = ResetMatch(PLAYERS, 23, models=models, live_turns=500, allow_review=False)
+                queries = []
+
+                def reply(model, prompt):
+                    name = owners[id(model)]
+                    if "현재 리셋 요청자 " in prompt:
+                        queries.append((match.current_turn, name, prompt))
+                        action = "reset" if name in requests[match.current_turn - 1] else "pass"
+                    elif "다음 구간에 남길 기억 세 개를 갱신하세요" in prompt:
+                        current = json.loads(prompt.rsplit("현재 저금통 번호: ", 1)[1].split(". 기존 기억:", 1)[0])
+                        action = json.dumps({str(bank): {"black": 77, "white": None} for bank in current[::2]})
+                    else:
+                        action = "pass"
+                    return json.dumps({"action": action, "note": ""})
+
+                with patch("games.models.CodexLanguageModel._complete", autospec=True, side_effect=reply):
+                    with self.assertRaises(TurnsComplete):
+                        play(match)
+
+                order = next(json.loads(event.content)["order"] for event in match.events if event.msg_type == "pig_setup")
+                prior = []
+                for turn, current_requests in enumerate(requests, 1):
+                    inputs = [(name, prompt) for number, name, prompt in queries if number == turn]
+                    eligible = set(PLAYERS) - set(prior)
+                    self.assertCountEqual([name for name, _ in inputs], eligible)
+                    for _, prompt in inputs:
+                        shown = json.loads(prompt.rsplit("현재 리셋 요청자 ", 1)[1].split(".", 1)[0])
+                        self.assertEqual(shown, prior, "A player must not see another current ballot before submitting")
+                        self.assertEqual([json.loads(value) for value in re.findall(r'"voters":(\[[^\]]*\])', prompt)], [prior])
+                    start = next(index for index, event in enumerate(match.events)
+                                 if event.msg_type == "pig_turn" and json.loads(event.content)["turn"] == turn)
+                    end = next(index for index, event in enumerate(match.events)
+                               if event.msg_type == "pig_turn" and json.loads(event.content)["turn"] == turn + 1)
+                    records = list(enumerate(match.events[start:end], start))
+                    ballots = [(index, event) for index, event in records if event.msg_type == "action"
+                               and json.loads(event.content)["phase"] == "pig_reset_vote"]
+                    self.assertCountEqual([event.agent_name for _, event in ballots], eligible)
+                    self.assertTrue(all(event.visible_to == [event.agent_name] for _, event in ballots))
+                    claim = next(json.loads(event.content) for _, event in records if event.msg_type == "pig_claim")
+                    if turn == 1:
+                        self.assertIn(claim["player"], eligible, "The recipient also participates in the reset batch")
+                    final = prior + [name for name in order if name in current_requests and name not in prior]
+                    public = [(index, json.loads(event.content)) for index, event in records if event.msg_type == "pig_reset_vote"]
+                    self.assertCountEqual([data["player"] for _, data in public], current_requests)
+                    for index, data in public:
+                        self.assertGreater(index, max(index for index, _ in ballots), "All answers must be recorded before any reset request is public")
+                        self.assertTrue(data["simultaneous"])
+                        self.assertEqual(data["voters"], final)
+                    challenges = [event.agent_name for _, event in records if event.msg_type == "action"
+                                  and json.loads(event.content)["phase"] == "pig_challenge"]
+                    self.assertEqual(challenges, [next(name for name in order if name not in final)] if len(final) == 3 else [])
+                    self.assertEqual(sum(event.msg_type == "pig_reset" for _, event in records), int(len(final) >= 3))
+                    prior = [] if len(final) >= 3 else final
 
     def test_saved_dynamic_game_keeps_four_opening_and_two_pre_deposit_discussions(self):
         match = Match(PLAYERS, 23)
@@ -343,6 +432,7 @@ class PiggyBankTest(unittest.TestCase):
         rules = next(event.content for event in match.events if event.msg_type == "rules")
         self.assertIn(NO_DISCUSSION_HEADING, rules)
         self.assertIn(NO_RELATIONSHIP_HEADING, rules)
+        self.assertIn(SIMULTANEOUS_RESET_HEADING, rules)
         phases = [json.loads(event.content)["phase"] for event in match.events if event.msg_type == "action"]
         self.assertNotIn("pig_talk", phases)
         self.assertFalse(any(event.msg_type == "invalid_action" and json.loads(event.content)["phase"] == "relationship_review"
@@ -525,10 +615,12 @@ class PiggyBankTest(unittest.TestCase):
             if kind == "pig_deposit":
                 raise RuntimeError("test interruption after legacy discussion")
 
-        for old_turns, mode in ((1, "none"), (2, "none"), (2, "exact"), (2, "summary"), (2, "dynamic"), (2, "silent")):
+        for old_turns, mode in ((1, "none"), (2, "none"), (2, "exact"), (2, "summary"),
+                                (2, "dynamic"), (2, "silent"), (2, "silent_noeval")):
             old_rules = f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩" + {
                 "none": "", "exact": MEMORY_HEADING, "summary": FREE_MEMORY_HEADING,
                 "dynamic": DYNAMIC_MEMORY_HEADING, "silent": DYNAMIC_MEMORY_HEADING + NO_DISCUSSION_HEADING,
+                "silent_noeval": DYNAMIC_MEMORY_HEADING + NO_DISCUSSION_HEADING + NO_RELATIONSHIP_HEADING,
             }[mode]
             with (
                 self.subTest(turns=old_turns, mode=mode),
@@ -553,27 +645,32 @@ class PiggyBankTest(unittest.TestCase):
                 expected_keys = [json.loads(line)["key"] for line in full.with_suffix(".decisions.jsonl").read_text().splitlines()]
                 actual_keys = [json.loads(line)["key"] for line in resumed.with_suffix(".decisions.jsonl").read_text().splitlines()]
                 self.assertEqual(actual_keys, expected_keys)
-                self.assertTrue(any(key[0] == "relationships" for key in expected_keys), "Saved games must keep relationship assessments")
+                self.assertEqual(any(key[0] == "relationships" for key in expected_keys), mode != "silent_noeval",
+                                 "Saved games must keep their recorded relationship assessment setting")
                 self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
                 self.assertEqual(completion.call_count - calls_before,
                                  expected[-1]["model_calls"] - prefix[-1]["model_calls"])
                 rules = next(row["content"] for row in actual if row.get("msg_type") == "rules")
-                if mode != "silent":
+                if mode not in {"silent", "silent_noeval"}:
                     self.assertIn(f"추가 행동 전에는 전원에게 {'한' if old_turns == 1 else '두'} 턴씩", rules)
                 self.assertEqual(MEMORY_HEADING in rules, mode == "exact")
                 windows = [json.loads(row["content"]) for row in actual if row.get("msg_type") == "pig_discussion"]
-                if mode == "silent":
+                if mode in {"silent", "silent_noeval"}:
                     self.assertFalse(windows)
                 else:
                     self.assertEqual(windows[0]["turns"], 4)
                     self.assertTrue(all(window["turns"] == old_turns for window in windows[1:]))
                 self.assertEqual(FREE_MEMORY_HEADING in rules, mode == "summary")
-                self.assertEqual(DYNAMIC_MEMORY_HEADING in rules, mode in {"dynamic", "silent"})
-                self.assertEqual(NO_DISCUSSION_HEADING in rules, mode == "silent")
-                self.assertNotIn(NO_RELATIONSHIP_HEADING, rules)
+                self.assertEqual(DYNAMIC_MEMORY_HEADING in rules, mode in {"dynamic", "silent", "silent_noeval"})
+                self.assertEqual(NO_DISCUSSION_HEADING in rules, mode in {"silent", "silent_noeval"})
+                self.assertEqual(NO_RELATIONSHIP_HEADING in rules, mode == "silent_noeval")
+                self.assertNotIn(SIMULTANEOUS_RESET_HEADING, rules)
+                self.assertTrue(all("simultaneous" not in json.loads(row["content"]) for row in actual
+                                    if row.get("msg_type") == "pig_reset_vote"))
                 self.assertEqual(any(row.get("msg_type") == "pig_memory_selection" for row in actual), mode == "exact")
                 self.assertEqual(any(row.get("msg_type") == "action" and
-                                     json.loads(row["content"])["phase"] == "pig_memory_update" for row in actual), mode in {"summary", "dynamic", "silent"})
+                                     json.loads(row["content"])["phase"] == "pig_memory_update" for row in actual),
+                                 mode in {"summary", "dynamic", "silent", "silent_noeval"})
                 for row in actual:
                     if row.get("msg_type") == "pig_recall":
                         self.assertEqual(set(json.loads(row["content"])), {"reset", "banks"} if mode == "exact" else
@@ -607,7 +704,8 @@ class PiggyBankTest(unittest.TestCase):
             self.assertEqual(set(retained), {"1", "3", "5"})
             self.assertTrue(all(counts == {"black": 77, "white": None} for counts in retained.values()))
             for checkpoint in ("pig_memory_update_initial", "pig_recall_update", "pig_deposit", "pig_doubt",
-                               "pig_memory_update_later", "pig_reset", "pig_memory_update_after_reset"):
+                               "pig_reset_ballot", "pig_reset_all_ballots", "pig_reset_vote", "pig_memory_update_later",
+                               "pig_reset", "pig_memory_update_after_reset"):
                 with self.subTest(checkpoint=checkpoint):
                     resumed = Path(directory) / f"resumed-{checkpoint}.jsonl"
 
@@ -624,6 +722,11 @@ class PiggyBankTest(unittest.TestCase):
                         elif checkpoint == "pig_recall_update":
                             reached = kind == "pig_recall" and any(event.msg_type == "action" and
                                       json.loads(event.content)["phase"] == "pig_memory_update" for event in match.events)
+                        elif checkpoint in {"pig_reset_ballot", "pig_reset_all_ballots"}:
+                            reached = kind == "action" and data["phase"] == "pig_reset_vote"
+                            if checkpoint.endswith("all_ballots"):
+                                reached = reached and sum(event.msg_type == "action" and
+                                          json.loads(event.content)["phase"] == "pig_reset_vote" for event in match.events) == len(PLAYERS)
                         else:
                             reached = kind == checkpoint
                         if reached:

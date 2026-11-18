@@ -83,7 +83,12 @@ export function pigEventText(type, data) {
     case "pig_pass": return tr(`${data.player}의 선언 통과 · 의심 없음`, `${data.player}’s claim passes without doubt`);
     case "pig_doubt": return tr(`${data.challenger} 의심 ${data.correct ? "성공" : "실패"} · ${bankLabel(data.bank)} 실제 ${coinText(data.actual)}`, `${data.challenger}’s doubt ${data.correct ? "succeeds" : "fails"} · ${bankLabel(data.bank)} revealed: ${coinText(data.actual)}`);
     case "pig_replace": return tr(`${data.player} · ${bankLabel(data.old_bank)} 제외 → 새 ${bankLabel(data.bank)}`, `${data.player} · Retire ${bankLabel(data.old_bank)} → New bank ${bankLabel(data.bank)}`);
-    case "pig_reset_vote": return tr(`${data.player} 리셋 요청 · ${data.voters.length} / 3명`, `${data.player} requests reset · ${data.voters.length} of 3`);
+    case "pig_reset_vote": {
+      const prefix = data.simultaneous ? tr("동시 제출 · ", "Simultaneous submission · ") : "";
+      return prefix + (data.voters.length > 3 ?
+        tr(`${data.player} 리셋 요청 · ${data.voters.length}명 요청 · 기준 3명`, `${data.player} requests reset · ${data.voters.length} requests · 3 required`) :
+        tr(`${data.player} 리셋 요청 · ${data.voters.length} / 3명`, `${data.player} requests reset · ${data.voters.length} of 3`));
+    }
     case "pig_challenge": return tr(`${data.player} 전체 암기 ${data.correct ? "성공 · +3점" : "실패 · −2점"}`, `${data.player}’s full-memory challenge ${data.correct ? "succeeds · +3 VP" : "fails · −2 VP"}`);
     case "pig_reset": return tr("전체 저금통 리셋 · 승점 유지", "All banks reset · Scores retained");
     case "pig_contents": return tr("운영자 전용 · 저금통 내부", "Operator only · Bank contents");
@@ -430,7 +435,8 @@ export function PiggyStage({state, players, selected, onChoose}) {
         <span className="pig-score-track" aria-hidden="true">{Array.from({length: 5}, (_, index) => <i key={index} data-earned={index < (scores[player] ?? 0) || undefined} />)}</span>
       </button>)}</div>
     <p className="muted">{tr("누군가 5점을 얻으면 종료 · 최하위 1명 탈락", "Ends when anyone reaches 5 VP · One last-place player is eliminated")}</p>
-    <p className="pig-reset-status">{tr("리셋 요청", "Reset requests")} <strong>{state.pigVoters?.length ?? 0} / 3</strong>
+    <p className="pig-reset-status">{tr("리셋 요청", "Reset requests")} <strong>{state.pigVoters?.length > 3 ?
+      tr(`${state.pigVoters.length}명 요청 · 기준 3명`, `${state.pigVoters.length} requests · 3 required`) : `${state.pigVoters?.length ?? 0} / 3`}</strong>
       {state.pigVoters?.length > 0 && <span>{state.pigVoters.join(" · ")}</span>}</p>
     {rules && <details className="stage-details"><summary>{tr("게임 규칙", "Game rules")}</summary><p className="choice-rules">{explanation}</p></details>}
   </div>;
