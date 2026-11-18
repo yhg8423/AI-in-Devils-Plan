@@ -276,6 +276,7 @@ def play(match: Match) -> dict:
         request = discussion.request(
             name, turn, topic +
             f"공개 누적 승점 {encode(scores)}. 내 피스 {pieces[name]}. "
+            "카드 정보나 교환 제안을 비공개로 조율할 상대가 있다면 논의실이나 귓속말을 쓰세요. "
             '전체 발언은 {"type":"speak","channel":"public","text":"발언"}, '
             '귓속말은 {"type":"speak","channel":"whisper","to":"같은 장소의 상대 ID","text":"발언"}, '
             '논의실 이동은 {"type":"move","room":1}, '
