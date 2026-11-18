@@ -1,4 +1,4 @@
-import React, {useLayoutEffect, useRef, useState} from "react";
+import React, {useId, useLayoutEffect, useRef, useState} from "react";
 import {Selector} from "@astryxdesign/core/Selector";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {setHeight, setWidth} from "./floor.js";
@@ -56,7 +56,12 @@ export function pigEventText(type, data) {
   }
 }
 
-export function applyPigEvent(state, type, data) {
+export function applyPigEvent(state, type, data, event = {}) {
+  if (type === "action" && data.phase === "pig_doubt" && data.action === "doubt" &&
+      state.pigClaim && !state.pigDoubtCue) {
+    const {player, bank, color, count} = state.pigClaim;
+    state.pigDoubtCue = {challenger: event.agent_name, player, bank, color, claimed: count, step: event.step};
+  }
   if (!type.startsWith("pig_")) return;
   if (data.scores) state.pigScores = {...data.scores};
   if (data.lower) state.pigLower = {...data.lower};
@@ -69,6 +74,8 @@ export function applyPigEvent(state, type, data) {
       state.pigVoters = [];
       state.pigTurn = null;
       state.pigClaim = null;
+      state.pigVerdict = null;
+      state.pigDoubtCue = null;
       state.pigDeposit = null;
       state.pigContents = {};
       state.pigActive = data.next_player ?? Object.keys(data.upper).find((player) => data.upper[player] != null);
@@ -76,11 +83,18 @@ export function applyPigEvent(state, type, data) {
         .filter((bank) => bank != null).map((bank) => [bank, {black: 1, white: 1}]));
       break;
     }
-    case "pig_turn": state.pigTurn = data; state.pigActive = data.player; state.pigClaim = null; state.pigVerdict = null; break;
+    case "pig_turn":
+      state.pigTurn = data;
+      state.pigActive = data.player;
+      state.pigClaim = null;
+      state.pigVerdict = null;
+      state.pigDoubtCue = null;
+      break;
     case "pig_deposit":
       state.pigDeposit = data;
       state.pigActive = data.to;
       state.pigClaim = null;
+      state.pigDoubtCue = null;
       delete state.pigKnown?.[data.bank];
       delete state.pigContents?.[data.bank];
       break;
@@ -89,6 +103,7 @@ export function applyPigEvent(state, type, data) {
       state.pigKnown ??= {};
       state.pigKnown[data.bank] = data.actual;
       state.pigVerdict = {type, data};
+      state.pigDoubtCue = {...data, step: event.step};
       break;
     case "pig_replace":
       delete state.pigKnown?.[data.old_bank];
@@ -104,14 +119,33 @@ export function applyPigEvent(state, type, data) {
   if (type !== "pig_contents") state.pigLast = {type, data};
 }
 
-function PigIcon({bank, coins, compact = false}) {
-  return <span className={`pig-icon${compact ? " compact" : ""}`} role="img" aria-label={`${bankLabel(bank)} · ${bank == null ? tr("빈칸", "Empty") : coinText(coins)}`}>
-    <svg viewBox="0 0 32 24" aria-hidden="true" shapeRendering="crispEdges" data-empty={bank == null || undefined}>
+function PigShell() {
+  return <>
       <path fill="#55353c" d="M6 4h3V1h5v3h9v3h4v4h4v7h-5v3h-4v3h-5v-3h-6v3H6v-5H3v-3H0V9h3V6h3z" />
       <path fill="#d48c95" d="M6 6h5V3h2v3h10v3h3v4h3v3h-5v3H7v-3H4V9h2z" />
       <path fill="#efb3ab" d="M8 7h13v3H7v4H5v-4h3zM25 13h4v3h-4z" />
       <path fill="#a35f74" d="M8 17h15v2H8zM7 20h3v2H7zM19 20h3v2h-3z" />
       <path fill="#241e2c" d="M21 9h2v2h-2zM12 5h7v2h-7zM27 13h1v1h-1z" />
+  </>;
+}
+
+function PigIcon({bank, coins, compact = false, opened = false}) {
+  const clip = useId();
+  return <span className={`pig-icon${compact ? " compact" : ""}${opened ? " opened" : ""}`} role="img"
+    aria-label={`${bankLabel(bank)} · ${opened ? tr("개봉 · ", "Opened · ") : ""}${bank == null ? tr("빈칸", "Empty") : coinText(coins)}`}>
+    <svg viewBox="-4 -3 40 29" aria-hidden="true" shapeRendering="crispEdges" data-empty={bank == null || undefined}>
+      {opened ? <>
+        <defs>
+          <clipPath id={`${clip}-left`}><path d="M0 0H16V7L13 10L17 13L13 16L15 24H0z" /></clipPath>
+          <clipPath id={`${clip}-right`}><path d="M16 0H32V24H15L13 16L17 13L13 10L16 7z" /></clipPath>
+        </defs>
+        <g className="pig-shell-left" clipPath={`url(#${clip}-left)`}><PigShell /></g>
+        <g className="pig-shell-right" clipPath={`url(#${clip}-right)`}><PigShell /></g>
+        <g className="pig-spilled-coins">
+          <path fill="#101721" stroke="#a8b6c0" strokeWidth=".5" d="M11 10h5v3h-5zM12 15h5v3h-5z" />
+          <path fill="#e8e8da" stroke="#c7c8b9" strokeWidth=".5" d="M17 9h5v3h-5zM17 14h5v3h-5z" />
+        </g>
+      </> : <PigShell />}
     </svg>
     <strong>{bank == null ? "–" : bankLabel(bank)}</strong>
   </span>;
@@ -127,6 +161,7 @@ export function PiggyScene({players, state, frame, selected, onChoose}) {
   useLayoutEffect(() => drawPiggySet(canvas.current), []);
   const order = state.pigOrder ?? players;
   const active = state.pigActive;
+  const cue = state.pigDoubtCue;
   const deposit = state.pigDeposit;
   const from = deposit && order.indexOf(deposit.player);
   const to = deposit && order.indexOf(deposit.to);
@@ -141,16 +176,36 @@ export function PiggyScene({players, state, frame, selected, onChoose}) {
           <path d={`M${piggySeats[from]} 290V309H${piggySeats[to]}V290`} markerEnd="url(#pig-pass-arrow)" />
         </svg>}
         {order.map((player, index) => <React.Fragment key={player}>
+          {cue?.challenger === player && <div className="pig-doubt-bubble" style={position(piggySeats[index], 83)}
+            data-player={player} data-correct={cue.correct} key={`${player}-doubt-${cue.step}`} role="status">
+            <strong>{tr("의심!", "Doubt!")}</strong>
+            {cue.correct != null && <span className="pig-doubt-badge" data-correct={cue.correct}>
+              {cue.correct ? tr("성공 +1", "SUCCESS +1") : tr("실패 −1", "FAIL −1")}</span>}
+          </div>}
           <button type="button" className={`token pig-seat${active === player ? " acting" : ""}`} style={position(piggySeats[index], 134)}
             aria-label={tr(`${player} · 승점 ${state.pigScores?.[player] ?? 0}`, `${player} · ${state.pigScores?.[player] ?? 0} VP`)} aria-pressed={selected === player}
+            data-doubt-caller={cue?.challenger === player || undefined}
             data-status={state.result?.eliminated.includes(player) ? "탈락" : undefined} data-speaking={speech?.agent_name === player || undefined}
             onClick={() => onChoose(player)}><Sprite player={player} /><span>{player} · {state.pigScores?.[player] ?? 0}</span></button>
           <div className="pig-station" style={position(piggySeats[index], 153)} data-active={active === player || undefined}>
             {["upper", "lower"].map((tier) => {
               const bank = (tier === "upper" ? state.pigUpper : state.pigLower)?.[player];
-              return <div className="pig-tier" key={tier} aria-label={`${player} · ${tier === "upper" ? tr("위칸", "Upper tier") : tr("아래칸", "Lower tier")}`}>
+              const bankCue = tier === "upper" && cue?.player === player ? cue : null;
+              const opened = bankCue?.actual != null && bank === bankCue.bank;
+              const retired = bankCue?.actual != null && bank !== bankCue.bank;
+              return <div className="pig-tier" key={tier} data-bank={bank} data-suspected={bankCue && !retired || undefined}
+                data-retired-reveal={retired || undefined} aria-label={`${player} · ${tier === "upper" ? tr("위칸", "Upper tier") : tr("아래칸", "Lower tier")}`}>
                 <span className="pig-tier-label">{tier === "upper" ? tr("위", "UP") : tr("아래", "LOW")}</span>
-                <PigIcon bank={bank} compact />{bank != null && <Coins coins={knownCoins(state, bank)} />}
+                {retired && <div className="pig-opened-bank pig-retired-bank" data-bank={bankCue.bank} data-correct={bankCue.correct}
+                  aria-label={tr(`직전 개봉 ${bankLabel(bankCue.bank)} · ${coinText(bankCue.actual)}`, `Previously opened ${bankLabel(bankCue.bank)} · ${coinText(bankCue.actual)}`)}>
+                  <small>{tr("직전 개봉", "OPENED")}</small><PigIcon bank={bankCue.bank} coins={bankCue.actual} compact opened />
+                  <Coins coins={bankCue.actual} />
+                </div>}
+                <div className={`pig-physical-bank${opened ? " pig-opened-bank" : ""}`} data-bank={bank} data-correct={opened ? bankCue.correct : undefined}>
+                  {retired && bank != null && <small>{tr("현재 저금통", "CURRENT")}</small>}
+                  <PigIcon bank={bank} coins={opened ? bankCue.actual : knownCoins(state, bank)} compact opened={opened} />
+                  {bank != null && <Coins coins={opened ? bankCue.actual : knownCoins(state, bank)} />}
+                </div>
               </div>;
             })}
             <span className="pig-reset-button" data-voted={state.pigVoters?.includes(player) || undefined} role="img"
