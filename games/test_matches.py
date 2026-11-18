@@ -25,11 +25,12 @@ from .either_or.negotiation import negotiate
 from .either_or.rectangle_counting import count_rectangles, rectangle_race, rectangle_stage
 from .gem_exchange.game import play as gem_exchange
 from .heavy_13.game import place, play as heavy_13
-from .match import DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_THREE_MAIN, DAY_TWO_MAIN, DAY_TWO_PRISON, Decision, Match, run_cli
+from .match import DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_THREE_MAIN, DAY_THREE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, Decision, Match, run_cli
 from .models import CodexLanguageModel, OpenAILanguageModel, StrategyNote, _openai_key
 from .mystery_stock_market.game import next_prices, play as market, trade_orders
 from .personas import persona_context
 from .russian_roulette.game import play as roulette
+from .piggy_bank.game import play as piggy_bank
 
 
 class MatchTest(unittest.TestCase):
@@ -597,9 +598,9 @@ class MatchTest(unittest.TestCase):
                 redirect_stdout(StringIO()),
                 redirect_stderr(StringIO()),
             ):
-                main_log, prison_log, market_log, roulette_log, gem_log = [
+                main_log, prison_log, market_log, roulette_log, gem_log, piggy_log = [
                     Path(directory) / game / "events.jsonl"
-                    for game in ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main")
+                    for game in ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main", "day3-prison")
                 ]
 
                 def play_stage(game, title, seats, output, *args, **kwargs):
@@ -656,6 +657,16 @@ class MatchTest(unittest.TestCase):
                 self.assertEqual(len(gems["eliminated"]), len(advancing) - 8)
                 self.assertEqual(len(gems["living"]), 4)
                 self.assertEqual(len(gems["prison"]), 4)
+                piggy_start, piggy = play_stage(
+                    piggy_bank, DAY_THREE_PRISON, 4, piggy_log,
+                    "--from-main", str(gem_log), previous_main=DAY_THREE_MAIN,
+                )
+                self.assertEqual(piggy_start["players"], gems["prison"])
+                self.assertEqual(piggy_start["pieces"], {name: gems["pieces"][name] for name in gems["prison"]})
+                self.assertEqual(len(piggy["eliminated"]), 1)
+                self.assertEqual(len(set(gems["living"]) | (set(gems["prison"]) - set(piggy["eliminated"]))), 7)
+                for name in gems["prison"]:
+                    self.assertEqual(piggy["pieces"][name], gems["pieces"][name] + piggy["pieces_awarded"].get(name, 0))
 
     def test_private_relationship_updates_follow_players_across_matches(self):
         players = [f"P{seat:02}" for seat in range(1, 10)]

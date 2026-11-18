@@ -1,0 +1,56 @@
+.pig-set .set-map { image-rendering: pixelated; }
+.pig-route { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.pig-route > path { fill: none; stroke: #ebbb76; stroke-width: 2; stroke-dasharray: 5 3; }
+.pig-seat { translate: -50% -100%; }
+.pig-seat canvas { width: clamp(14px, 1.9vw, 26px); }
+.pig-station { position: absolute; width: 15.6%; height: 35%; display: grid; grid-template-rows: 43% 43% 14%; translate: -50%; text-align: center; font-family: var(--pixel-font); }
+.pig-tier { position: relative; display: flex; align-items: center; justify-content: center; gap: 3px; min-height: 0; }
+.pig-tier-label { position: absolute; left: 1px; top: 1px; color: #9baaa7; font-size: clamp(6px, .7vw, 9px); }
+.pig-icon { display: inline-grid; justify-items: center; flex: 0 0 auto; gap: 2px; color: #f2d0bc; font-family: var(--pixel-font); }
+.pig-icon svg { width: 64px; height: 48px; image-rendering: pixelated; }
+.pig-icon strong { font-size: 13px; white-space: nowrap; line-height: 1.3; }
+.pig-icon.compact svg { width: clamp(20px, 3vw, 38px); height: auto; }
+.pig-icon.compact strong { font-size: clamp(7px, .9vw, 11px); }
+.pig-icon svg[data-empty] { opacity: .17; }
+.pig-coins { display: inline-flex; gap: 7px; font-size: 12px; white-space: nowrap; }
+.pig-coins > span { display: inline-flex; align-items: center; gap: 3px; }
+.pig-coins i { display: inline-block; width: 10px; height: 10px; background: #18202b; border: 1px solid #82909e; box-shadow: inset -2px -2px #0008; }
+.pig-coins i[data-color="white"] { background: #e5e5d9; border-color: #bfc5c9; }
+.pig-tier .pig-coins { display: grid; gap: 2px; color: #e6e1d3; font-size: clamp(7px, .9vw, 10px); }
+.pig-tier .pig-coins i { width: 7px; height: 7px; }
+.pig-hidden { color: #aab4bc; font-size: 11px; white-space: nowrap; }
+.pig-tier .pig-hidden { font-size: clamp(6px, .8vw, 10px); }
+.pig-reset-button { justify-self: center; display: inline-flex; align-items: center; gap: 4px; padding: 2px 4px; color: #a9aaa8; background: #15202a; border: 1px solid #625a50; font-size: clamp(6px, .8vw, 10px); line-height: 1.3; }
+.pig-reset-button i { width: 7px; height: 6px; display: inline-block; background: #72454b; box-shadow: 0 2px #37282d; }
+.pig-reset-button[data-voted] { color: #f4d393; border-color: #d0a770; }
+.pig-reset-button[data-voted] i { background: #e6b669; box-shadow: 0 2px #88613c; }
+.pig-station[data-active] .pig-tier:first-child { outline: 1px solid #d9b37d; outline-offset: -2px; background: #d2ae6810; }
+.pig-floor-caption { position: absolute; bottom: 1.1%; left: 3%; right: 3%; color: #dbd2bf; text-align: center; font: 700 clamp(7px, 1vw, 12px)/1.3 var(--pixel-font); }
+.pig-stage h2 { margin: 0 0 6px; }
+.pig-stage-status { min-height: 2.8em; margin-block: 0 12px; line-height: 1.55; }
+.pig-current-claim { display: flex; align-items: center; gap: 16px; padding: 12px; margin-bottom: 14px; border: 1px solid #80674f; background: #272a2c; }
+.pig-current-claim p { margin-block: 3px; }
+.pig-current-claim small { color: #abb6bf; font-size: 11px; }
+.pig-verdict { padding: 10px; margin-bottom: 12px; border-inline-start: 3px solid #e5ab79; background: #302b2c; font-size: 12px; }
+.pig-verdict[data-correct="true"] { border-color: #9cbf9f; background: #27332f; }
+.pig-verdict p { margin-block: 5px 0; }
+.pig-scoreboard { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.pig-scoreboard > button { display: grid; justify-items: center; gap: 6px; padding: 8px 3px; background: #202b35; border: 1px solid #45515c; color: #e7e1d5; cursor: pointer; font-family: var(--pixel-font); }
+.pig-scoreboard > button:is(:hover, [aria-pressed="true"]) { border-color: #d0a977; }
+.pig-scoreboard strong { font-size: 23px; line-height: 1.2; }
+.pig-scoreboard strong small { font-size: 10px; color: #a0aeb9; }
+.pig-score-track { display: flex; gap: 2px; }
+.pig-score-track i { width: 6px; height: 6px; background: #48535b; }
+.pig-score-track i[data-earned] { background: #d7b074; }
+.pig-stage > .muted { margin-block: 9px 13px; font-size: 11px; }
+.pig-reset-status { display: flex; flex-wrap: wrap; gap: 5px 10px; padding-top: 10px; border-top: 1px solid #45515c; font-size: 12px; }
+.pig-reset-status strong { color: #edc18b; }
+.pig-reset-status span { color: #a0aeb9; }
+.pig-info .match-info-games { margin-bottom: 5px; }
+@media (max-width: 720px) {
+  .pig-icon.compact svg { width: 5.2vw; }
+  .pig-tier-label { font-size: 1.4vw; }
+  .pig-icon.compact strong, .pig-tier .pig-coins { font-size: 1.9vw; }
+  .pig-tier .pig-hidden, .pig-reset-button { font-size: 1.6vw; }
+  .pig-floor-caption { font-size: 2vw; }
+}

@@ -31,11 +31,15 @@ DAY_ONE_PRISON = "1일차 감옥 매치 · 무거운 13"
 DAY_TWO_MAIN = "2일차 메인 매치 · 미스터리 거래소"
 DAY_TWO_PRISON = "2일차 감옥 매치 · 러시안 룰렛"
 DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
-PRISON_STAGES = {DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6)}
+DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
+PRISON_STAGES = {
+    DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
+}
 RELATIONSHIP_EVIDENCE = {
     "room_move", "teams", "rectangle_result", "team_vote", "choice_4_result", "grass_choices", "grass_placement",
     "grass_bonus", "choice_9_result", "poker_ranking", "placement", "market", "trade_fill", "inspection", "shift", "swap",
     "gem_auction", "gem_swap", "gem_bonus", "gem_reveal", "gem_card", "gem_peek", "gem_final",
+    "pig_deposit", "pig_claim", "pig_doubt", "pig_replace", "pig_reset", "pig_challenge", "pig_reset_vote",
 }
 
 
@@ -576,6 +580,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             label = None
             if event.msg_type in {"rules", "grass_phase"}:
                 label = event.content.split("\n", 1)[0]
+            elif event.msg_type == "pig_turn":
+                label = f"{json.loads(event.content)['turn']}턴"
             elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round"}:
                 data = json.loads(event.content)
                 label = f"{data['round']}라운드"

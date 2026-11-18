@@ -33,6 +33,7 @@ GAME_TERMS = {
     "피스": "Piece", "맛소금융": "Matso Finance", "무조건설": "Mujo Construction",
     "방어제철": "Bangeo Steel", "알트엔터": "Alt Entertainment", "열림보안": "Yeollim Security",
     "코요테크": "Koyo Tech", "후자전자": "Huja Electronics",
+    "돼지 저금통": "Piggy Bank",
 }
 TERM_PATTERN = re.compile("|".join(map(re.escape, GAME_TERMS)))
 PLAYER_ID = re.compile(r"(?i)\bp([0-9]{2})(?![0-9])")

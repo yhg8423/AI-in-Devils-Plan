@@ -9,9 +9,12 @@ from .spectator import CASE_STAGES, case_catalog, find_matches, next_match, read
 
 class ExportReplaysTest(unittest.TestCase):
     def test_exports_portable_playable_matches_in_both_languages(self):
-        self.check_round_trip(STAGES[:-1])
+        self.check_round_trip(STAGES[:4])
 
     def test_exports_day_three_after_its_day_two_predecessors(self):
+        self.check_round_trip(STAGES[:5])
+
+    def test_exports_day_three_prison_after_its_main_match(self):
         self.check_round_trip(STAGES)
 
     def check_round_trip(self, stages):

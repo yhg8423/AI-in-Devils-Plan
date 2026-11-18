@@ -13,6 +13,7 @@ const games = [
   {session: "2일차 메인 매치", name: "미스터리 거래소", description: tr("단서로 시세를 읽고, 거래로 자산을 불린다.", "Read the clues, anticipate prices, and trade to grow your portfolio.")},
   {session: "2일차 감옥 매치", name: "러시안 룰렛", description: tr("공개된 단서와 각자 확인한 정보로 다음 칸을 추리한다.", "Use public clues and private observations to work out what comes next.")},
   {session: "3일차 메인 매치", name: "보석 암시장", description: tr("카드를 교환해 구매자의 보석을 맞추고, 마니또와의 점수 곱으로 승부한다.", "Swap hidden cards, match the buyers’ gems, and multiply scores with your manito.")},
+  {session: "3일차 감옥 매치", name: "돼지 저금통", description: tr("오가는 저금통의 동전을 기억하고, 의심과 리셋 도전으로 승점을 얻는다.", "Remember the coins in circulating banks and score through doubts and reset challenges.")},
 ];
 
 export function runHref(id = "", caseId) {

@@ -9,13 +9,14 @@ from .spectator import CASE_STAGES, EVENT_FIELDS, source_paths
 from .translate_events import translation_rows
 
 
-STAGES = ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main")
+STAGES = ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main", "day3-prison")
 PREDECESSORS = (
     {},
     {"from_main": 0},
     {"from_main": 0, "from_prison": 1},
     {"from_main": 2},
     {"from_main": 2, "from_prison": 3},
+    {"from_main": 4},
 )
 HEADER_FIELDS = (
     "type", "game", "players", "seed", "pieces", "model", "effort", "provider",
@@ -26,7 +27,7 @@ RESULT_FIELDS = (
     "type", "ranking", "scores", "priority", "grass_placements", "alliance_saved",
     "living", "prison", "eliminated", "pieces", "prize_token", "penalties",
     "pieces_awarded", "assets", "rounds", "credits", "seats", "survivors", "model_calls",
-    "raw_scores", "manitos", "pieces_spent",
+    "raw_scores", "manitos", "pieces_spent", "turns", "resets",
 )
 
 
@@ -111,7 +112,7 @@ def export_replays(campaigns, source_root, output_root):
         logs = [campaign / stage / "events.jsonl" for stage in STAGES]
         if any(log.parent.is_symlink() for log in logs):
             raise ValueError(f"{campaign}: symbolic links are not supported")
-        if not logs[-1].is_symlink() and not logs[-1].exists():
+        while len(logs) > 4 and not logs[-1].is_symlink() and not logs[-1].exists():
             logs.pop()
         prepared[destination] = [
             prepare_match(log, game, links, logs, source_root, campaign.name)

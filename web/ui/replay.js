@@ -12,6 +12,10 @@ export const phaseNames = {
   submit: tr("카드와 칩 제출", "Submit card and chip"), trade: tr("주문", "Place an order"),
   secret: tr("시크릿 예약", "Reserve a Secret"), piece: tr("피스 사용", "Use a Piece"), market_turn: tr("거래소", "Stock exchange"),
   credit: tr("크레딧 사용", "Spend credits"), swap: tr("조작 위치 선택", "Choose slots to swap"),
+  pig_preparation: tr("비공개 전략 준비", "Private preparation"), pig_talk: tr("저금통 대화", "Piggy Bank discussion"),
+  pig_deposit: tr("입금과 전달", "Deposit and pass"), pig_count: tr("동전 개수 선언", "Declare a coin count"),
+  pig_doubt: tr("의심 선언", "Call doubt"), pig_reset_vote: tr("리셋 버튼", "Reset button"),
+  pig_challenge: tr("전체 저금통 도전", "All-bank challenge"),
   gem_bid: tr("선 플레이어 입찰", "Bid for the lead"), gem_auction_agreement: tr("경매 합의", "Auction agreement"),
   gem_peek: tr("피스 카드 확인", "Piece inspection"), gem_swap: tr("카드 교환", "Card swap"),
   gem_opening_talk: tr("게임 시작 전 대화", "Opening discussion"),
@@ -77,6 +81,9 @@ const relationshipCheckpoints = {
 
 export function checkpointLabel(checkpoint, translated) {
   if (!en || !checkpoint) return checkpoint;
+  if (checkpoint === "돼지 저금통 시작 전 대화 종료") return "End of opening discussions · Piggy Bank";
+  const piggy = checkpoint.match(/^돼지 저금통 (\d+)턴 (대화 종료|선언·의심 결과|전체 도전 결과|리셋 완료)$/);
+  if (piggy) return `Turn ${piggy[1]} · ${{"대화 종료": "End of discussion", "선언·의심 결과": "Declaration and doubt results", "전체 도전 결과": "All-bank challenge results", "리셋 완료": "Reset complete"}[piggy[2]]} · Piggy Bank`;
   const round = checkpoint.match(/^(거래소|러시안 룰렛|보석 암시장) (\d+)라운드 종료$/);
   if (round) return `End of round ${round[2]} · ${{"거래소": "Mystery Stock Exchange", "러시안 룰렛": "Russian Roulette", "보석 암시장": "Gem Black Market"}[round[1]]}`;
   const auction = checkpoint.match(/^보석 암시장 (\d+)피스 동률 협상 종료$/);
