@@ -79,7 +79,7 @@
 .pig-reset-status { display: flex; flex-wrap: wrap; gap: 5px 10px; padding-top: 10px; border-top: 1px solid #45515c; font-size: 12px; }
 .pig-reset-status strong { color: #edc18b; }
 .pig-reset-status span { color: #a0aeb9; }
-.pig-info .match-info-games { margin-bottom: 5px; }
+.pig-info .match-info-games { margin-block: 12px 5px; }
 @media (max-width: 720px) {
   .pig-action-bubble { padding: 3px 4px; gap: 2px; font-size: clamp(7px, 1.9vw, 11px); }
   .pig-icon.compact svg { width: 5.2vw; }
