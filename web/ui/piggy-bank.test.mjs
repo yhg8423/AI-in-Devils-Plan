@@ -6,6 +6,7 @@ import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {after, test} from "node:test";
 import {build} from "esbuild";
+import {rulesSummary} from "./rule-summaries.js";
 
 const temporary = mkdtempSync(join(tmpdir(), "piggy-replay-test-"));
 const bundle = join(temporary, "replay.cjs");
@@ -496,6 +497,87 @@ for (const language of ["ko", "en"]) {
     assert(final.includes(language === "en" ? "Eliminated" : "탈락"), "The tied last-place player is still eliminated");
     const early = replay([...steps, event("match_result", {...result, turns: 99, end_reason: "win_score"})], "public");
     assert(early.includes(language === "en" ? "Ended after a player reached 5 VP" : "5점 이상 달성으로 종료"));
+  });
+
+  test(`${language}: last-place tiebreaks show only active players, fresh memories, local turns, and the right reset threshold`, () => {
+    const oldRules = "돼지 저금통 · 참가자 4명\n\n5. 변경 가능한 기억 슬롯\n기억 갱신\n\n6. 대화 없는 진행\n대화 없음\n\n100턴 상한\n최대 100턴";
+    const rules = oldRules + "\n\n최하위 동점 추가 경기\n감점자는 탈락하고 득점자는 안전이 확정됩니다.";
+    for (const count of [2, 3, 4]) {
+      const active = players.slice(-count);
+      const extraScores = Object.fromEntries(active.map((player) => [player, 0]));
+      const extraLower = Object.fromEntries(active.map((player, index) => [player, index + 1]));
+      const extraUpper = Object.fromEntries(active.map((player, index) => [player, index ? null : count + 1]));
+      const before = [event("rules", rules), sequence(true).pending[0],
+        event("pig_recall", {reset: 0, mode: "dynamic", updated_turn: 100,
+          banks: {1: {black: 7777, white: 1}, 2: {black: 1, white: 1}, 3: {black: 1, white: 1}}}, [active[0]], active[0])];
+      const start = event("pig_tiebreak_start", {round: 1, players: active, main_scores: scores, scores: extraScores,
+        reset_threshold: count - 1, bank_count: count + 1, turn: 100});
+      const setup = event("pig_setup", {order: active, lower: extraLower, upper: extraUpper, scores: extraScores,
+        reset: 1, tiebreak: 1, reset_threshold: count - 1});
+      const extraRules = event("rules", "돼지 저금통 · 최하위 동점 추가 경기 1\n새 저금통을 배분하고 추가 승점 0점에서 시작합니다.");
+      const steps = [...before, start, extraRules, setup,
+        event("pig_turn", {turn: 101, tiebreak: 1, tiebreak_turn: 1, player: active[0], color: "black",
+          lower: extraLower, upper: extraUpper, scores: extraScores}),
+        event("pig_reset_vote", {turn: 101, player: active[0], voters: [active[0]], threshold: count - 1})];
+      for (const view of ["public", "operator", active[0]]) {
+        const html = replay(steps, view, steps.length, active[0]);
+        const scene = arena(html);
+        assert.equal([...scene.matchAll(/class="token pig-seat/g)].length, count);
+        assert(!scene.includes("7777"), "Main-match memory must not survive a fresh tiebreak");
+        assert(html.includes(language === "en" ? "Tiebreak 1 · Turn 1" : "추가 경기 1 · 1턴"));
+        const tag = openingTag(html, "pig-scoreboard");
+        const board = html.slice(html.indexOf(tag), html.indexOf("</div>", html.indexOf(tag)));
+        assert.equal([...board.matchAll(/<button/g)].length, count);
+        assert(!board.includes(" / 5") && !board.includes("pig-score-track"), "Extra scores have no five-point target");
+        const resetTag = openingTag(html, "pig-reset-status");
+        const resetStatus = html.slice(html.indexOf(resetTag), html.indexOf("</p>", html.indexOf(resetTag)));
+        assert(resetStatus.includes(`1 / ${count - 1}`));
+        if (language === "en") {
+          assert(replay(steps, view, before.length + 3, active[0]).includes(`${count + 1} banks`));
+          const extraSummary = rulesSummary("돼지 저금통 · 최하위 동점 추가 경기 1", "");
+          assert(extraSummary.includes("Normal deposits, passes, claims, doubts and all-bank challenge scoring still apply."));
+          assert(!extraSummary.includes("Four players circulate five numbered banks"));
+          assert(html.includes("Losing extra VP means elimination; gaining VP secures safety."));
+        } else assert(html.includes("추가 승점 감소 시 탈락 · 증가 시 안전 확정"));
+        const rewound = replay(steps, view, before.length, active[0]);
+        assert.equal([...arena(rewound).matchAll(/class="token pig-seat/g)].length, 4);
+        assert(openingTag(rewound, "pig-score-track"), "Rewinding restores the main-match score target");
+      }
+    }
+    if (language === "en") {
+      const old = replay([event("rules", oldRules), sequence(true).pending[0]], "public");
+      assert(!old.includes("Players tied for last place play fresh tiebreaks"), "Archived rules retain the previous tie policy");
+    }
+  });
+
+  test(`${language}: positive scores secure safety, the remaining field shrinks, and final results preserve main scores`, () => {
+    const mainScores = {P01: 4, P02: 0, P03: 0, P04: 0};
+    const first = {round: 1, players: ["P02", "P03", "P04"], scores: {P02: 3, P03: 0, P04: 0},
+      safe: ["P02"], eliminated: [], remaining: ["P03", "P04"], turn: 101, turns: 1};
+    const second = {round: 2, players: ["P03", "P04"], scores: {P03: 1, P04: -1},
+      safe: ["P03"], eliminated: ["P04"], remaining: [], turn: 102, turns: 1};
+    const extraLower = {P03: 1, P04: 2};
+    const extraUpper = {P03: 3, P04: null};
+    const steps = [sequence(true).pending[0], event("pig_tiebreak_result", first),
+      event("pig_tiebreak_start", {round: 2, players: second.players, main_scores: mainScores, scores: {P03: 0, P04: 0},
+        reset_threshold: 1, bank_count: 3, turn: 101}),
+      event("pig_setup", {order: second.players, scores: {P03: 0, P04: 0}, lower: extraLower, upper: extraUpper,
+        reset: 2, tiebreak: 2, reset_threshold: 1})];
+    const html = replay(steps, "public");
+    assert.equal([...arena(html).matchAll(/class="token pig-seat/g)].length, 2);
+    assert(!arena(html).includes("P02"), "A player who gained points no longer participates");
+    assert(html.includes(language === "en" ? "Safe: P02" : "생존 확정 P02"));
+    const result = {ranking: players, scores: mainScores, pieces_awarded: {P01: 3}, eliminated: ["P04"],
+      turns: 102, main_turns: 100, turn_limit: 100, end_reason: "turn_limit", tiebreaks: [first, second]};
+    const final = replay([...steps, event("pig_tiebreak_result", second), event("match_result", result)], "public");
+    assert(final.includes(language === "en" ? "Eliminated after losing VP: P04" : "승점 감소로 탈락 P04"));
+    const caption = final.indexOf(language === "en" ? "Piggy Bank final standings" : "돼지 저금통 최종 순위");
+    const standings = final.slice(final.lastIndexOf("<table", caption), final.indexOf("</table>", caption));
+    assert(standings?.includes("1. P01") && standings.includes(">4</td>"), "The main winner retains their original score");
+    assert(!standings.includes(">-1</td>"), "Extra scores are separate from the main final standings");
+    const soleRemaining = {...second, scores: {P03: 3, P04: 0}};
+    const remainingFinal = replay([...steps, event("match_result", {...result, tiebreaks: [first, soleRemaining]})], "public");
+    assert(remainingFinal.includes(language === "en" ? "Eliminated as the last tied player: P04" : "마지막 동점자로 남아 탈락 P04"));
   });
 
   test(`${language}: simultaneous reset choices stay private until the final voter list is published and four requests display clearly`, () => {

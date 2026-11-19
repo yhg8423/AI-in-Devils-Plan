@@ -76,8 +76,23 @@ export function pigActionText(phase, action) {
 
 export function pigEventText(type, data) {
   switch (type) {
-    case "pig_setup": return tr(`추첨 순서 ${data.order.join(" → ")} · 저금통 5개`, `Drawn order ${data.order.join(" → ")} · Five banks`);
-    case "pig_turn": return tr(`${data.turn}턴 · ${data.player} 동전 넣기 · 다음 선언 ${pigColorLabel(data.color)}`, `Turn ${data.turn} · ${data.player} deposits · Next claim: ${pigColorLabel(data.color)}`);
+    case "pig_setup": return data.tiebreak ?
+      tr(`추가 경기 ${data.tiebreak} · 참가자 ${data.order.join(" → ")} · 저금통 ${data.order.length + 1}개`, `Tiebreak ${data.tiebreak} · Players ${data.order.join(" → ")} · ${data.order.length + 1} banks`) :
+      tr(`추첨 순서 ${data.order.join(" → ")} · 저금통 5개`, `Drawn order ${data.order.join(" → ")} · Five banks`);
+    case "pig_turn": return data.tiebreak ?
+      tr(`추가 경기 ${data.tiebreak} · ${data.tiebreak_turn}턴 · ${data.player} 동전 넣기 · 다음 선언 ${pigColorLabel(data.color)}`, `Tiebreak ${data.tiebreak} · Turn ${data.tiebreak_turn} · ${data.player} deposits · Next claim: ${pigColorLabel(data.color)}`) :
+      tr(`${data.turn}턴 · ${data.player} 동전 넣기 · 다음 선언 ${pigColorLabel(data.color)}`, `Turn ${data.turn} · ${data.player} deposits · Next claim: ${pigColorLabel(data.color)}`);
+    case "pig_tiebreak_start": return tr(`최하위 동점 추가 경기 ${data.round} · ${data.players.join(" · ")} · 추가 승점 0점부터 시작`,
+      `Last-place tiebreak ${data.round} · ${data.players.join(" · ")} · Extra scores start at 0 VP`);
+    case "pig_tiebreak_result": {
+      const lostPoints = data.eliminated.some((player) => data.scores[player] < 0);
+      return [tr(`추가 경기 ${data.round}`, `Tiebreak ${data.round}`),
+        data.safe.length > 0 && tr(`생존 확정 ${data.safe.join(" · ")}`, `Safe: ${data.safe.join(" · ")}`),
+        data.eliminated.length > 0 && (lostPoints ?
+          tr(`승점 감소로 탈락 ${data.eliminated.join(" · ")}`, `Eliminated after losing VP: ${data.eliminated.join(" · ")}`) :
+          tr(`마지막 동점자로 남아 탈락 ${data.eliminated.join(" · ")}`, `Eliminated as the last tied player: ${data.eliminated.join(" · ")}`)),
+        data.remaining.length > 0 && tr(`남은 동점자 ${data.remaining.join(" · ")}`, `Still tied: ${data.remaining.join(" · ")}`)].filter(Boolean).join(" · ");
+    }
     case "pig_deposit": return tr(`${data.player} → ${data.to} · ${bankLabel(data.bank)}에 흑 ${data.black}, 백 ${data.white}개 넣음`, `${data.player} → ${data.to} · ${bankLabel(data.bank)}: added ${data.black} black, ${data.white} white`);
     case "pig_claim": return tr(`${data.player} · ${bankLabel(data.bank)} ${pigColorLabel(data.color)} ${data.count}개 선언`, `${data.player} · ${bankLabel(data.bank)}: claims ${data.count} ${pigColorLabel(data.color)} coins`);
     case "pig_pass": return tr(`${data.player}의 선언 통과 · 의심 없음`, `${data.player}’s claim passes without doubt`);
@@ -85,9 +100,10 @@ export function pigEventText(type, data) {
     case "pig_replace": return tr(`${data.player} · ${bankLabel(data.old_bank)} 제외 → 새 ${bankLabel(data.bank)}`, `${data.player} · Retire ${bankLabel(data.old_bank)} → New bank ${bankLabel(data.bank)}`);
     case "pig_reset_vote": {
       const prefix = data.simultaneous ? tr("동시 제출 · ", "Simultaneous submission · ") : "";
-      return prefix + (data.voters.length > 3 ?
-        tr(`${data.player} 리셋 요청 · ${data.voters.length}명 요청 · 기준 3명`, `${data.player} requests reset · ${data.voters.length} requests · 3 required`) :
-        tr(`${data.player} 리셋 요청 · ${data.voters.length} / 3명`, `${data.player} requests reset · ${data.voters.length} of 3`));
+      const threshold = data.threshold ?? 3;
+      return prefix + (data.voters.length > threshold ?
+        tr(`${data.player} 리셋 요청 · ${data.voters.length}명 요청 · 기준 ${threshold}명`, `${data.player} requests reset · ${data.voters.length} requests · ${threshold} required`) :
+        tr(`${data.player} 리셋 요청 · ${data.voters.length} / ${threshold}명`, `${data.player} requests reset · ${data.voters.length} of ${threshold}`));
     }
     case "pig_challenge": return tr(`${data.player} 전체 암기 ${data.correct ? "성공 · +3점" : "실패 · −2점"}`, `${data.player}’s full-memory challenge ${data.correct ? "succeeds · +3 VP" : "fails · −2 VP"}`);
     case "pig_reset": return tr("전체 저금통 리셋 · 승점 유지", "All banks reset · Scores retained");
@@ -121,7 +137,26 @@ export function applyPigEvent(state, type, data, event = {}) {
   if (data.lower) state.pigLower = {...data.lower};
   if (data.upper) state.pigUpper = {...data.upper};
   if (data.order) state.pigOrder = data.order;
+  if (data.reset_threshold != null) state.pigResetThreshold = data.reset_threshold;
   switch (type) {
+    case "pig_tiebreak_start":
+      state.pigTiebreak = data;
+      state.pigOrder = data.players;
+      state.pigTurn = null;
+      state.pigClaim = null;
+      state.pigVerdict = null;
+      state.pigDoubtCue = null;
+      state.pigChallengeCue = null;
+      state.pigDeposit = null;
+      state.pigVoters = [];
+      state.pigLower = {};
+      state.pigUpper = {};
+      state.pigMemories = {};
+      state.pigSummaries = {};
+      state.pigContents = {};
+      state.pigKnown = {};
+      state.pigActive = null;
+      break;
     case "pig_setup":
     case "pig_reset": {
       state.pigSetup ??= data;
@@ -183,7 +218,10 @@ export function applyPigEvent(state, type, data, event = {}) {
         }
       }
       break;
-    case "pig_reset_vote": state.pigVoters = data.voters; break;
+    case "pig_reset_vote":
+      state.pigVoters = data.voters;
+      if (data.threshold != null) state.pigResetThreshold = data.threshold;
+      break;
     case "pig_challenge":
       state.pigKnown = {...state.pigKnown, ...data.actual};
       state.pigVerdict = {type, data};
@@ -403,6 +441,8 @@ export function PiggyStage({state, players, selected, onChoose}) {
   const rules = state.feed.find((event) => event.msg_type === "rules");
   const rawRules = rules ? typeof rules.data === "string" ? rules.data : rules.content : "";
   const turnLimit = result?.turn_limit ?? (rawRules.includes("\n\n100턴 상한\n") ? 100 : null);
+  const tiebreak = state.pigTiebreak;
+  const resetThreshold = state.pigResetThreshold ?? 3;
   const [rulesTitle, ...rulesBody] = rawRules.split("\n");
   const explanation = en ? rulesSummary(rulesTitle, rulesBody.join("\n")) ?? rules?.text : rawRules;
   const order = result?.ranking ?? [...(state.pigOrder ?? players)].sort((a, b) => (scores[b] ?? 0) - (scores[a] ?? 0));
@@ -416,14 +456,17 @@ export function PiggyStage({state, players, selected, onChoose}) {
     {result.end_reason === "turn_limit" && <p className="muted">{tr(`${turnLimit}턴 상한 도달 · 최종 승점으로 순위 결정`,
       `Reached the ${turnLimit}-turn limit · Ranked by final VP`)}</p>}
     {result.end_reason === "win_score" && <p className="muted">{tr("5점 이상 달성으로 종료", "Ended after a player reached 5 VP")}</p>}
+    {result.tiebreaks?.map((report) => <p className="muted" key={report.round}>{pigEventText("pig_tiebreak_result", report)}</p>)}
     <Table caption={tr("돼지 저금통 최종 순위", "Piggy Bank final standings")} headers={tr(["참가자", "승점", "획득 피스", "결과"], ["Player", "VP", "Pieces earned", "Result"])}
       rows={order.map((player, index) => [`${index + 1}. ${player}`, result.scores?.[player] ?? scores[player] ?? 0,
         result.pieces_awarded?.[player] ?? 0, result.eliminated.includes(player) ? tr("탈락", "Eliminated") : tr("생존", "Survived")])} />
     {verdict?.type === "pig_challenge" && <PiggyChallengeResult data={verdict.data} />}
   </div>;
   return <div className="pig-stage">
-    <h2>{turn ? tr(turnLimit ? `${turn.turn} / ${turnLimit}턴` : `${turn.turn}턴`,
-      turnLimit ? `Turn ${turn.turn} / ${turnLimit}` : `Turn ${turn.turn}`) : tr("돼지 저금통 준비", "Preparing Piggy Bank")}</h2>
+    <h2>{tiebreak ? tr(`추가 경기 ${tiebreak.round}${turn ? ` · ${turn.tiebreak_turn}턴` : " 준비"}`,
+      `Tiebreak ${tiebreak.round}${turn ? ` · Turn ${turn.tiebreak_turn}` : " preparation"}`) :
+      turn ? tr(turnLimit ? `${turn.turn} / ${turnLimit}턴` : `${turn.turn}턴`,
+        turnLimit ? `Turn ${turn.turn} / ${turnLimit}` : `Turn ${turn.turn}`) : tr("돼지 저금통 준비", "Preparing Piggy Bank")}</h2>
     <p className="pig-stage-status">{latest ? pigEventText(latest.type, latest.data) : tr("규칙 공개 대기", "Awaiting the game rules")}</p>
     {claim && verdict?.type !== "pig_challenge" && <div className="pig-current-claim"><PigIcon bank={claim.bank} /><div><strong>{claim.player}</strong>
       <p>{tr(`${pigColorLabel(claim.color)} ${claim.count}개 선언`, `Claims ${claim.count} ${pigColorLabel(claim.color)} coins`)}</p>
@@ -434,16 +477,18 @@ export function PiggyStage({state, players, selected, onChoose}) {
       <p>{pigEventText(verdict.type, verdict.data)}</p>
       {verdict.type === "pig_challenge" && <PiggyChallengeResult data={verdict.data} />}
     </div>}
-    <div className="pig-scoreboard" aria-label={tr("현재 승점", "Current scores")}>{order.map((player) =>
+    <div className="pig-scoreboard" style={tiebreak ? {gridTemplateColumns: `repeat(${order.length}, minmax(0, 1fr))`} : undefined}
+      aria-label={tiebreak ? tr("추가 경기 승점", "Tiebreak scores") : tr("현재 승점", "Current scores")}>{order.map((player) =>
       <button type="button" key={player} aria-pressed={player === selected} onClick={() => onChoose(player)}>
-        <span>{player}</span><strong>{scores[player] ?? 0}<small> / 5</small></strong>
-        <span className="pig-score-track" aria-hidden="true">{Array.from({length: 5}, (_, index) => <i key={index} data-earned={index < (scores[player] ?? 0) || undefined} />)}</span>
+        <span>{player}</span><strong>{scores[player] ?? 0}{!tiebreak && <small> / 5</small>}</strong>
+        {!tiebreak && <span className="pig-score-track" aria-hidden="true">{Array.from({length: 5}, (_, index) => <i key={index} data-earned={index < (scores[player] ?? 0) || undefined} />)}</span>}
       </button>)}</div>
-    <p className="muted">{turnLimit ? tr(`5점 이상 달성 또는 ${turnLimit}턴 완료 시 종료 · 최하위 1명 탈락`,
+    <p className="muted">{tiebreak ? tr("추가 승점 감소 시 탈락 · 증가 시 안전 확정 · 마지막 남은 동점자 탈락",
+      "Losing extra VP means elimination; gaining VP secures safety. The last remaining tied player is eliminated.") : turnLimit ? tr(`5점 이상 달성 또는 ${turnLimit}턴 완료 시 종료 · 최하위 1명 탈락`,
       `Ends at 5 VP or after Turn ${turnLimit} · One last-place player is eliminated`) :
       tr("누군가 5점을 얻으면 종료 · 최하위 1명 탈락", "Ends when anyone reaches 5 VP · One last-place player is eliminated")}</p>
-    <p className="pig-reset-status">{tr("리셋 요청", "Reset requests")} <strong>{state.pigVoters?.length > 3 ?
-      tr(`${state.pigVoters.length}명 요청 · 기준 3명`, `${state.pigVoters.length} requests · 3 required`) : `${state.pigVoters?.length ?? 0} / 3`}</strong>
+    <p className="pig-reset-status">{tr("리셋 요청", "Reset requests")} <strong>{state.pigVoters?.length > resetThreshold ?
+      tr(`${state.pigVoters.length}명 요청 · 기준 ${resetThreshold}명`, `${state.pigVoters.length} requests · ${resetThreshold} required`) : `${state.pigVoters?.length ?? 0} / ${resetThreshold}`}</strong>
       {state.pigVoters?.length > 0 && <span>{state.pigVoters.join(" · ")}</span>}</p>
     {rules && <details className="stage-details"><summary>{tr("게임 규칙", "Game rules")}</summary><p className="choice-rules">{explanation}</p></details>}
   </div>;
@@ -456,6 +501,8 @@ export function PiggyInformation({state, replay}) {
   const owner = memoryOwner(state, selected);
   const freeMemory = hasFreeMemory(state);
   const dynamicMemory = hasDynamicMemory(state);
+  const scorePlayers = state.result?.ranking ?? state.pigOrder ?? players;
+  const currentScores = state.result?.scores ?? state.pigScores;
   const memoryEnabled = hasMemorySlots(state) || freeMemory;
   const memoryRecord = owner && state.feed.findLast((event) => event.msg_type === "pig_recall" &&
     event.agent_name === owner && (freeMemory || event.data.reset === state.pigMemoryReset));
@@ -464,8 +511,8 @@ export function PiggyInformation({state, replay}) {
   let eventTurn = 0;
   const history = state.feed.filter(({msg_type, data}) => {
     if (msg_type === "pig_turn") eventTurn = data.turn;
-    return ["pig_deposit", "pig_claim", "pig_pass", "pig_doubt", "pig_challenge", "pig_replace", "pig_reset"].includes(msg_type) &&
-      (!selected || [data.player, data.to, data.challenger].includes(selected)) && (!filteredTurn || (data.turn ?? eventTurn) === filteredTurn);
+    return ["pig_deposit", "pig_claim", "pig_pass", "pig_doubt", "pig_challenge", "pig_replace", "pig_reset", "pig_tiebreak_start", "pig_tiebreak_result"].includes(msg_type) &&
+      (!selected || [data.player, data.to, data.challenger, ...(data.players ?? [])].includes(selected)) && (!filteredTurn || (data.turn ?? eventTurn) === filteredTurn);
   });
   const banks = [...new Set([...Object.values(state.pigLower ?? {}), ...Object.values(state.pigUpper ?? {})].filter((bank) => bank != null))].sort((a, b) => a - b);
   return <aside className="caption match-info pig-info" aria-label={tr("돼지 저금통 게임 정보", "Piggy Bank information")}>
@@ -484,7 +531,8 @@ export function PiggyInformation({state, replay}) {
     <div id="pig-history-panel" className="match-info-scroll" role="tabpanel" aria-labelledby="pig-history" hidden={tab !== "history"} tabIndex={0}>
       {history.length ? <Table caption={tr("동전 전달과 의심·리셋 판정", "Coin passes, doubts, and reset verdicts")} headers={tr(["기록", "행동", "내용"], ["Event", "Action", "Details"])}
         rows={history.map(({msg_type, data, step}) => [<button type="button" className="result-link" onClick={() => seek(step)}>{step}</button>,
-          ({pig_deposit: tr("전달", "Pass"), pig_claim: tr("개수 선언", "Claim"), pig_pass: tr("의심 없음", "No doubt"), pig_doubt: tr("의심 판정", "Doubt verdict"), pig_replace: tr("교체", "Replace"), pig_reset: tr("리셋", "Reset"), pig_challenge: tr("전체 암기", "Full recall")})[msg_type],
+          ({pig_deposit: tr("전달", "Pass"), pig_claim: tr("개수 선언", "Claim"), pig_pass: tr("의심 없음", "No doubt"), pig_doubt: tr("의심 판정", "Doubt verdict"), pig_replace: tr("교체", "Replace"), pig_reset: tr("리셋", "Reset"), pig_challenge: tr("전체 암기", "Full recall"),
+            pig_tiebreak_start: tr("추가 경기 시작", "Tiebreak begins"), pig_tiebreak_result: tr("추가 경기 결과", "Tiebreak result")})[msg_type],
           msg_type === "pig_challenge" ? <details className="pig-challenge-details"><summary>{pigEventText(msg_type, data)}</summary>
             <PiggyChallengeResult data={data} /></details> : pigEventText(msg_type, data)])} /> :
         <p className="empty">{tr("이 조건에 해당하는 기록이 없어요.", "No records match these filters.")}</p>}
@@ -514,11 +562,12 @@ export function PiggyInformation({state, replay}) {
       </>}
     </div>}
     <div id="pig-scores-panel" className="match-info-scroll" role="tabpanel" aria-labelledby="pig-scores" hidden={tab !== "scores"} tabIndex={0}>
-      <Table caption={tr("현재 공개 승점", "Current public scores")} headers={tr(["참가자", "누적 승점", "리셋 요청"], ["Player", "Total VP", "Reset requested"])}
-        rows={(selected ? [selected] : state.pigOrder ?? players).map((player) => [player, state.pigScores?.[player] ?? 0, state.pigVoters?.includes(player) ? tr("요청함", "Requested") : "–"])} />
+      <Table caption={state.pigTiebreak && !state.result ? tr("추가 경기 승점", "Tiebreak scores") : tr("현재 공개 승점", "Current public scores")}
+        headers={tr(["참가자", "누적 승점", "리셋 요청"], ["Player", "Total VP", "Reset requested"])}
+        rows={scorePlayers.filter((player) => !selected || selected === player).map((player) => [player, currentScores?.[player] ?? 0, state.pigVoters?.includes(player) ? tr("요청함", "Requested") : "–"])} />
       {state.feed.some(({msg_type}) => ["pig_doubt", "pig_challenge"].includes(msg_type)) && <Table caption={tr("판정 후 승점", "Scores after verdicts")} headers={[tr("기록", "Event"), ...(selected ? [selected] : players)]}
         rows={state.feed.filter(({msg_type}) => ["pig_doubt", "pig_challenge"].includes(msg_type)).map(({data, step}) => [
-          <button type="button" className="result-link" onClick={() => seek(step)}>{step}</button>, ...(selected ? [selected] : players).map((player) => scoreText(data.scores?.[player] ?? 0))])} />}
+          <button type="button" className="result-link" onClick={() => seek(step)}>{step}</button>, ...(selected ? [selected] : players).map((player) => data.scores?.[player] == null ? "–" : scoreText(data.scores[player]))])} />}
     </div>
   </aside>;
 }

@@ -14,13 +14,16 @@ from unittest.mock import patch
 from ..match import DAY_THREE_PRISON, Match, run_cli
 from ..models import CodexLanguageModel
 from .game import (
-    NO_DISCUSSION_HEADING, NO_RELATIONSHIP_HEADING, SIMULTANEOUS_RESET_HEADING,
+    INITIAL_MEMORY_SELECTION_HEADING, NO_DISCUSSION_HEADING, NO_RELATIONSHIP_HEADING,
+    SCORING_GOAL_HEADING, SIMULTANEOUS_RESET_HEADING, TURN_LIMIT_HEADING,
     parse_challenge, parse_deposit, play,
 )
 from .memory import DYNAMIC_MEMORY_HEADING, FREE_MEMORY_HEADING, MEMORY_HEADING, MEMORY_SUMMARY_LIMIT
 
 
 PLAYERS = ("P01", "P02", "P03", "P04")
+CAPPED_RULES_BEFORE_TIEBREAK = (DYNAMIC_MEMORY_HEADING + NO_DISCUSSION_HEADING + NO_RELATIONSHIP_HEADING
+                              + SCORING_GOAL_HEADING + INITIAL_MEMORY_SELECTION_HEADING + TURN_LIMIT_HEADING)
 
 
 class PiggyBankTest(unittest.TestCase):
@@ -62,6 +65,7 @@ class PiggyBankTest(unittest.TestCase):
 
     def test_complete_match_preserves_bank_routing_counts_and_scores(self):
         match = Match(PLAYERS, 23, pieces=[1, 2, 3, 4])
+        match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": CAPPED_RULES_BEFORE_TIEBREAK}])
         result = play(match)
         banks = {str(bank): {"black": 1, "white": 1} for bank in range(1, 6)}
         scores = dict.fromkeys(PLAYERS, 0)
@@ -283,6 +287,7 @@ class PiggyBankTest(unittest.TestCase):
                 return super().decide_together(phase, decisions, **kwargs)
 
         match = ChallengeMatch(PLAYERS, 23)
+        match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": CAPPED_RULES_BEFORE_TIEBREAK}])
         result = play(match)
         self.assertEqual(result["scores"], {"P01": 6, "P02": 0, "P03": 0, "P04": 0})
         self.assertEqual(result["turns"], 2)
@@ -329,6 +334,7 @@ class PiggyBankTest(unittest.TestCase):
         for scenario in ("pass", "doubt", "challenge_success", "challenge_failure"):
             with self.subTest(scenario=scenario):
                 match = CappedMatch(PLAYERS, 23)
+                match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": CAPPED_RULES_BEFORE_TIEBREAK}])
                 result = play(match)
                 self.assertEqual(result["turns"], 100)
                 self.assertEqual(result["turn_limit"], 100)
@@ -397,6 +403,139 @@ class PiggyBankTest(unittest.TestCase):
         }])
         with self.assertRaises(PastLimit):
             play(match)
+
+    def test_two_three_and_four_way_last_place_ties_play_only_the_remaining_players(self):
+        class TiebreakMatch(Match):
+            def __init__(self):
+                super().__init__(PLAYERS, 23)
+                self.active = list(PLAYERS)
+                self.phase = self.main_turn = self.phase_turn = 0
+                self.fresh_inputs = []
+
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "pig_tiebreak_start":
+                    self.phase, self.active, self.phase_turn = data["round"], data["players"], 0
+                elif kind == "pig_turn":
+                    self.color = data["color"]
+                    if self.phase:
+                        self.phase_turn = data["tiebreak_turn"]
+                    else:
+                        self.main_turn = data["turn"]
+                elif kind == "pig_contents":
+                    self.banks = json.loads(json.dumps(data["banks"]))
+                elif kind == "pig_deposit":
+                    self.bank = data["bank"]
+
+            def decide(self, name, phase, prompt, default, **kwargs):
+                if phase == "pig_deposit":
+                    recipient = next(player for player in reversed(self.active) if player != name)
+                    default = json.dumps({"black": 1, "white": 0, "to": recipient})
+                elif phase == "pig_count":
+                    default = str(self.banks[str(self.bank)][self.color]) if self.phase and tied_count == 3 else "0"
+                elif phase == "pig_reset_vote":
+                    challenge = tied_count in (2, 3) if not self.phase else tied_count == 4
+                    caller = ("P01" if self.main_turn == 1 or early_win else "P02") if not self.phase else self.active[0]
+                    default = "reset" if challenge and name != caller else "pass"
+                elif phase == "pig_challenge":
+                    guesses = json.loads(json.dumps(self.banks))
+                    if self.phase == 3:
+                        guesses[next(iter(guesses))]["black"] += 1
+                    default = json.dumps(guesses)
+                return super().decide(name, phase, prompt, default, **kwargs)
+
+            def decide_together(self, phase, decisions, **kwargs):
+                if phase == "pig_preparation":
+                    decisions = {name: replace(decision, default="OLD_MAIN_PLAN94701") for name, decision in decisions.items()}
+                elif phase == "pig_doubt":
+                    self.doubter = next(iter(decisions))
+                    decisions = {name: replace(decision, default="doubt" if self.phase and tied_count in (2, 3) and name == self.doubter else "pass")
+                                 for name, decision in decisions.items()}
+                elif phase == "pig_memory_update":
+                    if self.phase and self.phase_turn == 0:
+                        for name, decision in decisions.items():
+                            previous = json.loads(decision.prompt.rsplit("기존 기억: ", 1)[1].split("\n", 1)[0])
+                            projected = self.model_observations(name, self.observations(name))
+                            self.fresh_inputs.append((self.phase, name, previous["banks"], "\n".join(event.content for event in projected)))
+                    decisions = {name: replace(decision, default=json.dumps({bank: {"black": 94441 + self.phase, "white": None}
+                                                                            for bank in json.loads(decision.default)}))
+                                 for name, decision in decisions.items()}
+                if self.phase:
+                    if not set(decisions) <= set(self.active):
+                        raise AssertionError("A safe participant must not receive another tiebreak decision")
+                return super().decide_together(phase, decisions, **kwargs)
+
+        for tied_count, early_win in ((2, False), (3, False), (4, False), (3, True)):
+            limit = 100 if early_win else 2 if tied_count == 2 else 1
+            with self.subTest(tied_count=tied_count, early_win=early_win), patch("games.piggy_bank.game.MAX_TURNS", limit):
+                match = TiebreakMatch()
+                result = play(match)
+                starts = [json.loads(event.content) for event in match.events if event.msg_type == "pig_tiebreak_start"]
+                reports = result["tiebreaks"]
+                self.assertEqual(len(starts), 3 if tied_count == 4 else 1)
+                self.assertEqual(len(reports), len(starts))
+                expected_main = dict.fromkeys(PLAYERS, 0)
+                if tied_count in (2, 3):
+                    expected_main["P01"] = 6 if early_win else 3
+                if tied_count == 2:
+                    expected_main["P02"] = 3
+                self.assertEqual(result["scores"], expected_main)
+                self.assertEqual(result["main_turns"], 2 if tied_count == 2 or early_win else 1)
+                self.assertEqual(result["end_reason"], "win_score" if early_win else "turn_limit")
+                self.assertEqual(result["turns"], result["main_turns"] + sum(report["turns"] for report in reports))
+                remaining = {name for name in PLAYERS if expected_main[name] == min(expected_main.values())}
+                for start, report in zip(starts, reports, strict=True):
+                    self.assertEqual(set(start["players"]), remaining)
+                    self.assertEqual(start["main_scores"], expected_main)
+                    self.assertTrue(all(score == 0 for score in start["scores"].values()))
+                    self.assertEqual(start["bank_count"], len(remaining) + 1)
+                    self.assertEqual(start["reset_threshold"], len(remaining) - 1)
+                    self.assertEqual(set(report["scores"]), remaining)
+                    self.assertEqual(report["turns"], 1)
+                    remaining -= set(report["safe"])
+                if tied_count == 4:
+                    self.assertEqual([len(start["players"]) for start in starts], [4, 3, 2])
+                    self.assertEqual([report["safe"] for report in reports[:2]], [[start["players"][0]] for start in starts[:2]])
+                    self.assertTrue(all(not report["eliminated"] for report in reports[:2]))
+                    loser = starts[-1]["players"][0]
+                    self.assertEqual(reports[-1]["scores"][loser], -2)
+                elif tied_count == 3:
+                    loser = match.doubter
+                    self.assertEqual(reports[-1]["scores"][loser], -1)
+                else:
+                    loser = next(json.loads(event.content)["player"] for event in reversed(match.events) if event.msg_type == "pig_claim")
+                    self.assertEqual(reports[-1]["scores"][loser], -1)
+                self.assertEqual(result["eliminated"], [loser])
+                self.assertEqual(result["ranking"][-1], loser)
+                self.assertCountEqual(result["ranking"], PLAYERS)
+                winners = [name for name in PLAYERS if expected_main[name] == max(expected_main.values()) and name != loser]
+                self.assertCountEqual(result["winners"], winners)
+                for name in PLAYERS:
+                    self.assertEqual(result["pieces_awarded"][name], 3 // len(winners) if name in winners else 0)
+                for _, _, previous, projected in match.fresh_inputs:
+                    self.assertEqual(previous, {})
+                    for stale in ("OLD_MAIN_PLAN94701", "94441", "94442", "94443"):
+                        self.assertNotIn(stale, projected, "Each extra game must start without old private memories or plans")
+                self.assertEqual(len(match.fresh_inputs), sum(len(start["players"]) for start in starts))
+                active = set(PLAYERS)
+                phase_verdict = None
+                for event in match.events:
+                    if event.msg_type == "pig_tiebreak_start":
+                        active = set(json.loads(event.content)["players"])
+                        phase_verdict = False
+                    elif event.msg_type in {"pig_doubt", "pig_challenge"} and phase_verdict is not None:
+                        phase_verdict = True
+                    elif event.msg_type == "pig_tiebreak_result":
+                        phase_verdict = None
+                    elif event.msg_type == "pig_contents":
+                        self.assertEqual(len(json.loads(event.content)["banks"]), len(active) + 1)
+                    elif phase_verdict:
+                        self.assertNotIn(event.msg_type, {"action", "pig_replace", "pig_reset"},
+                                         "A scoring verdict must finish the extra game before more decisions or fresh banks")
+                    elif event.msg_type in {"action", "decision_note", "pig_recall"}:
+                        self.assertIn(event.agent_name, active)
+                        if event.msg_type == "pig_recall":
+                            self.assertEqual(event.visible_to, [event.agent_name])
 
     def test_simultaneous_reset_queries_share_prior_votes_and_publish_all_current_requests(self):
         class TurnsComplete(Exception):
@@ -748,7 +887,9 @@ class PiggyBankTest(unittest.TestCase):
                     decisions = {name: replace(decision, default=values) for name, decision in decisions.items()}
                 return super().decide_together(phase, decisions, **kwargs)
 
-        self._assert_end_turn_memory(DynamicMatch(PLAYERS, 23), "dynamic")
+        match = DynamicMatch(PLAYERS, 23)
+        match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": CAPPED_RULES_BEFORE_TIEBREAK}])
+        self._assert_end_turn_memory(match, "dynamic")
 
     def _assert_end_turn_memory(self, match, mode, *, discussion=False):
         result = play(match)

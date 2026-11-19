@@ -23,6 +23,7 @@ SIMULTANEOUS_RESET_HEADING = "\n\n8. 리셋 동시 판단\n"
 SCORING_GOAL_HEADING = "\n\n득점 목표\n"
 INITIAL_MEMORY_SELECTION_HEADING = "\n\n초기 기억 선택\n"
 TURN_LIMIT_HEADING = "\n\n100턴 상한\n"
+TIEBREAK_HEADING = "\n\n최하위 동점 추가 경기\n"
 COLORS = ("black", "white")
 PASS = '{"type":"pass"}'
 
@@ -43,7 +44,7 @@ def parse_challenge(action, bank_ids):
         return None
     guesses = json.loads(action)
     if not isinstance(guesses, dict) or set(guesses) != {str(bank) for bank in bank_ids}:
-        raise ValueError("현재 저금통 다섯 개를 모두 답하세요.")
+        raise ValueError("현재 저금통을 모두 답하세요.")
     for counts in guesses.values():
         if (not isinstance(counts, dict) or counts.keys() != set(COLORS)
                 or any(type(counts[color]) is not int or counts[color] < 0 for color in COLORS)):
@@ -74,6 +75,7 @@ def play(match: Match) -> dict:
         recorded_rules = next((event["content"] for event in match.resume_log.events
                                if event["msg_type"] == "rules"), None)
     turn_limit = MAX_TURNS if recorded_rules is None or TURN_LIMIT_HEADING in recorded_rules else None
+    tiebreak_enabled = recorded_rules is None or TIEBREAK_HEADING in recorded_rules
     discussion_turns = 1 if recorded_rules is not None and "전원에게 한 턴씩" in recorded_rules else 2
     discussion_enabled = recorded_rules is not None and NO_DISCUSSION_HEADING not in recorded_rules
     match.relationship_reviews_enabled = recorded_rules is not None and NO_RELATIONSHIP_HEADING not in recorded_rules
@@ -85,6 +87,7 @@ def play(match: Match) -> dict:
     free_memory = recorded_rules is not None and FREE_MEMORY_HEADING in recorded_rules
     limited_memory = dynamic_memory or free_memory or MEMORY_HEADING in recorded_rules
     order = match.rng.sample(list(players), 4)
+    main_order = order.copy()
     scores = dict.fromkeys(players, 0)
     acting = order[0]
     banks = {}
@@ -93,6 +96,12 @@ def play(match: Match) -> dict:
     next_bank = 6
     voters = []
     resets = turn = 0
+    tiebreak_round = phase_start = 0
+    main_scores = None
+    main_turns = 0
+    main_end_reason = None
+    tiebreaks = []
+    eliminated = []
     discussion = Discussion(order, OPENING_TURNS)
     memory_mode = "dynamic" if dynamic_memory else "summary" if free_memory else "exact"
     memory = (PiggyMemory(players, banks, mode=memory_mode, auto_select=not choose_initial_memory)
@@ -102,9 +111,11 @@ def play(match: Match) -> dict:
 
     def distribute():
         banks.clear()
-        banks.update({bank: {"black": 1, "white": 1} for bank in range(1, 6)})
+        banks.update({bank: {"black": 1, "white": 1} for bank in range(1, len(order) + 2)})
+        lower.clear()
+        upper.clear()
         lower.update({name: index for index, name in enumerate(order, 1)})
-        upper.update({name: 5 if name == acting else None for name in order})
+        upper.update({name: len(order) + 1 if name == acting else None for name in order})
 
     def locations():
         return {"lower": lower.copy(), "upper": upper.copy()}
@@ -112,10 +123,18 @@ def play(match: Match) -> dict:
     def contents():
         match.event("pig_contents", {"banks": banks}, private=["__operator__"])
 
-    def remember(names=order):
+    def remember(names=None):
         if memory is not None:
-            for name in names:
+            for name in order if names is None else names:
                 match.event("pig_recall", memory.recall(name), actor=name, private=[name])
+
+    def score_finished():
+        if tiebreak_round:
+            return any(score != 0 for score in scores.values())
+        return max(scores.values()) >= WIN_SCORE
+
+    def phase_finished():
+        return score_finished() or not tiebreak_round and turn_limit is not None and turn >= turn_limit
 
     def memory_selection(names):
         for name in names:
@@ -360,6 +379,18 @@ def play(match: Match) -> dict:
             "최하위 한 명이 탈락합니다. 공동 1위의 피스 배분과 최하위 동점 판정은 기존 규칙을 따릅니다. "
             "남은 턴과 현재 승점 격차를 고려해 득점 기회와 실패 손실을 판단하세요."
         )
+    if tiebreak_enabled:
+        rules = rules.replace("최하위 동점은 추첨 순서가 뒤인 사람이 탈락합니다.",
+                              "최하위 동점은 동점자끼리 추가 경기를 진행해 탈락자를 정합니다.")
+        rules += (
+            TIEBREAK_HEADING
+            + "본 경기 종료 시 최하위가 동점이면 해당 참가자만 0점에서 추가 경기를 합니다. 참가자 수보다 "
+            "하나 많은 새 저금통을 배분하고, 리셋은 참가자 수보다 한 명 적게 요청하면 처리합니다. "
+            "처음 점수가 변하는 판정에서 감점받은 사람이 있으면 그 사람이 탈락합니다. 득점자만 나오면 "
+            "그 사람은 생존하고 나머지 동점자끼리 새 추가 경기를 합니다. 남은 사람이 한 명이면 그 사람이 "
+            "탈락합니다. 추가 경기에는 5점 목표와 100턴 상한을 적용하지 않으며 추첨으로 탈락자를 정하지 "
+            "않습니다. 추가 경기 점수는 본 경기 승점에 합산하지 않습니다. 탈락자는 1위 피스 보상에서 제외합니다."
+        )
     rules += (
         SCORING_GOAL_HEADING
         + "5점 이상을 먼저 달성해 1위를 차지하도록 적극적으로 득점 기회를 찾으세요. "
@@ -412,12 +443,77 @@ def play(match: Match) -> dict:
         talk("opening", OPENING_TURNS)
     update_memory()
 
-    while max(scores.values()) < WIN_SCORE:
+    while True:
+        if phase_finished():
+            if not tiebreak_enabled:
+                break
+            if not tiebreak_round:
+                main_scores = scores.copy()
+                main_turns = turn
+                main_end_reason = "win_score" if max(scores.values()) >= WIN_SCORE else "turn_limit"
+                contenders = [name for name in main_order if scores[name] == min(scores.values())]
+                if len(contenders) == 1:
+                    eliminated = contenders
+                    break
+            else:
+                lost = [name for name in order if scores[name] < 0]
+                safe = [name for name in order if scores[name] > 0]
+                contenders = [name for name in order if name not in safe]
+                if lost:
+                    eliminated = lost
+                    safe = [name for name in order if name not in lost]
+                    contenders = []
+                elif len(contenders) == 1:
+                    eliminated = contenders
+                    contenders = []
+                report = {"round": tiebreak_round, "players": order.copy(), "scores": scores.copy(),
+                          "safe": safe, "eliminated": eliminated.copy(), "remaining": contenders.copy(),
+                          "turns": turn - phase_start}
+                tiebreaks.append(report)
+                match.event("pig_tiebreak_result", report)
+                if eliminated:
+                    break
+            tiebreak_round += 1
+            phase_start = turn
+            order = [name for name in main_order if name in contenders]
+            acting = order[0]
+            scores = dict.fromkeys(order, 0)
+            voters.clear()
+            next_bank = len(order) + 2
+            memory = PiggyMemory(order, banks, mode="dynamic", auto_select=False)
+            memory.through = dict.fromkeys(order, len(match.events))
+            match.model_observations = memory
+            distribute()
+            memory.reset(resets, turn)
+            match.event("pig_tiebreak_start", {"round": tiebreak_round, "players": order,
+                                               "main_scores": main_scores, "scores": scores,
+                                               "reset_threshold": len(order) - 1, "bank_count": len(banks),
+                                               "turn": turn, "tiebreak": tiebreak_round, "tiebreak_turn": 0})
+            match.event("rules", (
+                f"돼지 저금통 · 최하위 동점 추가 경기 {tiebreak_round}\n"
+                f"참가자는 {encode(order)}이며 모두 0점으로 시작합니다. 저금통은 {len(banks)}개이고 "
+                "처음에 흑·백 동전이 하나씩 들어 있습니다. 동전 추가·전달·선언·의심은 본 경기와 같습니다. "
+                f"리셋 요청자가 {len(order) - 1}명이 되면 남은 한 명이 모든 저금통의 두 색 수량을 맞히는 "
+                "도전을 하거나 패스합니다. 의심 성공은 +1점과 선언자 -1점, 의심 실패는 -1점입니다. "
+                "전체 도전 성공은 +3점, 실패는 -2점입니다. 첫 점수 변동에서 감점받으면 탈락하고, "
+                "득점하면 생존합니다. 득점자만 나오면 나머지 참가자끼리 새 추가 경기를 하며, 한 명만 "
+                "남으면 그 사람이 탈락합니다. 5점 목표나 100턴 상한은 없습니다. "
+                "득점할 기회를 찾되 실패하면 즉시 탈락한다는 점을 고려하세요. 대화와 관계 평가는 없습니다. "
+                "새 기억 세 개를 비공개로 직접 고르고 매 턴 갱신하세요. 기억은 추정이며 틀릴 수 있습니다."
+            ))
+            match.event("pig_setup", {"order": order, "reset": resets, **locations(), "scores": scores,
+                                      "turn": turn, "color": "black", "next_player": acting,
+                                      "tiebreak": tiebreak_round, "tiebreak_turn": 0,
+                                      "reset_threshold": len(order) - 1})
+            contents()
+            update_memory()
         turn += 1
-        color = COLORS[(turn - 1) % 2]
+        color = COLORS[(turn - phase_start - 1) % 2]
+        reset_threshold = len(order) - 1
         match.event("pig_turn", {"turn": turn, "player": acting, "color": color,
-                                 **locations(), "scores": scores.copy()})
-        if discussion_enabled:
+                                 **locations(), "scores": scores.copy(),
+                                 **({"tiebreak": tiebreak_round, "tiebreak_turn": turn - phase_start} if tiebreak_round else {})})
+        if discussion_enabled and not tiebreak_round:
             talk("before_turn", discussion_turns)
         black = match.policy.randrange(6)
         white = match.policy.randint(0 if black else 1, 5 - black)
@@ -430,8 +526,8 @@ def play(match: Match) -> dict:
             '각 색은 0개 이상, 두 색 합계는 1~5개이며 이번 선언 색과 관계없이 두 색 모두 추가할 수 있습니다. '
             '추가 개수는 그대로 공개됩니다. '
             f"받는 사람은 {'흑' if color == 'black' else '백'} 동전의 총개수를 선언합니다.",
-            default, valid=lambda action: _accepts(parse_deposit, action, players, acting),
-        ), players, acting)
+            default, valid=lambda action: _accepts(parse_deposit, action, order, acting),
+        ), order, acting)
         recipient = deposit["to"]
         bank = lower[acting]
         for coin in COLORS:
@@ -479,6 +575,8 @@ def play(match: Match) -> dict:
                 "turn": turn, "challenger": challenger, "player": recipient, "bank": bank, "color": color,
                 "claimed": count, "actual": banks[bank].copy(), "correct": correct, "scores": scores.copy(),
             })
+            if tiebreak_round:
+                continue
             acting = recipient if correct else challenger
             del banks[bank]
             upper[recipient] = None
@@ -496,8 +594,8 @@ def play(match: Match) -> dict:
         else:
             match.event("pig_pass", {"turn": turn, "player": recipient, "bank": bank, "color": color, "count": count})
         match.review_relationships(f"돼지 저금통 {turn}턴 선언·의심 결과")
-        if max(scores.values()) >= WIN_SCORE:
-            break
+        if score_finished():
+            continue
 
         if simultaneous_reset:
             responses = match.decide_together("pig_reset_vote", {
@@ -506,8 +604,8 @@ def play(match: Match) -> dict:
                     "아직 요청하지 않은 참가자 전원이 동시에 비공개로 판단합니다. 이번 다른 참가자의 응답을 "
                     "볼 수 없으며 모두 제출한 뒤 새 요청을 함께 공개합니다. 리셋을 요청하려면 reset, 아니면 "
                     "pass입니다. 이전 요청은 유지되고 취소할 수 없습니다. 새 요청까지 전부 반영한 누적 인원이 "
-                    "세 명 이상이면 리셋하며, 정확히 세 명이면 남은 한 명만 전체 도전을 선택할 수 있습니다. "
-                    "네 명 모두 요청하면 전체 도전 없이 바로 리셋합니다.",
+                    f"{reset_threshold}명 이상이면 리셋하며, 정확히 {reset_threshold}명이면 남은 한 명만 전체 도전을 선택할 수 있습니다. "
+                    "전원이 요청하면 전체 도전 없이 바로 리셋합니다.",
                     "reset" if match.policy.randrange(8) == 0 else "pass", options=("reset", "pass"),
                 ) for name in order if name not in voters
             })
@@ -515,7 +613,8 @@ def play(match: Match) -> dict:
             voters.extend(new_voters)
             for name in new_voters:
                 match.event("pig_reset_vote", {"turn": turn, "player": name, "voters": voters.copy(),
-                                              "simultaneous": True})
+                                              "simultaneous": True,
+                                              **({"threshold": reset_threshold} if tiebreak_round else {})})
         else:
             for name in order:
                 if name in voters:
@@ -523,22 +622,23 @@ def play(match: Match) -> dict:
                 request = match.decide(
                     name, "pig_reset_vote",
                     f"{turn}턴 전달과 의심이 끝났습니다. 현재 리셋 요청자 {encode(voters)}. {seating()}\n"
-                    "리셋을 요청하려면 reset, 아니면 pass입니다. 요청은 취소할 수 없으며 세 명이면 리셋합니다. "
+                    f"리셋을 요청하려면 reset, 아니면 pass입니다. 요청은 취소할 수 없으며 {reset_threshold}명이면 리셋합니다. "
                     "나머지 한 명은 그 전에 전체 동전 수 맞추기에 도전할 수 있습니다.",
                     "reset" if match.policy.randrange(8) == 0 else "pass", options=("reset", "pass"), private=False,
                 )
                 if request != "reset":
                     continue
                 voters.append(name)
-                match.event("pig_reset_vote", {"turn": turn, "player": name, "voters": voters.copy()})
-                if len(voters) == 3:
+                match.event("pig_reset_vote", {"turn": turn, "player": name, "voters": voters.copy(),
+                                              **({"threshold": reset_threshold} if tiebreak_round else {})})
+                if len(voters) == reset_threshold:
                     break
-        if len(voters) >= 3:
-            if len(voters) == 3:
+        if len(voters) >= reset_threshold:
+            if len(voters) == reset_threshold:
                 challenger = next(name for name in order if name not in voters)
                 guess = parse_challenge(match.decide(
                     challenger, "pig_challenge",
-                    f"세 명이 리셋을 요청했습니다. 당신만 현재 저금통 {encode(sorted(banks))}의 흑·백 개수를 모두 "
+                    f"{reset_threshold}명이 리셋을 요청했습니다. 당신만 현재 저금통 {encode(sorted(banks))}의 흑·백 개수를 모두 "
                     "맞히는 도전에 나설 수 있습니다. 성공 +3점, 실패 -2점입니다. 도전하지 않으면 pass를 출력하세요. "
                     '도전하려면 모든 번호를 문자열 키로 포함한 JSON 객체를 출력하고, '
                     '각 값에는 black과 white의 개수를 넣으세요. '
@@ -558,36 +658,45 @@ def play(match: Match) -> dict:
                     match.event("pig_challenge", {"turn": turn, "player": challenger, "guesses": guess, "actual": actual,
                                                  "correct": correct, "scores": scores.copy()})
                     match.review_relationships(f"돼지 저금통 {turn}턴 전체 도전 결과")
-                if max(scores.values()) >= WIN_SCORE:
-                    break
-            if turn_limit is not None and turn >= turn_limit:
-                break
+                if score_finished():
+                    continue
+            if phase_finished():
+                continue
             resets += 1
             if free_memory:
                 memory.reset(resets)
             distribute()
             if dynamic_memory:
                 memory.reset(resets, turn)
-            next_bank = 6
+            next_bank = len(order) + 2
             voters.clear()
             match.event("pig_reset", {"turn": turn, "reset": resets, "order": order, "scores": scores.copy(),
-                                      "next_player": acting, **locations()})
+                                      "next_player": acting, **locations(),
+                                      **({"tiebreak": tiebreak_round, "reset_threshold": reset_threshold} if tiebreak_round else {})})
             contents()
             if dynamic_memory and not choose_initial_memory:
                 remember()
             select_memory()
             match.review_relationships(f"돼지 저금통 {turn}턴 리셋 완료")
-        if turn_limit is not None and turn >= turn_limit:
-            break
-        if max(scores.values()) < WIN_SCORE:
-            update_memory()
+        if phase_finished():
+            continue
+        update_memory()
 
-    ranking = sorted(order, key=lambda name: -scores[name])
-    winners = [name for name in ranking if scores[name] == scores[ranking[0]]]
-    awards = {name: 3 // len(winners) if name in winners else 0 for name in players}
-    result = {"turns": turn, "resets": resets, "ranking": ranking, "scores": scores,
+    final_scores = main_scores if main_scores is not None else scores
+    ranking = sorted(main_order, key=lambda name: -final_scores[name])
+    if eliminated:
+        ranking = [name for name in ranking if name not in eliminated] + eliminated
+    else:
+        eliminated = ranking[-1:]
+    winners = [name for name in ranking if final_scores[name] == max(final_scores.values())
+               and (not tiebreaks or name not in eliminated)]
+    awards = {name: 3 // len(winners) if name in winners else 0 for name in match.players}
+    result = {"turns": turn, "resets": resets, "ranking": ranking, "scores": final_scores,
               "winners": winners, "survivors": ranking[:-1], "eliminated": ranking[-1:],
-              "pieces_awarded": awards, "pieces": {name: match.pieces[name] + awards[name] for name in players}}
+              "pieces_awarded": awards, "pieces": {name: match.pieces[name] + awards[name] for name in match.players}}
     if turn_limit is not None:
-        result.update(turn_limit=turn_limit, end_reason="win_score" if max(scores.values()) >= WIN_SCORE else "turn_limit")
+        result.update(turn_limit=turn_limit, end_reason=main_end_reason or
+                      ("win_score" if max(final_scores.values()) >= WIN_SCORE else "turn_limit"))
+    if tiebreaks:
+        result.update(main_turns=main_turns, tiebreaks=tiebreaks)
     return result

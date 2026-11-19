@@ -55,6 +55,7 @@ const labels = {
   pig_pass: tr("의심 없이 통과", "Declaration accepted"), pig_discussion: tr("대화 시작", "Discussion begins"),
   pig_discussion_end: tr("대화 종료", "Discussion ends"), pig_preparation: tr("비공개 전략 준비", "Private preparation"),
   pig_preparation_end: tr("전략 준비 완료", "Preparation complete"),
+  pig_tiebreak_start: tr("최하위 동점 추가 경기", "Last-place tiebreak"), pig_tiebreak_result: tr("추가 경기 결과", "Tiebreak result"),
   pass: tr("자동 패스", "Automatic pass"), private_action: tr("비공개 행동", "Private action"), match_result: tr("최종 결과", "Final results"), match_interrupted: tr("플레이 중단", "Run interrupted"),
 };
 const legacyRelationshipCheckpoints = new Map([
@@ -189,6 +190,7 @@ function ruleHeading(title) {
     if (players && total) return `${gameTitle(name)} · ${players} players, ${total} rounds`;
   }
   if (name === "러시안 룰렛") return "Russian Roulette · A deduction game for six players";
+  if (name === "돼지 저금통" && details?.startsWith("최하위 동점 추가 경기 ")) return `Piggy Bank · Last-place tiebreak ${details.split(" ").at(-1)}`;
   if (name === "돼지 저금통") return "Piggy Bank · A memory game for four players";
   return gameTitle(title);
 }
@@ -1144,7 +1146,7 @@ export function MatchReplay({replay, transport, caseName}) {
       (type === "gem_discussion" ? gemDiscussionLabel(data) : null) ??
       (type === "gem_auction_round" && data.manito_reveal ? tr("마니또 확인 · 피스 경매", "Manito reveal and Piece auction") : null) ??
       (type === "gem_strategy" ? gemEventText(type, data) : null) ??
-      (["pig_setup", "pig_turn", "pig_doubt", "pig_challenge", "pig_reset"].includes(type) ? pigEventText(type, data) : null) ??
+      (["pig_setup", "pig_turn", "pig_doubt", "pig_challenge", "pig_reset", "pig_tiebreak_start", "pig_tiebreak_result"].includes(type) ? pigEventText(type, data) : null) ??
       (type === "negotiation_start" ? (data.choice === 2 ? tr("선택 2 팀 구성 협상", "Choice 2 team negotiations") : tr(`선택 ${data.choice} 전 협상`, `Negotiation before Choice ${data.choice}`)) : null) ??
       (type === "grass_phase" && grassPhases[data] === "place" ? tr("잔디 타일 배치", "Grass tile placement") : null);
     return label ? [{value: String(index + 1), label}] : [];

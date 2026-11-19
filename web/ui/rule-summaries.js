@@ -2,6 +2,7 @@ const attack = "Attack uses the uncut tile. A successful placement earns twice i
 const partner = "Two players who select each other cooperate. If both tiles are placed, the pair earns 1 bonus point per shared edge. Their submitted shares must add up to the full bonus. A player who chooses to compete earns 5 extra points if their tile is placed and no more than nine players place tiles in total.";
 const obstacle = "Choose one tree or two manholes worth +1 and −1. A tile may cover a tree only with a hole. Covering a manhole adds or subtracts one point. Place manholes first, then trees, then tiles. Obstacles go on empty board cells in tile placement order.";
 const points = "Choose Points for 5 Victory Points or Information for a private preview of Choices 6–8 before picking a tile.";
+const piggyTiebreak = "Players tied for last place play fresh tiebreaks with separate scores starting at zero. At the first score change, losing extra Victory Points means elimination; gaining points secures safety. Remaining tied players start another fresh tiebreak, and the last remaining tied player is eliminated even if their score is unchanged. Each tiebreak uses one more bank than active players, three memory slots, and a reset threshold of one fewer than the active player count. The main match’s five-point target and 100-turn limit do not apply to tiebreaks. Extra scores do not change main-match Victory Points. Eliminated players do not share first-place rewards.";
 
 // Replay logs retain the original rules. Summaries cover known headings without changing archived data.
 const summaries = [
@@ -26,6 +27,8 @@ const summaries = [
 
 export function rulesSummary(heading, body) {
   if (heading.startsWith("돼지 저금통")) {
+    if (heading.includes("최하위 동점 추가 경기")) return piggyTiebreak +
+      " Normal deposits, passes, claims, doubts and all-bank challenge scoring still apply. Players privately choose three fresh memories and update them each turn. There are no discussion or relationship assessments.";
     const turns = body.includes("전원에게 두 턴씩") ? "two discussion turns" : "one discussion turn";
     const silent = body.includes("\n\n6. 대화 없는 진행\n");
     const memory = body.includes("\n\n5. 변경 가능한 기억 슬롯\n") ?
@@ -46,9 +49,13 @@ export function rulesSummary(heading, body) {
       " Relationship assessments are disabled during and at the end of this match." : "";
     const initialMemory = body.includes("\n\n초기 기억 선택\n") ?
       " Memory slots start empty. At the start and after each reset, each player independently chooses three current banks in private." : "";
+    const tiebreak = body.includes("\n\n최하위 동점 추가 경기\n") ?
+      " " + piggyTiebreak : "";
+    if (tiebreak) summary = summary.replace("End immediately", "The main match ends immediately")
+      .replace("drawn order resolves simultaneous doubts and final score ties", "drawn order resolves simultaneous doubts");
     return (silent ? summary.replace("discussion and decision windows replace the timers", "decision windows replace the timers") : summary) +
       (silent ? " There are no discussion or whisper phases. Players privately prepare and update their initial memory before the first deposit. Coin deposits, count declarations, and verdicts remain public." :
-        ` Each player has four opening discussion turns and ${turns} before each deposit.`) + memory + initialMemory + relationships;
+        ` Each player has four opening discussion turns and ${turns} before each deposit.`) + memory + initialMemory + relationships + tiebreak;
   }
   if (heading.startsWith("보석 암시장")) {
     const relationships = body.includes("\n\n8. 관계 평가 갱신\n") ?

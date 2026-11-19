@@ -42,6 +42,7 @@ _BOUNDARIES = {"pig_setup", "pig_turn", "pig_reset"}
 _CURRENT_EVENTS = {
     *_BOUNDARIES, "pig_preparation", "pig_preparation_end", "pig_discussion", "pig_discussion_end",
     "pig_deposit", "pig_claim", "pig_doubt", "pig_replace", "pig_pass", "pig_reset_vote", "pig_challenge",
+    "pig_tiebreak_start", "pig_tiebreak_result",
     "public", "whisper",
 }
 
@@ -163,7 +164,8 @@ class PiggyMemory:
             if kind not in _CURRENT_EVENTS:
                 continue
             data = json.loads(event.content)
-            for key in ("lower", "upper", "scores", "turn", "color", "next_player"):
+            for key in ("lower", "upper", "scores", "turn", "color", "next_player",
+                        "tiebreak", "tiebreak_turn", "reset_threshold"):
                 if key in data:
                     state[key] = data[key]
             if kind in {"pig_setup", "pig_reset"}:
