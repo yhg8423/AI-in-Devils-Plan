@@ -64,6 +64,18 @@ function statusText(state, player) {
   return "";
 }
 
+function BingoStandings({state, selected = ""}) {
+  const reveal = state.bingoReveal;
+  const guest = state.bingoSetup?.guest ?? "G01";
+  return <Table caption={tr("본선 최종 순위 · 게스트 별도 표시", "Final standings · Guest listed separately")} headers={tr(["참가자", "순위", "빙고", "채운 칸", "잔여 금액", "결과"], ["Player", "Rank", "Lines", "Filled", "Coins left", "Result"])}
+    rows={[...reveal.ranking, guest].filter((player) => !selected || selected === player).map((player) => {
+      const final = reveal.players[player];
+      return [player, player === guest ? tr("게스트", "Guest") : reveal.ranking.indexOf(player) + 1,
+        final.lines, `${final.filled} / 9`, priceLabel(final.remaining_value),
+        player === guest ? tr("게스트", "Guest") : statusText(state, player)];
+    })} />;
+}
+
 export function BingoSubmission({progress, players, selected, onChoose}) {
   if (!progress) return null;
   const {phase, round, submitted, total} = progress;
@@ -110,6 +122,9 @@ export function BingoStage({state, replay}) {
       <div className="bingo-template"><BingoCard board={board} /><p>{tr("세모 3개 · 동그라미 4개 · 별 2개", "3 triangles · 4 circles · 2 stars")}<br />{tr("마지막에 빙고 줄 수가 최대가 되도록 자동 배치합니다.", "Shapes are placed automatically to maximize completed lines at the end.")}</p></div>
       <p className="bingo-starting-coins">{tr("시작 코인 30원 · 1원×3, 2원×3, 3원×2, 5원×1, 10원×1", "Starting coins: 30 won · 1×3, 2×3, 3×2, 5×1, 10×1")}<br />{tr("매 라운드 최소 1원 입찰 · 낙찰 실패에도 사용한 코인은 소모", "Bid at least one won each round · Losing bids are also spent")}</p>
     </> : <>
+      {state.result && <section className="bingo-standings" aria-label={tr("최종 순위", "Final standings")}>
+        <BingoStandings state={state} />
+      </section>}
       <p className="bingo-secrecy revealed">{tr("획득 도형과 빙고판이 모두 공개되었습니다.", "All acquired shapes and bingo cards have been revealed.")}</p>
       <div className="bingo-player-picker">{players.map((player) => <button type="button" key={player} onClick={() => choosePlayer(player)} aria-pressed={chosen === player} data-guest={player === guest}>{player}{player === guest && <small>{tr("게스트", "Guest")}</small>}</button>)}</div>
       {final && <section className="bingo-final-card"><div><h3>{chosen} <small>{statusText(state, chosen)}</small></h3><BingoCard board={board} filled={final.board} label={tr(`${chosen} · ${final.lines}줄, ${final.filled}칸 완성`, `${chosen} · ${final.lines} lines, ${final.filled} filled cells`)} /></div>
@@ -180,11 +195,7 @@ export function BingoInformation({state, replay}) {
     </div>
     <div id="bingo-results-panel" className="match-info-scroll" role="tabpanel" aria-labelledby="bingo-results" hidden={tab !== "results"} tabIndex={0}>
       {!reveal ? <p className="empty">{tr("7라운드가 끝나면 빙고판과 최종 순위를 공개합니다.", "Bingo cards and final standings are revealed after Round 7.")}</p> : <>
-        <Table caption={tr("본선 최종 순위 · 게스트 별도 표시", "Final standings · Guest listed separately")} headers={tr(["참가자", "순위", "빙고", "채운 칸", "잔여 금액", "결과"], ["Player", "Rank", "Lines", "Filled", "Coins left", "Result"])}
-          rows={[...reveal.ranking, guest].filter((player) => !selected || selected === player).map((player) => {
-            const final = reveal.players[player];
-            return [player, player === guest ? tr("게스트", "Guest") : reveal.ranking.indexOf(player) + 1, final.lines, `${final.filled} / 9`, priceLabel(final.remaining_value), statusText(state, player)];
-          })} />
+        <BingoStandings state={state} selected={selected} />
         <p className="muted">{tr(`${guest}는 생존·탈락 순위에서 제외됩니다. 빙고판 완성 시 피스 4개를 얻습니다.`, `${guest} is excluded from survival and elimination. A full card earns four Pieces.`)}</p>
         {state.result?.guest_result && <section className="bingo-guest-result"><h3>{guest} · {tr("게스트 미션", "Guest missions")}</h3>
           <p>{tr(`전체 ${state.result.guest_result.rank}위 · 전체 1위 ${state.result.guest_result.first ? "성공" : "실패"} · 빙고판 완성 ${state.result.guest_result.full_board ? "성공" : "실패"}`, `Overall rank ${state.result.guest_result.rank} · First place: ${state.result.guest_result.first ? "Achieved" : "Not achieved"} · Full card: ${state.result.guest_result.full_board ? "Achieved" : "Not achieved"}`)}</p>

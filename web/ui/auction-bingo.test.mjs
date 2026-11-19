@@ -158,9 +158,21 @@ test("final reveal shows cards and prices while sealed bids stay private", () =>
   const results = Object.fromEntries(players.map((player) => [player, {shapes: {triangle: 3, circle: 4, star: 2}, board: bingoBoard, lines: 8, filled: 9, remaining_value: 10, coins: {10: 1}, pieces: 1}]));
   const reveal = event("bingo_reveal", {ranking: regular, all_ranking: ["G01", ...regular], players: results, guest: "G01",
     rounds: [{round: 1, choices, counts: {triangle: 2, circle: 3, star: 3}, prices: {triangle: 777, circle: 2, star: 777}, secret: ["triangle", "star"]}]});
-  const result = event("match_result", {ranking: regular, living: regular.slice(0, 3), prison: regular.slice(3, -1), eliminated: ["P07"],
+  const result = event("match_result", {ranking: regular, living: ["P01", "P02", "P05"], prison: ["P03", "P04", "P06"], eliminated: ["P07"],
     pieces: Object.fromEntries(players.map((player) => [player, 5])), guest_result: {player: "G01", rank: 1, first: true, full_board: true, prize_won: 20_000_000}});
   const html = render([...pending, reveal, result], "public", "G01");
+  assert.doesNotMatch(render([...pending, reveal], "public"), /class="bingo-standings"/);
+  const standings = html.match(/<section class="bingo-standings"[\s\S]*?<\/section>/)[0];
+  for (const player of players) assert.match(standings, new RegExp(player));
+  assert.match(standings, /P01<\/th><td>1<\/td>/);
+  assert.match(standings, /P05<\/th>(?:(?!<\/tr>)[\s\S])*생활동/);
+  assert.match(standings, /P07<\/th>[\s\S]*?탈락/);
+  assert.match(standings, /G01<\/th><td>게스트<\/td>/);
+  assert.ok(html.indexOf('class="bingo-standings"') < html.indexOf('class="bingo-player-picker"'));
+  const englishStandings = render([...pending, reveal, result], "public", "G01", "en").match(/<section class="bingo-standings"[\s\S]*?<\/section>/)[0];
+  assert.match(englishStandings, /Final standings/);
+  assert.match(englishStandings, /P05<\/th>(?:(?!<\/tr>)[\s\S])*Living Quarters/);
+  assert.match(englishStandings, /G01<\/th><td>Guest<\/td>/);
   assert.match(html, /data-filled="true"/);
   assert.match(html, /생존 판정 제외/);
   assert.match(html, /상금 20,000,000원/);
