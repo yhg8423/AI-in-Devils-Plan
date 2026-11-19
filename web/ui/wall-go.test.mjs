@@ -105,3 +105,18 @@ test("stalemate results show occupied-square scoring and preserve the scored cel
   assert.match(render(steps,{language:"en"}), /Only occupied squares in shared territory score one point per counter/);
   assert.doesNotMatch(render(steps,{frame:1}), /교착 종료/);
 });
+
+test("high-contrast player colors remain stable in a reordered two-player round", () => {
+  const initial = render([setup]);
+  for (const color of ["#ff765e", "#55b9ff", "#ffe066"]) assert.match(initial, new RegExp(`fill="${color}"`));
+  assert.match(initial, /P01 · 빨강/);
+  assert.match(initial, /P02 · 파랑/);
+  assert.match(initial, /P03 · 노랑/);
+  const second = {...board, game:2, round:2, players:["P03","P02"], order:["P03","P02"],
+    pieces:Object.fromEntries(Object.entries(board.pieces).filter(([,piece]) => piece.player !== "P01"))};
+  const html = render([setup,event("wall_setup",second)]);
+  assert.match(html, /P02 · 파랑/);
+  assert.match(html, /P03 · 노랑/);
+  assert.doesNotMatch(html, /fill="#ff765e"/);
+  assert.match(render([setup],{language:"en"}), /P01 · Red/);
+});

@@ -1,6 +1,5 @@
 import React, {useState} from "react";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
-import {playerColor} from "./cast.js";
 import {en, tr} from "./locale.js";
 import {Table} from "./records.jsx";
 import {rulesSummary} from "./rule-summaries.js";
@@ -8,6 +7,11 @@ import "./wall-go.css";
 
 const cellText = (cell) => cell ? `(${cell.join(", ")})` : "–";
 const kindText = (kind) => kind === "square" ? tr("사각", "Square") : tr("원형", "Round");
+const wallColors = [
+  {fill: "#ff765e", name: tr("빨강", "Red")},
+  {fill: "#55b9ff", name: tr("파랑", "Blue")},
+  {fill: "#ffe066", name: tr("노랑", "Yellow")},
+];
 const pieceText = (id) => {
   const [, kind, number] = (id ?? "").split(":");
   return ["square", "round"].includes(kind) ? `${kindText(kind)} ${number}` : id ?? "";
@@ -86,8 +90,10 @@ function Wall({edge, broken, recent}) {
   return <line {...line} className={`wall-segment${broken ? " broken-wall" : ""}${recent ? " recent-wall" : ""}`} data-edge={edgeKey(edge)} />;
 }
 
-export function WallGoScene({state, selected, onChoose}) {
+export function WallGoScene({state, players, selected, onChoose}) {
   const game = state.wallGame;
+  const colors = Object.fromEntries((players ?? game?.players ?? []).map((player, index) => [player, wallColors[index]]));
+  const color = (player) => colors[player] ?? {fill: "#b8c4d4", name: ""};
   const move = state.wallLastMove;
   const territories = state.wallEnd?.territories ?? [];
   const path = move?.path && move.from ? [move.from, ...move.path] : [];
@@ -103,7 +109,7 @@ export function WallGoScene({state, selected, onChoose}) {
         const row = Math.floor(index / 7) + 1, col = index % 7 + 1;
         const owner = territories.find((region) => region.cells.some(([r, c]) => r === row && c === col))?.owner;
         return <rect key={index} x={left + (col - 1) * side} y={top + (row - 1) * side} width={side} height={side}
-          fill={owner ? playerColor(owner) : (row + col) % 2 ? "#655d4c" : "#756b56"} fillOpacity={owner ? .7 : 1} stroke="#a18b663f" data-cell={`${row},${col}`} data-owner={owner ?? undefined} />;
+          fill={owner ? color(owner).fill : (row + col) % 2 ? "#655d4c" : "#756b56"} fillOpacity={owner ? .7 : 1} stroke="#a18b663f" data-cell={`${row},${col}`} data-owner={owner ?? undefined} />;
       })}
       {Array.from({length: 7}, (_, index) => <g key={index} className="wall-coordinates">
         <text x={left + (index + .5) * side} y={top - 10}>{index + 1}</text>
@@ -120,16 +126,16 @@ export function WallGoScene({state, selected, onChoose}) {
           role="button" tabIndex="0" aria-label={label} aria-pressed={selected === piece.player}
           onClick={() => onChoose(piece.player)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); onChoose(piece.player); } }}>
           <title>{label}</title>
-          {piece.kind === "square" ? <rect x={x - 14} y={y - 14} width="28" height="28" fill={playerColor(piece.player)} stroke={selected === piece.player ? "#fff7d1" : "#18212c"} strokeWidth="3" /> :
-            <circle cx={x} cy={y} r="15" fill={playerColor(piece.player)} stroke={selected === piece.player ? "#fff7d1" : "#18212c"} strokeWidth="3" />}
+          {piece.kind === "square" ? <rect x={x - 14} y={y - 14} width="28" height="28" fill={color(piece.player).fill} stroke={selected === piece.player ? "#fff7d1" : "#18212c"} strokeWidth="3" /> :
+            <circle cx={x} cy={y} r="15" fill={color(piece.player).fill} stroke={selected === piece.player ? "#fff7d1" : "#18212c"} strokeWidth="3" />}
           <text x={x} y={y + 3} className="wall-piece-label">{piece.player}</text>
         </g>;
       })}
       <text x="210" y="351" className="wall-room-title">{game ? gameText(game) : tr("말 배치 준비", "Preparing the board")}</text>
       <text x="210" y="371" className="wall-bottom-label">{tr("■ 사각 · ● 원형 · 붉은 점선은 부순 벽", "■ Square · ● Round · Red dashes mark a broken wall")}</text>
     </svg>
-    {game && <div className="wall-player-legend">{game.players.map((player) => <button key={player} type="button" aria-pressed={selected === player} onClick={() => onChoose(player)} style={{"--wall-player": playerColor(player)}}>
-      <i />{player}{state.wallTurn?.player === player && <strong>{tr("진행 중", "Acting")}</strong>}
+    {game && <div className="wall-player-legend">{game.players.map((player) => <button key={player} type="button" aria-pressed={selected === player} onClick={() => onChoose(player)} style={{"--wall-player": color(player).fill}}>
+      <i aria-hidden="true" />{player} · {color(player).name}{state.wallTurn?.player === player && <strong>{tr("진행 중", "Acting")}</strong>}
     </button>)}</div>}
   </section>;
 }
