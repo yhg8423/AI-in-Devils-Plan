@@ -15,6 +15,7 @@ const gameNames = new Map([
   ["3일차 메인 매치", "Day 3 Main Match"], ["보석 암시장", "Gem Black Market"],
   ["3일차 감옥 매치", "Day 3 Prison Match"], ["돼지 저금통", "Piggy Bank"],
   ["4일차 메인 매치", "Day 4 Main Match"], ["경매 빙고", "Auction Bingo"],
+  ["4일차 감옥 매치", "Day 4 Prison Match"], ["벽바둑 2", "Wall Go II"],
   ["양자택일", "Either/Or"], ["무거운 13", "Heavy 13"],
   ["미스터리 거래소", "Mystery Stock Exchange"], ["러시안 룰렛", "Russian Roulette"],
   ["큐브 세기", "Cube Counting"], ["네모 세기", "Rectangle Counting"],

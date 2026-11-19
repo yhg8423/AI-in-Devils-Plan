@@ -35,6 +35,7 @@ GAME_TERMS = {
     "코요테크": "Koyo Tech", "후자전자": "Huja Electronics",
     "돼지 저금통": "Piggy Bank",
     "경매 빙고": "Auction Bingo",
+    "벽바둑 2": "Wall Go II",
 }
 TERM_PATTERN = re.compile("|".join(map(re.escape, GAME_TERMS)))
 PLAYER_ID = re.compile(r"(?i)\b([pg])([0-9]{2})(?![0-9])")

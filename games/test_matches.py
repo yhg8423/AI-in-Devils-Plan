@@ -26,12 +26,13 @@ from .either_or.rectangle_counting import count_rectangles, rectangle_race, rect
 from .gem_exchange.game import play as gem_exchange
 from .auction_bingo.game import play as auction_bingo
 from .heavy_13.game import place, play as heavy_13
-from .match import DAY_FOUR_MAIN, DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_THREE_MAIN, DAY_THREE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, Decision, Match, run_cli
+from .match import DAY_FOUR_MAIN, DAY_FOUR_PRISON, DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_THREE_MAIN, DAY_THREE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, Decision, Match, run_cli
 from .models import CodexLanguageModel, OpenAILanguageModel, StrategyNote, _openai_key
 from .mystery_stock_market.game import next_prices, play as market, trade_orders
 from .personas import persona_context
 from .russian_roulette.game import play as roulette
 from .piggy_bank.game import play as piggy_bank
+from .wall_go.game import play as wall_go
 
 
 class MatchTest(unittest.TestCase):
@@ -599,9 +600,9 @@ class MatchTest(unittest.TestCase):
                 redirect_stdout(StringIO()),
                 redirect_stderr(StringIO()),
             ):
-                main_log, prison_log, market_log, roulette_log, gem_log, piggy_log, bingo_log = [
+                main_log, prison_log, market_log, roulette_log, gem_log, piggy_log, bingo_log, wall_log = [
                     Path(directory) / game / "events.jsonl"
-                    for game in ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main", "day3-prison", "day4-main")
+                    for game in ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main", "day3-prison", "day4-main", "day4-prison")
                 ]
 
                 def play_stage(game, title, seats, output, *args, **kwargs):
@@ -681,6 +682,15 @@ class MatchTest(unittest.TestCase):
                 self.assertCountEqual(bingo["ranking"], advancing)
                 self.assertEqual((len(bingo["living"]), len(bingo["prison"]), len(bingo["eliminated"])), (3, 3, 1))
                 self.assertEqual(bingo["rounds"], 7)
+                wall_start, wall = play_stage(
+                    wall_go, DAY_FOUR_PRISON, 3, wall_log, "--from-main", str(bingo_log), previous_main=DAY_FOUR_MAIN,
+                )
+                self.assertEqual(wall_start["players"], bingo["prison"])
+                self.assertNotIn("G01", wall_start["players"])
+                self.assertEqual(wall_start["pieces"], {name: bingo["pieces"][name] for name in bingo["prison"]})
+                self.assertEqual((len(wall["survivors"]), len(wall["eliminated"])), (2, 1))
+                for name in bingo["prison"]:
+                    self.assertEqual(wall["pieces"][name], bingo["pieces"][name] + int(name in wall["survivors"]))
 
     def test_private_relationship_updates_follow_players_across_matches(self):
         players = [f"P{seat:02}" for seat in range(1, 10)]
