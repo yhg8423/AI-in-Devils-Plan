@@ -18,6 +18,7 @@ INITIAL_COINS = {1: 3, 2: 3, 3: 2, 5: 1, 10: 1}
 OPENING_TURNS = 10
 DISCUSSION_TURNS = 6
 FREE_SUBMISSION_HEADING = "\n\n6. 자유 제출\n"
+DEALER_VISIT_HEADING = "\n\n7. 딜러룸 입찰\n"
 PREPARATION_STEPS = (
     "목표 설정: 빙고판과 자금 제약을 검토하고, 필요한 도형과 생존·우승 목표를 정하세요.",
     "위험·대안 검토: 낙찰 여부는 본인도 알 수 없고 낙찰 실패에도 코인이 소모됩니다. 이전 계획의 위험과 대안을 검토하세요.",
@@ -100,6 +101,7 @@ def play(match: Match) -> dict:
     recorded_rules = next((event["content"] for event in log.events if event["msg_type"] == "rules"), None) if (
         log is not None and log.resume) else None
     free_submission = recorded_rules is None or FREE_SUBMISSION_HEADING in recorded_rules
+    dealer_visits = recorded_rules is None or DEALER_VISIT_HEADING in recorded_rules
     opening_turns = OPENING_TURNS if free_submission else 12
     discussion_turns = DISCUSSION_TURNS if free_submission else 4
     base_order = match.rng.sample(list(players), len(players))
@@ -152,6 +154,12 @@ def play(match: Match) -> dict:
             "전원 제출하면 남은 대화 없이 즉시 해당 단계를 끝냅니다. 6턴이 끝나거나 전원 패스하면 미제출자만 마지막으로 제출합니다. "
             "도형은 전원 제출 후 함께 공개하고, 개인 입찰액은 계속 비공개입니다. 입찰 전 전략 요약은 입찰 대화를 시작하기 전에 정리하고, "
             "대화 중에는 매 차례 전략 메모를 갱신합니다. 입찰 확정과 동시에 사용 코인과 교환 피스를 정산합니다."
+        )
+    if dealer_visits:
+        rules += DEALER_VISIT_HEADING + (
+            "입찰을 확정하면 오른쪽 딜러룸에 들러 비공개로 제출한 뒤 즉시 복도로 돌아옵니다. "
+            "논의실에 있던 사람도 입찰 후에는 복도에 위치하므로 이후 귓속말과 논의실 대화는 바뀐 위치를 기준으로 합니다. "
+            "딜러룸 안에서는 대화하거나 머무를 수 없습니다."
         )
     if recorded_rules is not None:
         rules = recorded_rules
@@ -366,6 +374,12 @@ def play(match: Match) -> dict:
             if free_submission:
                 match.event("bingo_bank", {"round": round_number, "coins": coins[name].copy(),
                                            "pieces": pieces[name], "spent": spent[name]}, actor=name, private=[name])
+            if dealer_visits and discussion.location(name):
+                turn = len(match.events)
+                movement = discussion.parse(name, encode({"type": "move", "room": 0}), turn, notes=False)
+                for event in discussion.record(name, movement, turn):
+                    match.event(event.msg_type, event.content, actor=event.agent_name,
+                                private=() if event.visible_to == "all" else event.visible_to)
 
         if free_submission:
             discuss("before_bid", round_number, bid_topic, decisions=decisions, on_submit=apply_bid)

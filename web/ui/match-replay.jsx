@@ -395,7 +395,7 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange, 
     if (perspective !== "operator" && event.visible_to !== "all" && !event.visible_to.includes(perspective)) continue;
     state.feed.push({...record(event, index + 1), round: state.rounds});
     if (isGemExchange) applyGemEvent(state, type, data, event);
-    if (isBingo) applyBingoEvent(state, type, data, event);
+    if (isBingo) applyBingoEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("pig_") || (type === "action" && ["pig_doubt", "pig_challenge"].includes(data.phase))) {
       applyPigEvent(state, type, data, state.feed.at(-1));
     }
@@ -1229,6 +1229,7 @@ export function MatchReplay({replay, transport, caseName}) {
           row={latest?.step === frame ? {player: latest.agent_name} : undefined} selected={selected}
           onChoose={replay.choosePlayer} playerDetails={playerDetails} drawMap={isBingo ? drawBingoMap : isGemExchange ? drawGemMap : undefined}
           getPoint={isBingo ? bingoSetPoint : isGemExchange ? gemSetPoint : undefined}
+          dealerVisits={isBingo ? state.bingoDealerVisits : undefined} dealerPhase={isBingo ? state.bingoDealerPhase : undefined}
           label={isBingo ? tr("경매 빙고 메인홀", "Auction Bingo main hall") : isGemExchange ? tr("보석 암시장 메인홀", "Gem Black Market main hall") :
             isMarket ? tr("미스터리 거래소 메인홀", "Mystery Stock Exchange main hall") : tr("전체 세트장", "Full set")} />}
       {Venue && <Venue players={match.players} state={state} frame={frame} selected={selected} onChoose={replay.choosePlayer} />}

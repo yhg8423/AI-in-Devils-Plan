@@ -8,6 +8,7 @@ import {after, test} from "node:test";
 import {build} from "esbuild";
 import {bingoActionText, bingoBoard, coinValue} from "./auction-bingo-state.js";
 import {rulesSummary} from "./rule-summaries.js";
+import {cancelDealerVisits, dealerVisitFrames, syncDealerVisits} from "./dealer-visit.js";
 
 const temporary = mkdtempSync(join(tmpdir(), "bingo-replay-test-"));
 after(() => rmSync(temporary, {recursive: true, force: true}));
@@ -115,6 +116,90 @@ test("early submissions show public completion badges without revealing chosen s
   assert.match(english, /Shape submissions/);
   assert.match(english, /Submitted/);
   assert.match(english, /Turn 2 of 6/);
+  assert.doesNotMatch(arena(english), /data-dealer-cue/);
+});
+
+test("only a public funded bid submission cues a dealer visit, consistently in every viewpoint", () => {
+  const steps = [setup, event("bingo_round", {round: 1, phase: "bid"}),
+    event("action", {phase: "bingo_bid", action: JSON.stringify({coins: {1: 997}, pieces: 0})}, ["P01"], "P01")];
+  assert.doesNotMatch(arena(render(steps, "operator")), /data-dealer-cue/);
+  steps.push(event("bingo_submission", {round: 1, phase: "bid", player: "P01", submitted: ["P01"], total: 8}));
+  for (const view of ["public", "P02", "P01", "operator"]) {
+    const html = arena(render(steps, view));
+    assert.match(html, /data-player="P01"[^>]*data-dealer-cue="4"/);
+    assert.doesNotMatch(html, /997/);
+  }
+  assert.doesNotMatch(arena(render(steps.slice(0, -1), "public")), /data-dealer-cue/);
+  const forfeit = [...steps, event("bingo_forfeit", {round: 1, player: "G01"}),
+    event("bingo_submission", {round: 1, phase: "bid", player: "G01", submitted: ["P01", "G01"], total: 8})];
+  assert.doesNotMatch(arena(render(forfeit)).match(/<button[^>]*data-player="G01"[^>]*>/)[0], /data-dealer-cue/);
+  const next = [...steps, event("bingo_round", {round: 2, phase: "shape"})];
+  assert.doesNotMatch(arena(render(next)), /data-dealer-cue/);
+});
+
+function visitorToken(player) {
+  const classes = new Set();
+  const animations = [];
+  return {dataset: {player}, classes, animations,
+    classList: {add: (...names) => names.forEach((name) => classes.add(name)), remove: (...names) => names.forEach((name) => classes.delete(name))},
+    getAnimations: () => animations.filter((animation) => !animation.ended),
+    animate: (frames, options) => {
+      const animation = {frames, options, cancel() { this.ended = true; this.oncancel?.(); }, finish() { this.ended = true; this.onfinish?.(); }};
+      animations.push(animation);
+      return animation;
+    }};
+}
+
+test("dealer visits survive subsequent frames and selection changes, then restore visible tokens", () => {
+  const token = visitorToken("P01");
+  const active = new Map();
+  const context = {cues: [{player: "P01", step: 10, round: 1}], frame: 10, previousFrame: 9, phase: "1:bid", previousPhase: "1:bid",
+    locations: {}, tokens: new Map([["P01", token]]), routeFor: () => [[120, 252]], reducedMotion: false};
+  syncDealerVisits(active, context);
+  assert.equal(token.animations.length, 1);
+  assert.equal(token.dataset.dealerVisit, "10");
+  assert(token.classes.has("dealer-visiting"));
+  syncDealerVisits(active, {...context, frame: 11, previousFrame: 10});
+  syncDealerVisits(active, {...context, frame: 11, previousFrame: 11});
+  assert.equal(token.animations.length, 1);
+  assert.equal(active.size, 1);
+  const frames = token.animations[0].frames;
+  assert(frames.some((frame) => frame.opacity === 0));
+  assert.equal(frames[0].left, frames.at(-1).left);
+  assert.equal(frames[0].top, frames.at(-1).top);
+  assert.equal(frames.at(-1).opacity, 1);
+  token.animations[0].finish();
+  assert.equal(active.size, 0);
+  assert.equal(token.dataset.dealerVisit, undefined);
+  assert(!token.classes.has("dealer-visiting"));
+});
+
+test("overlapping visitors remain independent and rewind, phase, real moves, motion preference and unmount cancel safely", () => {
+  const first = visitorToken("P01"), second = visitorToken("P02");
+  const tokens = new Map([["P01", first], ["P02", second]]);
+  const context = {cues: [{player: "P01", step: 10, round: 1}, {player: "P02", step: 11, round: 1}], frame: 11, previousFrame: 9,
+    phase: "1:bid", previousPhase: "1:bid", locations: {}, tokens, routeFor: () => [[150, 252]], reducedMotion: false};
+  for (const update of [{frame: 8, previousFrame: 11}, {frame: 12, previousFrame: 11, phase: "2:shape", cues: []},
+    {frame: 12, previousFrame: 11, reducedMotion: true}, {frame: 12, previousFrame: 11, locations: {P01: 1, P02: 2}}]) {
+    const active = new Map();
+    syncDealerVisits(active, context);
+    assert.equal(active.size, 2);
+    syncDealerVisits(active, {...context, ...update});
+    assert.equal(active.size, 0);
+    for (const token of tokens.values()) assert(!token.classes.has("dealer-visiting"));
+  }
+  const active = new Map();
+  syncDealerVisits(active, {...context, reducedMotion: true});
+  assert.equal(active.size, 0);
+  syncDealerVisits(active, context);
+  first.animations.at(-1).finish();
+  assert.equal(active.size, 1);
+  assert(second.classes.has("dealer-visiting"));
+  cancelDealerVisits(active);
+  assert.equal(active.size, 0);
+  assert(!second.classes.has("walking"));
+  const frames = dealerVisitFrames([[80, 80], [160, 200], [200, 252]]);
+  assert(frames.every((frame, index) => !index || frame.offset >= frames[index - 1].offset));
 });
 
 test("submission progress resets for the next phase and round while early bids remain private", () => {
@@ -152,6 +237,10 @@ test("English rules preserve archived discussion limits and explain new free sub
   assert.match(current, /Submitted players may continue talking/);
   assert.match(current, /Shape choices are revealed only after everyone submits/);
   assert.doesNotMatch(current, /12 opening discussion turns/);
+  assert.doesNotMatch(current, /takes the player out of any discussion room/);
+  const dealer = rulesSummary("경매 빙고 · 게임 규칙", "rules\n\n6. 자유 제출\n\n\n7. 딜러룸 입찰\n");
+  assert.match(dealer, /private dealer room, then back to the hallway/);
+  assert.match(dealer, /changes who can hear their subsequent room messages and whispers/);
 });
 
 test("final reveal shows cards and prices while sealed bids stay private", () => {

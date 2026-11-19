@@ -26,6 +26,9 @@ export function applyBingoEvent(state, type, data, event = {}) {
     case "bingo_setup": state.bingoSetup = data; break;
     case "bingo_round":
       if (state.bingoRound !== data.round) state.bingoChoices = {};
+      if (state.bingoRound !== data.round) state.bingoForfeits = [];
+      state.bingoDealerVisits = [];
+      state.bingoDealerPhase = `${data.round}:${data.phase}`;
       if (state.bingoFreeSubmission || state.bingoSubmission) state.bingoSubmission = {
         round: data.round, phase: data.phase, submitted: [], total: state.bingoSetup?.base_order.length ?? 8,
       };
@@ -35,6 +38,14 @@ export function applyBingoEvent(state, type, data, event = {}) {
       break;
     case "bingo_submission":
       state.bingoSubmission = {round: data.round, phase: data.phase, submitted: data.submitted.slice(), total: data.total};
+      if (data.phase === "bid" && event.visible_to === "all" && !state.bingoForfeits?.includes(data.player)) {
+        state.bingoDealerVisits ??= [];
+        state.bingoDealerVisits.push({player: data.player, round: data.round, step: event.step});
+      }
+      break;
+    case "bingo_forfeit":
+      state.bingoForfeits ??= [];
+      state.bingoForfeits.push(data.player);
       break;
     case "bingo_preparation": state.bingoPhase = "preparation"; break;
     case "bingo_preparation_end": state.bingoPhase = null; break;
@@ -48,6 +59,8 @@ export function applyBingoEvent(state, type, data, event = {}) {
       break;
     case "bingo_result":
       state.bingoPhase = "result";
+      state.bingoDealerPhase = `${data.round}:result`;
+      state.bingoDealerVisits = [];
       state.bingoSubmission = null;
       state.bingoResults ??= [];
       state.bingoResults.push(data);
@@ -56,7 +69,8 @@ export function applyBingoEvent(state, type, data, event = {}) {
       state.bingoBanks ??= {};
       state.bingoBanks[event.agent_name] = data;
       break;
-    case "bingo_reveal": state.bingoReveal = data; state.bingoDiscussion = null; state.bingoSubmission = null; break;
+    case "bingo_reveal": state.bingoReveal = data; state.bingoDiscussion = null; state.bingoSubmission = null;
+      state.bingoDealerVisits = []; state.bingoDealerPhase = "reveal"; break;
   }
 }
 

@@ -33,7 +33,9 @@ export function rulesSummary(heading, body) {
       "have 12 opening discussion turns and up to four turns before both shape selection and bidding.",
       "have 10 opening discussion turns and up to six turns before both shape selection and bidding. Each player may submit their own shape or bid during that discussion; submissions are final and cannot be revised. Submitted players may continue talking while the others decide. Only submitted IDs and the completion count are public. Shape choices are revealed only after everyone submits, while bid amounts remain private.",
     ) : summary;
-    return submission + " Individual sealed bids and per-round awards remain private after the final reveal; final acquired-shape totals, bingo cards and previously secret winning prices are public.";
+    const dealer = body.includes("\n\n7. 딜러룸 입찰\n") ?
+      " Submitting a bid takes the player out of any discussion room to the private dealer room, then back to the hallway. Leaving a discussion room changes who can hear their subsequent room messages and whispers." : "";
+    return submission + dealer + " Individual sealed bids and per-round awards remain private after the final reveal; final acquired-shape totals, bingo cards and previously secret winning prices are public.";
   }
   if (heading.startsWith("돼지 저금통")) {
     if (heading.includes("최하위 동점 추가 경기")) return piggyTiebreak +
