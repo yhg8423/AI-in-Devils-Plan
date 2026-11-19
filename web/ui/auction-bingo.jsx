@@ -16,18 +16,27 @@ export function drawBingoSet(canvas, choices = {}) {
   const c = canvas.getContext("2d");
   c.setTransform(canvas.width / setWidth, 0, 0, canvas.height / setHeight, 0, 0);
   const rect = (x, y, w, h, color) => { c.fillStyle = color; c.fillRect(x, y, w, h); };
-  // The dealer booth occupies the central panel; the stairs and four rooms stay accessible.
-  rect(209, 165, 94, 49, "#171825");
-  rect(212, 168, 88, 42, "#43364f");
-  rect(217, 172, 78, 31, "#1b2030");
-  rect(209, 202, 94, 7, "#a58b62");
-  rect(209, 209, 94, 3, "#584633");
-  rect(244, 178, 24, 14, "#3f4654");
-  rect(248, 181, 16, 9, "#b7a175");
+  // The private dealer room is a separate right-side annex with an entrance from the hall.
+  rect(423, 175, 85, 94, "#10141d");
+  rect(420, 171, 85, 94, "#777082");
+  rect(423, 174, 79, 88, "#302b3c");
+  rect(427, 178, 71, 80, "#1a1d29");
+  rect(420, 168, 85, 5, "#a197a8");
+  rect(502, 174, 3, 91, "#403a4b");
+  rect(431, 182, 63, 28, "#44394f");
+  rect(435, 185, 55, 1, "#a58b62");
+  rect(408, 240, 16, 9, "#6b655f");
+  rect(410, 242, 12, 5, "#999080");
+  rect(419, 220, 16, 39, "#a58b62");
+  rect(422, 223, 10, 33, "#101722");
+  rect(424, 225, 6, 29, "#343344");
+  rect(424, 239, 2, 3, "#e4c784");
+  for (let y = 220; y < 248; y += 5) rect(446, y, 41, 2, "#363342");
   c.fillStyle = "#f1dca4";
   c.textAlign = "center";
   c.font = "bold 7px monospace";
-  c.fillText(tr("비공개 딜러룸", "SEALED BID ROOM"), 256, 199);
+  c.fillText(tr("비공개", "SEALED BIDS"), 463, 195);
+  c.fillText(tr("딜러룸", "DEALER ROOM"), 463, 205);
   // Three freestanding ticket boxes sit on their own table in front of the cast.
   rect(153, 322, 207, 9, "#382e2c");
   rect(158, 329, 6, 12, "#92704c");
