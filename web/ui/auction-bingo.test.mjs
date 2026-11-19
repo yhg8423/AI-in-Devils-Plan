@@ -370,3 +370,15 @@ test("submitted players render behind others while retaining their badge", () =>
   assert.match(html.match(/<button[^>]*data-player="P02"[^>]*>/)?.[0], /z-index:252/);
   assert.match(html, /token-badge">제출 완료/);
 });
+
+test("model information separates the guest even when everyone uses Sol", () => {
+  for (const language of ["ko", "en"]) {
+    const data = replay([setup]);
+    Object.assign(data.match, {provider: "codex", model: "gpt-6.1-sol", effort: "low", model_players: players});
+    const html = renders[language](data);
+    const label = html.match(/class="muted match-models">([\s\S]*?)<\/p>/)?.[1];
+    assert.match(label, language === "ko" ? /7명/ : /7 players/);
+    assert.match(label, language === "ko" ? /게스트 G01: gpt-6.1-sol low effort/ : /Guest G01: gpt-6.1-sol low effort/);
+    assert.doesNotMatch(label, /8명|8 players|all players|모든 참가자/);
+  }
+});

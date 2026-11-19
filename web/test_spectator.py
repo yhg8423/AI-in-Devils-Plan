@@ -3,10 +3,22 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from .spectator import case_catalog, find_matches, match_catalog, next_match, read_match
+from .spectator import case_catalog, find_matches, match_catalog, model_counts, next_match, read_match
 
 
 class SpectatorLogTest(unittest.TestCase):
+    def test_guest_model_is_separate_even_when_regular_players_use_the_same_model(self):
+        players = [f"P{seat:02}" for seat in range(1, 8)] + ["G01"]
+        for model in ("gpt-6.1-sol", "gpt-6-luna"):
+            with self.subTest(model=model):
+                groups = model_counts({"players": players, "model_players": players, "model": model,
+                                       "effort": "low", "model_overrides": {
+                                           "G01": {"model": "gpt-6.1-sol", "effort": "low"}}})
+                self.assertEqual(groups, [
+                    {"model": model, "effort": "low", "count": 7},
+                    {"model": "gpt-6.1-sol", "effort": "low", "count": 1, "guest": True},
+                ])
+
     def test_cases_keep_explicit_lineage_and_prefer_linked_model_records(self):
         with TemporaryDirectory() as directory:
             root = Path(directory) / "runs"

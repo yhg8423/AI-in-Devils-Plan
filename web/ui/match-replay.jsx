@@ -1112,13 +1112,18 @@ function modelLabel({provider, model, effort, model_players: modelPlayers, model
   const enabled = new Set(modelPlayers);
   const groups = new Map();
   const scripted = [];
+  let guestSettings;
   for (const player of players) {
+    const override = Object.hasOwn(overrides, player) ? overrides[player] : undefined;
+    const settings = override ? modelSettings(override.model, override.effort, override.provider ?? defaultProvider) : defaults;
+    if (player === "G01") {
+      guestSettings = enabled.has(player) ? settings : tr("스크립트", "Scripted");
+      continue;
+    }
     if (!enabled.has(player)) {
       scripted.push(player);
       continue;
     }
-    const override = Object.hasOwn(overrides, player) ? overrides[player] : undefined;
-    const settings = override ? modelSettings(override.model, override.effort, override.provider ?? defaultProvider) : defaults;
     if (!groups.has(settings)) groups.set(settings, []);
     groups.get(settings).push(player);
   }
@@ -1130,6 +1135,7 @@ function modelLabel({provider, model, effort, model_players: modelPlayers, model
   };
   const lines = [...groups].map(([settings, members]) => label(settings, members));
   if (scripted.length) lines.push(label(tr("스크립트", "Scripted"), scripted));
+  if (guestSettings) lines.push(`${tr("게스트", "Guest")} G01: ${guestSettings}`);
   return `${prefix} ${lines.join("\n")}`;
 }
 
