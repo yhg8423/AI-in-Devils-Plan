@@ -64,7 +64,7 @@
 .bingo-info .match-table { font-size: 12px; }
 .bingo-info .match-table td { white-space: normal; }
 .venue-stage:has(.bingo-stage) .hall-label { bottom: 0; }
-.venue-stage:has(.bingo-stage) .token.dealer-visiting { z-index: 1000 !important; pointer-events: none; }
+.venue-stage:has(.bingo-stage) .token.dealer-visiting { pointer-events: none; }
 .venue-stage:has(.bingo-stage) [data-player="G01"] > span { color: #ffe6a6; border-color: #b99a5b; background: #453650; }
 .venue-stage:has(.bingo-stage) [data-player="G01"] > span::after { content: " ★"; }
 @media (max-width: 560px) {

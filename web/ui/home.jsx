@@ -184,8 +184,9 @@ export function CasePicker({game, onClose}) {
               {(match.model_counts?.length > 0 || match.image_model) && <div className="case-card-models">
                 <p>{tr("모델 정보", "Model information")}</p>
                 <ul>
-                  {match.model_counts?.map(({provider, model, effort, count, image_model: imageModel}) => (
-                    <li key={`${provider}-${model}-${effort}-${imageModel}`}>
+                  {match.model_counts?.map(({provider, model, effort, count, guest, image_model: imageModel}) => (
+                    <li key={`${provider}-${model}-${effort}-${imageModel}-${Boolean(guest)}`}>
+                      {guest && tr("게스트 G01: ", "Guest G01: ")}
                       {provider && `${provider} · `}{model ?? tr("스크립트", "Scripted")}{effort && ` ${effort}`}
                       {count !== null && tr(` (${count}명)`, ` (${count} ${count === 1 ? "player" : "players"})`)}
                       {imageModel && <ul><li>↳ {tr("이미지 모델", "Image model")}: {imageModel}</li></ul>}

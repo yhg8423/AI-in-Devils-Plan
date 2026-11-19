@@ -112,21 +112,23 @@ def model_counts(header: dict) -> list[dict]:
     overrides = header.get("model_overrides") or {}
     provider = header.get("provider") if any(config.get("provider") for config in overrides.values()) else None
     image_overrides = header.get("image_model_overrides") or {}
-    counts = Counter({(provider, *default, None): 0})
+    counts = Counter({(provider, *default, None, False): 0})
     for player in roster or enabled or ():
+        guest = player == "G01"
         if player not in players:
-            counts[None, None, None, None] += 1
+            counts[None, None, None, None, guest] += 1
             continue
         override = overrides.get(player)
         model, effort = (override["model"], override.get("effort")) if override else default
         player_provider = override.get("provider", provider) if override else provider
         default_image = header.get("image_model") if player_provider == provider else None
         image_model = image_overrides.get(player, default_image) if image_overrides or provider else None
-        counts[player_provider, model, effort, image_model if image_model != model else None] += 1
+        counts[player_provider, model, effort, image_model if image_model != model else None, guest] += 1
     return [{"model": model, "effort": effort, "count": count,
              **({"provider": player_provider} if player_provider else {}),
-             **({"image_model": image_model} if image_model else {})}
-            for (player_provider, model, effort, image_model), count in counts.items() if count]
+             **({"image_model": image_model} if image_model else {}),
+             **({"guest": True} if guest else {})}
+            for (player_provider, model, effort, image_model, guest), count in counts.items() if count]
 
 
 def case_catalog(root: Path) -> list[dict]:
