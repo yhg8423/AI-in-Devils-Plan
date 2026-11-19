@@ -34,8 +34,10 @@ DAY_TWO_PRISON = "2일차 감옥 매치 · 러시안 룰렛"
 DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
 DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
 DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
+DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
+    DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),
 }
 RELATIONSHIP_EVIDENCE = {
     "room_move", "teams", "rectangle_result", "team_vote", "choice_4_result", "grass_choices", "grass_placement",
@@ -614,7 +616,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             label = None
             if event.msg_type in {"rules", "grass_phase"}:
                 label = event.content.split("\n", 1)[0]
-            elif event.msg_type == "pig_turn":
+            elif event.msg_type in {"pig_turn", "wall_turn"}:
                 label = f"{json.loads(event.content)['turn']}턴"
             elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round", "bingo_round"}:
                 data = json.loads(event.content)

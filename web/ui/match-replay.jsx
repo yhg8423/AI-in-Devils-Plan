@@ -15,6 +15,7 @@ import {runHref} from "./home.jsx";
 import {cardPositions, CommunityCards, duelWinner, formatPokerCards, GrassResults, handNames, PokerCard, PokerResults} from "./minigame-results.jsx";
 import {PrisonScene} from "./prison-scene.jsx";
 import {applyPigEvent, pigActionText, pigEventText, PiggyScene, PiggyStage, PiggyInformation} from "./piggy-bank.jsx";
+import {applyWallEvent, wallActionText, wallEventText, WallGoScene, WallGoStage, WallGoInformation} from "./wall-go.jsx";
 import {isStrategy, MatchFeed, Participant, Standings, Table} from "./records.jsx";
 import {BoardScene, RoomScene} from "./scene.jsx";
 import {checkpointLabel, decisionNoteLabel, eventFields, eventText, grassBonusText, phaseNames, roomRecordText, scoreText, snapshot} from "./replay.js";
@@ -22,6 +23,12 @@ import {en, gameTitle, tr} from "./locale.js";
 import {rulesSummary} from "./rule-summaries.js";
 
 const labels = {
+  wall_setup: tr("벽바둑 준비", "Wall Go setup"), wall_place: tr("말 배치", "Counter placement"),
+  wall_turn: tr("말 이동 차례", "Move turn"), wall_move: tr("말 이동·벽 설치", "Move and build a wall"),
+  wall_pass: tr("자동 패스", "Automatic pass"), wall_end: tr("영역 판정", "Territory scoring"),
+  wall_replay: tr("동률 재경기", "Tied-player replay"),
+  wall_timeout: tr("제한 시간 초과", "Time limit exceeded"),
+  wall_advance: tr("생존 확정·2라운드 진출", "Survival secured and Round 2 begins"),
   bingo_setup: tr("경매 빙고 준비", "Auction Bingo setup"), bingo_round: tr("라운드 시작", "Round begins"),
   bingo_shapes: tr("도형 선택 공개", "Shape choices revealed"), bingo_result: tr("낙찰가 발표", "Winning prices revealed"),
   bingo_bank: tr("비공개 코인 현황", "Private coin balance"), bingo_reveal: tr("빙고판·낙찰가 공개", "Bingo cards and winning prices revealed"),
@@ -73,6 +80,7 @@ const legacyRelationshipCheckpoints = new Map([
   ["경기 종료", "매치 종료"],
 ]);
 const actions = {
+  wall_place: tr("말 배치", "Counter placement"), wall_move: tr("말 이동·벽 설치", "Move and build a wall"),
   bingo_shape: tr("도형 선택", "Shape selection"), bingo_bid: tr("비공개 입찰", "Sealed bid"),
   bingo_preparation: tr("비공개 전략 준비", "Private preparation"), bingo_strategy: tr("입찰 전 전략 정리", "Planning before bidding"),
   bingo_discussion: tr("경매 빙고 대화", "Auction Bingo discussion"),
@@ -112,7 +120,7 @@ const dialogueTypes = new Set(["public", "room", "whisper", "room_invite", "room
 const rouletteObservations = new Set(["inspection", "shift", "swap"]);
 const rouletteStartingCredits = 16;
 const pokerPhases = {nominate: tr("대결 상대 지목", "Choose an opponent"), memorize: tr("카드 암기 중", "Memorizing cards"), memory_poker: tr("카드 선택 중", "Selecting cards")};
-const matchVenues = {"무거운 13": PrisonScene, "러시안 룰렛": RouletteScene, "돼지 저금통": PiggyScene};
+const matchVenues = {"무거운 13": PrisonScene, "러시안 룰렛": RouletteScene, "돼지 저금통": PiggyScene, "벽바둑 2": WallGoScene};
 const marketActions = {trade: tr("주문", "Order"), speak: tr("발언", "Speak"), move: tr("이동", "Move"), move_room: tr("이동", "Move"), pass: tr("패스", "Pass"),
   respond_invite: tr("초대 응답", "Invitation response"), piece: tr("피스 사용", "Spend a Piece"), secret: tr("시크릿 예약", "Schedule Secret")};
 const marketStartingCash = 100_000;
@@ -206,6 +214,7 @@ function ruleHeading(title) {
   if (name === "돼지 저금통" && details?.startsWith("최하위 동점 추가 경기 ")) return `Piggy Bank · Last-place tiebreak ${details.split(" ").at(-1)}`;
   if (name === "돼지 저금통") return "Piggy Bank · A memory game for four players";
   if (name === "경매 빙고") return "Auction Bingo · Seven regular players and guest G01 · Seven rounds";
+  if (name === "벽바둑 2") return "Wall Go II · Three players · Two rounds";
   return gameTitle(title);
 }
 
@@ -246,6 +255,7 @@ function record(event, step) {
       if (credit) return credit.text;
       if (data.phase.startsWith("bingo_")) return bingoActionText(data.phase, data.action);
       if (data.phase.startsWith("pig_")) return pigActionText(data.phase, data.action);
+      if (data.phase.startsWith("wall_")) return wallActionText(data.phase, data.action);
       if (["gem_bid", "gem_auction_agreement", "gem_peek", "gem_swap"].includes(data.phase)) return gemActionText(data.phase, data.action);
       if (["gem_talk", "gem_opening_talk", "gem_auction_talk", "gem_after_auction_talk"].includes(data.phase)) {
         const action = parse(data.action);
@@ -348,7 +358,7 @@ function record(event, step) {
   }[type];
   const actor = ["inspection", "shift", "swap", "pass"].includes(type) ? data.player :
     type === "trade_fill" ? event.visible_to[0] : event.agent_name;
-  const fallback = text ? text() : bingoEventText(type, data) ?? pigEventText(type, data) ?? gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
+  const fallback = text ? text() : wallEventText(type, data) ?? bingoEventText(type, data) ?? pigEventText(type, data) ?? gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
   return {...event, agent_name: actor, step, label, creditCost: credit?.cost,
     text: type === "grass_phase" && fallback !== content ? fallback : eventText(event, fallback)};
 }
@@ -396,6 +406,7 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange, 
     state.feed.push({...record(event, index + 1), round: state.rounds});
     if (isGemExchange) applyGemEvent(state, type, data, event);
     if (isBingo) applyBingoEvent(state, type, data, state.feed.at(-1));
+    if (type.startsWith("wall_")) applyWallEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("pig_") || (type === "action" && ["pig_doubt", "pig_challenge"].includes(data.phase))) {
       applyPigEvent(state, type, data, state.feed.at(-1));
     }
@@ -1038,6 +1049,7 @@ function RouletteInformation({state, replay}) {
 }
 
 function Stage({state, replay, choiceResult, gemExchange}) {
+  if (replay.match.game.endsWith(" · 벽바둑 2")) return <WallGoStage state={state} players={replay.match.players} />;
   if (replay.match.game.endsWith(" · 경매 빙고")) return <BingoStage state={state} replay={replay} />;
   const {match} = replay;
   if (match.game.endsWith(" · 돼지 저금통")) return <PiggyStage state={state} players={match.players} selected={replay.selected} onChoose={replay.choosePlayer} />;
@@ -1150,6 +1162,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const isGemExchange = name === "보석 암시장";
   const isPiggyBank = name === "돼지 저금통";
   const isBingo = name === "경매 빙고";
+  const isWallGo = name === "벽바둑 2";
   const [tab, setTab] = useState("all");
   const events = useMemo(() => match.steps.map(({events: [event]}) => {
     const data = parse(event.content);
@@ -1173,6 +1186,7 @@ export function MatchReplay({replay, transport, caseName}) {
       (type === "gem_auction_round" && data.manito_reveal ? tr("마니또 확인 · 피스 경매", "Manito reveal and Piece auction") : null) ??
       (type === "gem_strategy" ? gemEventText(type, data) : null) ??
       (["bingo_preparation", "bingo_discussion", "bingo_round", "bingo_result", "bingo_reveal"].includes(type) ? bingoEventText(type, data) : null) ??
+      (["wall_setup", "wall_end", "wall_replay", "wall_advance"].includes(type) ? wallEventText(type, data) : null) ??
       (["pig_setup", "pig_turn", "pig_doubt", "pig_challenge", "pig_reset", "pig_tiebreak_start", "pig_tiebreak_result"].includes(type) ? pigEventText(type, data) : null) ??
       (type === "negotiation_start" ? (data.choice === 2 ? tr("선택 2 팀 구성 협상", "Choice 2 team negotiations") : tr(`선택 ${data.choice} 전 협상`, `Negotiation before Choice ${data.choice}`)) : null) ??
       (type === "grass_phase" && grassPhases[data] === "place" ? tr("잔디 타일 배치", "Grass tile placement") : null);
@@ -1222,7 +1236,8 @@ export function MatchReplay({replay, transport, caseName}) {
         {nextMatch ?
           <Button label={`${tr("다음 매치 보기", "Watch next match")} · ${gameTitle(nextMatch.game)}`}
             href={runHref(nextMatch.id, caseRecord?.id)} variant="primary" size="sm" /> :
-          state.result && caseRecord && <p className="muted">{isBingo ?
+          state.result && caseRecord && <p className="muted">{isWallGo ?
+            tr("4일차까지 마쳤어요.", "End of Day 4.") : isBingo ?
             tr("4일차 메인 매치를 마쳤어요.", "End of Day 4 Main Match.") : isPiggyBank ?
             tr("3일차까지 마쳤어요.", "End of Day 3.") : isGemExchange ?
             tr("3일차 메인 매치를 마쳤어요.", "End of Day 3 Main Match.") : caseRecord.matches.length === 4 ?
@@ -1256,7 +1271,7 @@ export function MatchReplay({replay, transport, caseName}) {
         <Selector label={tr("관전 시점", "Viewpoint")} isLabelHidden value={view} size="sm" options={views} onChange={replay.chooseView} />
       </div>
     </div>
-    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange || isPiggyBank || isBingo ? <div className="match-details">
+    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange || isPiggyBank || isBingo || isWallGo ? <div className="match-details">
       {records}
       {isMarket && <MarketInformation key={replay.id} state={state} replay={replay} />}
       {isRoulette && <RouletteInformation key={replay.id} state={state} replay={replay} />}
@@ -1264,6 +1279,7 @@ export function MatchReplay({replay, transport, caseName}) {
       {isGemExchange && <GemInformation key={replay.id} state={state} replay={replay} />}
       {isPiggyBank && <PiggyInformation key={replay.id} state={state} replay={replay} />}
       {isBingo && <BingoInformation key={replay.id} state={state} replay={replay} />}
+      {isWallGo && <WallGoInformation key={replay.id} state={state} replay={replay} />}
       {match.board && <MatchInformation key={replay.id} state={state} replay={replay} choices={choices} />}
     </div> : records}
   </main>;

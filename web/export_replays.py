@@ -9,7 +9,7 @@ from .spectator import CASE_STAGES, EVENT_FIELDS, source_paths
 from .translate_events import translation_rows
 
 
-STAGES = ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main", "day3-prison", "day4-main")
+STAGES = ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main", "day3-prison", "day4-main", "day4-prison")
 PREDECESSORS = (
     {},
     {"from_main": 0},
@@ -18,6 +18,7 @@ PREDECESSORS = (
     {"from_main": 2, "from_prison": 3},
     {"from_main": 4},
     {"from_main": 4, "from_prison": 5},
+    {"from_main": 6},
 )
 HEADER_FIELDS = (
     "type", "game", "players", "seed", "pieces", "model", "effort", "provider",
@@ -31,6 +32,7 @@ RESULT_FIELDS = (
     "raw_scores", "manitos", "pieces_spent", "turns", "resets",
     "turn_limit", "end_reason", "main_turns", "tiebreaks",
     "all_ranking", "filled", "remaining_value", "shapes", "boards", "coins", "guest", "guest_result", "forced_last",
+    "largest", "second_scores", "second_largest", "games",
 )
 
 

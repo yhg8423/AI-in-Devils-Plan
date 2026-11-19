@@ -159,7 +159,7 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/openai-smoke/day1-main/events.jsonl
 ```
 
-## Continue from the Day 1 main match through the Day 4 main match
+## Continue from the Day 1 main match through the Day 4 prison match
 
 Once Either/Or finishes, run the remaining matches in order and keep their logs in the same run directory. If the web server is running, open a new terminal at the project root. This example picks up the log from **Run locally**.
 
@@ -192,6 +192,10 @@ uv run --locked --python 3.12 python -m games.auction_bingo \
   --from-main "$run_dir/day3-main/events.jsonl" \
   --from-prison "$run_dir/day3-prison/events.jsonl" \
   --output "$run_dir/day4-main/events.jsonl"
+
+uv run --locked --python 3.12 python -m games.wall_go \
+  --from-main "$run_dir/day4-main/events.jsonl" \
+  --output "$run_dir/day4-prison/events.jsonl"
 ```
 
 `--from-main` and `--from-prison` connect each match to the earlier result files it needs. To continue a match you ran with an LLM, set `run_dir` to that run’s folder. Pass the same model options to each match command to keep the same model lineup.
@@ -240,6 +244,7 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 3 main match | Gem Black Market | 9 or 10 | Exchange hidden gem and bomb cards in forward and reverse order. Buyer cards determine Victory Points, which are multiplied by a secret Manito's points for the final ranking. |
 | Day 3 prison match | Piggy Bank | 4 | Play without discussion or relationship assessments, deciding reset requests in seat order. Each model updates its memories of three banks and may change which banks it retains at every update. Mistaken memories are not corrected from the true contents. Score by calling doubt or recalling all banks before a reset. The main match ends at five points or after at most 100 turns. Last-place ties play extra rounds: losing points eliminates a player, gaining points secures safety, and the last remaining tied player is eliminated. |
 | Day 4 main match | Auction Bingo | 7 regular + 1 guest | Choose shapes and bid privately over seven rounds. Won shapes are automatically arranged at the end; rank by bingo lines, filled spaces, then the total value of unused coins. |
+| Day 4 prison match | Wall Go II | 3 | Move counters and build walls to claim territory without discussion. The three-player winner survives; the other two play a duel to determine elimination. Complete ties replay with only tied players and reversed turn order. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
 
@@ -254,7 +259,7 @@ Use **KO / EN** at the top to switch the website’s language. The Python game e
 
 ### Export play logs for the website
 
-The website reads only replays exported to `play_results/`. Each published run contains the four Day 1 and Day 2 matches, plus the Day 3 main and prison matches and the Day 4 main match if the run continued. Each match directory contains the original log and its English translation.
+The website reads only replays exported to `play_results/`. A published run can contain the main and prison matches from Days 1–4 in order. Each match directory contains the original log and its English translation.
 
 ```text
 play_results/matches/<run>/<stage>/events.jsonl

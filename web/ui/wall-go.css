@@ -1,0 +1,30 @@
+.wall-arena { min-width: 0; overflow: hidden; background: #171c26; align-self: start; }
+.wall-arena svg { display: block; width: 100%; height: auto; max-height: 65vh; }
+.wall-room-title, .wall-coordinates, .wall-bottom-label { fill: #e8d6af; text-anchor: middle; font-family: var(--pixel-font); }
+.wall-room-title { font-size: 11px; font-weight: 700; }
+.wall-coordinates { font-size: 11px; }
+.wall-bottom-label { font-size: 8px; }
+.wall-piece-label { text-anchor: middle; fill: #17202b; font: 700 9px var(--pixel-font); pointer-events: none; }
+.wall-piece { cursor: pointer; }
+.wall-piece:focus-visible { outline: none; filter: drop-shadow(0 0 3px #fff3b0); }
+.wall-piece[aria-pressed="true"] { filter: drop-shadow(0 0 3px #fff3b0); }
+.wall-segment { stroke: #eee0bd; stroke-width: 6; stroke-linecap: square; }
+.wall-segment.recent-wall { stroke: #f1c75d; }
+.wall-segment.broken-wall { stroke: #ed8376; stroke-width: 4; stroke-dasharray: 6 5; }
+.wall-move-path { stroke: #ffe9a0; stroke-width: 3; stroke-dasharray: 4 4; fill: none; }
+.wall-player-legend { display: flex; flex-wrap: wrap; gap: 8px; padding: 8px 12px; border-top: 2px solid #414852; }
+.wall-player-legend button { display: flex; align-items: center; gap: 5px; border: 1px solid #59606a; background: #242b36; color: #eee7d5; padding: 5px 8px; font: inherit; }
+.wall-player-legend button[aria-pressed="true"] { border-color: #efd19c; }
+.wall-player-legend i { display: inline-block; width: 9px; height: 9px; background: var(--wall-player); }
+.wall-player-legend strong { font-size: .7rem; color: #ebc88e; }
+.wall-stage { min-width: 0; }
+.wall-stage h2 { margin-top: 0; }
+.wall-phase, .wall-verdict { color: #ebcf9d; font-weight: 700; }
+.wall-last-action { padding: 10px; background: #252c37; border-left: 3px solid #c4a773; overflow-wrap: anywhere; }
+.wall-rules p { white-space: pre-wrap; line-height: 1.65; }
+.wall-information { min-width: 0; }
+.wall-round-result { padding: 12px 0; border-bottom: 1px solid #3e4652; }
+.wall-round-result h3 { margin: 0 0 8px; }
+.wall-round-result h3 button, .wall-move-log button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.wall-move-log { padding-left: 20px; }
+.wall-move-log li { padding: 8px 0; border-bottom: 1px solid #343e4b; overflow-wrap: anywhere; }
