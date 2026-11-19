@@ -3,6 +3,7 @@ import {drawSprite, playerColor} from "./cast.js";
 import {drawSet, rooms, roomWidth, setHeight, setPoint, setWidth, walkRoute} from "./floor.js";
 import {tr} from "./locale.js";
 import {locationName, scoreText} from "./replay.js";
+import {cancelDealerVisits, syncDealerVisits} from "./dealer-visit.js";
 
 const walkDuration = 540;
 const statusLabels = {탈락: tr("탈락", "Eliminated"), 생활동: tr("생활동", "Living Quarters"), 감옥동: tr("감옥동", "Prison Wing")};
@@ -66,10 +67,11 @@ function walk(button, points, width, height) {
   animation.oncancel = settle;
 }
 
-export function RoomScene({state, players, row, frame, following, selected, onChoose, playerDetails, label, standalone, drawMap = drawSet, getPoint = setPoint}) {
+export function RoomScene({state, players, row, frame, following, selected, onChoose, playerDetails, label, standalone, drawMap = drawSet, getPoint = setPoint, dealerVisits = [], dealerPhase}) {
   const floor = useRef(null);
   const map = useRef(null);
-  const previous = useRef({frame: -1, locations: {}, points: {}, pair: []});
+  const previous = useRef({frame: -1, locations: {}, points: {}, pair: [], dealerPhase});
+  const visits = useRef(new Map());
   const counts = [0, 0, 0, 0, 0];
   for (const player of players) counts[state.locations[player] ?? 0]++;
   const speech = state.lastSpeech;
@@ -95,15 +97,25 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
   }
 
   useLayoutEffect(() => drawMap(map.current), [drawMap]);
+  useLayoutEffect(() => () => cancelDealerVisits(visits.current), []);
   useLayoutEffect(() => {
     const scene = floor.current;
     const {width, height} = scene.getBoundingClientRect();
     const previousFrame = previous.current.frame;
-    const animate = previousFrame >= 0 && frame > previousFrame &&
-      !matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const reducedMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const animate = previousFrame >= 0 && frame > previousFrame && !reducedMotion;
     const nextFrame = frame === previousFrame + 1;
-    for (const token of scene.querySelectorAll("[data-player]")) {
+    const tokens = new Map([...scene.querySelectorAll("[data-player]")].map((token) => [token.dataset.player, token]));
+    syncDealerVisits(visits.current, {cues: dealerVisits, frame, previousFrame, phase: dealerPhase,
+      previousPhase: previous.current.dealerPhase, locations: state.locations, tokens, reducedMotion,
+      routeFor: (player) => {
+        const index = players.indexOf(player);
+        const room = state.locations[player] ?? 0;
+        return room ? [points[player], ...walkRoute(room, 0, index).slice(1, -1), getPoint(0, index, players.length)] : [points[player]];
+      }});
+    for (const token of tokens.values()) {
       const player = token.dataset.player;
+      if (visits.current.has(player)) continue;
       const fromRoom = previous.current.locations[player] ?? 0;
       const toRoom = state.locations[player] ?? 0;
       const from = previous.current.points[player];
@@ -118,8 +130,8 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
         walk(token, [from, ...between, to], width, height);
       }
     }
-    previous.current = {frame, locations: state.locations, points, pair};
-  }, [frame, following, players, state.locations, pair, points]);
+    previous.current = {frame, locations: state.locations, points, pair, dealerPhase};
+  }, [frame, following, players, state.locations, pair, points, dealerVisits, dealerPhase, getPoint]);
 
   return <div className="arena">
     <section className={`stage-window pixel-frame${standalone ? "" : " match-set"}${drawMap === drawSet ? "" : " pixel-map"}`} aria-label={label}>
@@ -133,16 +145,17 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
             const room = state.locations[player] ?? 0;
             const [x, y] = points[player];
             const score = state.scores[player];
-            const {rank, status} = playerDetails?.get(player) ?? {};
+            const {rank, status, badge} = playerDetails?.get(player) ?? {};
             const label = [player, locationName(room), score == null ? null : `${scoreText(score)}${tr("점", " VP")}`,
-              rank, statusLabels[status] ?? status].filter(Boolean).join(" · ");
+              rank, statusLabels[status] ?? status, badge].filter(Boolean).join(" · ");
             return <button key={player} className={row?.player === player ? "token acting" : "token"}
               type="button" data-player={player} data-room={room} data-status={status} aria-pressed={player === selected}
+              data-dealer-cue={dealerVisits.findLast((cue) => cue.player === player)?.step}
               data-speaking={showSpeech && player === speech.agent_name ? "true" : undefined}
               data-whispering={showSpeech && whispering.includes(player) ? "true" : undefined}
               aria-label={label} title={label} style={{...position(x, y), zIndex: Math.floor(y)}}
               onClick={() => onChoose(player)}>
-              <Sprite player={player} /><span>{player}</span>
+              <Sprite player={player} /><span>{player}{badge && <small className="token-badge">{badge}</small>}</span>
             </button>;
           })}
         </div>

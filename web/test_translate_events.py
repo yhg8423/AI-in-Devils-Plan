@@ -25,6 +25,7 @@ class TranslateEventsTests(unittest.TestCase):
                 event("hints", json.dumps({"알트엔터": "□□ 같이 하자 ▧ □"}, ensure_ascii=False), 1),
                 event("relationship_update", json.dumps({"ratings": {"P02": {"trust": 50, "reason": "같이 하자"}}},
                                                        ensure_ascii=False), 2),
+                event("room_move", "G01 → 2번 논의실", 3),
             ]
             original = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in rows) + '{"type": "event"'
             log.write_text(original, encoding="utf-8")
@@ -38,6 +39,7 @@ class TranslateEventsTests(unittest.TestCase):
                 {"turn": 0, "text": "Invite #2 · Room 1 · Let’s work together"},
                 {"turn": 1, "fields": {"알트엔터": "□□ Let’s work together ▧ □"}},
                 {"turn": 2, "fields": {"ratings": {"P02": {"trust": 50, "reason": "Let’s work together"}}}},
+                {"turn": 3, "text": "G01 → Room 2"},
             ])
             with sqlite3.connect(root / ".translation-ko-en.sqlite3") as cache:
                 self.assertEqual(cache.execute("SELECT count(*) FROM translations").fetchone(), (1,))

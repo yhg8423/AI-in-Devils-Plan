@@ -26,12 +26,14 @@ from .resume_legacy import LegacyDecisions
 
 REVIEWABLE_BATCH_PHASES = {"representative", "memory_poker", "submit"}
 EFFORTS = ("low", "medium", "high", "xhigh")
+DEFAULT_GUEST_MODEL = ("codex", "gpt-6.1-sol", "low")
 DAY_ONE_MAIN = "1일차 메인 매치 · 양자택일"
 DAY_ONE_PRISON = "1일차 감옥 매치 · 무거운 13"
 DAY_TWO_MAIN = "2일차 메인 매치 · 미스터리 거래소"
 DAY_TWO_PRISON = "2일차 감옥 매치 · 러시안 룰렛"
 DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
 DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
+DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
 }
@@ -40,6 +42,7 @@ RELATIONSHIP_EVIDENCE = {
     "grass_bonus", "choice_9_result", "poker_ranking", "placement", "market", "trade_fill", "inspection", "shift", "swap",
     "gem_auction", "gem_swap", "gem_bonus", "gem_reveal", "gem_card", "gem_peek", "gem_final",
     "pig_deposit", "pig_claim", "pig_doubt", "pig_replace", "pig_reset", "pig_challenge", "pig_reset_vote",
+    "bingo_shapes", "bingo_result", "bingo_reveal", "bingo_submission",
 }
 
 
@@ -446,7 +449,8 @@ def parse_group_image_model(value: str) -> tuple[str | None, str, str, str, str 
 
 
 def run_cli(play, *, title: str, seats: int | tuple[int, ...],
-            previous_main: str | None = None, after_prison: bool = False, argv=None) -> None:
+            previous_main: str | None = None, after_prison: bool = False,
+            guest: str | None = None, argv=None) -> None:
     seat_counts = (seats,) if isinstance(seats, int) else seats
     roster_args = seat_counts[0] if len(seat_counts) == 1 else "+"
     parser = argparse.ArgumentParser(description=title)
@@ -491,7 +495,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             if saved["game"] != title:
                 parser.error(f"{args.output}에는 {title} 기록이 필요합니다.")
             try:
-                restore_resume_args(args, saved)
+                restore_resume_args(args, saved, guest=guest)
             except (KeyError, TypeError, ValueError) as error:
                 parser.error(f"중단된 매치의 설정을 읽을 수 없습니다. {error}")
 
@@ -526,6 +530,11 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         if any(not isinstance(name, str) or not name or any(char.isspace() for char in name)
                or name in {SYSTEM_NAME, MODERATOR_NAME, "개인"} for name in players):
             parser.error("참가자 ID는 공백이나 예약어가 없는 문자열이어야 합니다.")
+        if guest is not None:
+            if guest in players:
+                parser.error(f"{guest}은 자동으로 참가하는 게스트 ID입니다. --players에는 본선 참가자만 지정하세요.")
+            pieces = [*(pieces if pieces is not None else [1] * len(players)), 1]
+            players = [*players, guest]
         live_players = args.model_player or players
         model_turns = args.model_turns
         if model_turns is None:
@@ -543,6 +552,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             if name not in live_players or name in overrides:
                 parser.error(f"--player-model은 모델 참가자 {name}에게 한 번만 지정할 수 있습니다.")
             overrides[name] = (player_provider or provider, model, player_effort)
+        if saved is None and model_name and guest is not None and guest in live_players:
+            overrides.setdefault(guest, DEFAULT_GUEST_MODEL)
 
         group_image_models = {(image_provider or provider, model, level): (image_model, image_effort)
                               for image_provider, model, level, image_model, image_effort in args.image_model_for}
@@ -605,7 +616,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
                 label = event.content.split("\n", 1)[0]
             elif event.msg_type == "pig_turn":
                 label = f"{json.loads(event.content)['turn']}턴"
-            elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round"}:
+            elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round", "bingo_round"}:
                 data = json.loads(event.content)
                 label = f"{data['round']}라운드"
                 if event.msg_type == "negotiation_round":
@@ -669,7 +680,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
 
-def restore_resume_args(args, saved: dict) -> None:
+def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
     """Use saved settings and reject explicit changes to a running match."""
     players = saved["players"]
     model_players = saved["model_players"]
@@ -704,15 +715,18 @@ def restore_resume_args(args, saved: dict) -> None:
             raise ValueError(f"--{option.replace('_', '-')} 값이 저장된 설정과 일치하지 않습니다.")
         setattr(args, option, path)
 
-    ordered_pieces = [pieces[name] for name in players]
-    if args.players is not None and args.players != players:
+    roster = [name for name in players if name != guest]
+    if guest is not None and (players != [*roster, guest] or pieces.get(guest) != 1):
+        raise ValueError("저장된 게스트 명단이나 시작 피스가 올바르지 않습니다.")
+    ordered_pieces = [pieces[name] for name in roster]
+    if args.players is not None and args.players != roster:
         raise ValueError("--players 값이 저장된 설정과 일치하지 않습니다.")
     if args.pieces is not None and args.pieces != ordered_pieces:
         raise ValueError("--pieces 값이 저장된 설정과 일치하지 않습니다.")
     if args.model_player is not None and model_players and list(dict.fromkeys(args.model_player)) != model_players:
         raise ValueError("--model-player 값이 저장된 설정과 일치하지 않습니다.")
     if args.from_main is None:
-        args.players, args.pieces = players, ordered_pieces
+        args.players, args.pieces = roster, ordered_pieces
     else:
         args.players = args.pieces = None
     args.model_player = model_players
@@ -729,6 +743,8 @@ def restore_resume_args(args, saved: dict) -> None:
         overrides.append((name, player_provider, config["model"], config["effort"]))
     provided_overrides = [(name, player_provider or args.provider, model, level)
                           for name, player_provider, model, level in args.player_model if name in players]
+    if provided_overrides and not any(config[0] == guest for config in provided_overrides):
+        provided_overrides.extend(config for config in overrides if config[0] == guest)
     if provided_overrides and model_players and sorted(provided_overrides) != sorted(overrides):
         raise ValueError("--player-model 값이 저장된 설정과 일치하지 않습니다.")
     if not model_players:

@@ -3,6 +3,8 @@ import {Button} from "@astryxdesign/core/Button";
 import {Selector} from "@astryxdesign/core/Selector";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {choiceCountLabel, choiceOptionLabel, choiceResults, optionsByChoice} from "./choice-results.js";
+import {BingoInformation, BingoStage, bingoSetPoint, drawBingoSet} from "./auction-bingo.jsx";
+import {applyBingoEvent, bingoActionText, bingoEventText} from "./auction-bingo-state.js";
 import {RouletteInspection, RouletteInspectionLegend, RouletteScene} from "./day-two-scenes.jsx";
 import {applyGemEvent, gemActionText, gemDiscussionLabel, gemEventText, gemSlotLabel, GemStage} from "./gem-exchange.jsx";
 import {drawGemSet, gemSetPoint} from "./gem-floor.js";
@@ -20,6 +22,14 @@ import {en, gameTitle, tr} from "./locale.js";
 import {rulesSummary} from "./rule-summaries.js";
 
 const labels = {
+  bingo_setup: tr("경매 빙고 준비", "Auction Bingo setup"), bingo_round: tr("라운드 시작", "Round begins"),
+  bingo_shapes: tr("도형 선택 공개", "Shape choices revealed"), bingo_result: tr("낙찰가 발표", "Winning prices revealed"),
+  bingo_bank: tr("비공개 코인 현황", "Private coin balance"), bingo_reveal: tr("빙고판·낙찰가 공개", "Bingo cards and winning prices revealed"),
+  bingo_preparation: tr("비공개 전략 준비", "Private preparation"), bingo_preparation_end: tr("전략 준비 완료", "Preparation complete"),
+  bingo_discussion: tr("대화 시작", "Discussion begins"), bingo_discussion_round: tr("대화 턴", "Discussion turn"),
+  bingo_discussion_end: tr("대화 종료", "Discussion ends"), bingo_strategy: tr("입찰 전 전략 정리", "Planning before bidding"),
+  bingo_forfeit: tr("최소 입찰 불가", "Minimum bid unavailable"),
+  bingo_submission: tr("제출 현황", "Submission progress"),
   rules: tr("게임 규칙", "Game rules"), action: tr("행동", "Action"), invalid_action: tr("반려된 행동", "Rejected action"), scoreboard: tr("승점", "Victory Points"), round: tr("라운드", "Round"),
   cube_puzzle: tr("큐브 세기", "Cube Counting"), cube_answer: tr("큐브 답안", "Cube answer"), priority: tr("큐브 세기 결과", "Cube Counting results"), teams: tr("네모 세기 팀", "Rectangle Counting teams"),
   representatives: tr("팀 대표", "Team representative"), rectangle_puzzle: tr("네모 세기", "Rectangle Counting"), buzz: tr("버저", "Buzzer"), rectangle_answer: tr("네모 세기 정답", "Rectangle Counting answer"),
@@ -63,6 +73,9 @@ const legacyRelationshipCheckpoints = new Map([
   ["경기 종료", "매치 종료"],
 ]);
 const actions = {
+  bingo_shape: tr("도형 선택", "Shape selection"), bingo_bid: tr("비공개 입찰", "Sealed bid"),
+  bingo_preparation: tr("비공개 전략 준비", "Private preparation"), bingo_strategy: tr("입찰 전 전략 정리", "Planning before bidding"),
+  bingo_discussion: tr("경매 빙고 대화", "Auction Bingo discussion"),
   choice_1: tr("선택 1", "Choice 1"), choice_2: tr("선택 2", "Choice 2"), choice_3_team: tr("선택 3 · 팀", "Choice 3 · Team"), choice_3_solo: tr("선택 3 · 개인", "Choice 3 · Solo"),
   choice_4: tr("선택 4", "Choice 4"), choice_9: tr("선택 9", "Choice 9"), choice_10: tr("선택 10", "Choice 10"), cubes: tr("큐브 답안 제출", "Submit cube count"), rectangles: tr("네모 답안 제출", "Submit rectangle count"),
   rectangle_challenge: tr("추가 대결 답안", "Tiebreaker answer"), memorize: tr("암기 위치", "Memorized positions"), memory_poker: tr("포커 카드 선택", "Poker card selection"), nominate: tr("대결 상대 지목", "Choose an opponent"),
@@ -192,6 +205,7 @@ function ruleHeading(title) {
   if (name === "러시안 룰렛") return "Russian Roulette · A deduction game for six players";
   if (name === "돼지 저금통" && details?.startsWith("최하위 동점 추가 경기 ")) return `Piggy Bank · Last-place tiebreak ${details.split(" ").at(-1)}`;
   if (name === "돼지 저금통") return "Piggy Bank · A memory game for four players";
+  if (name === "경매 빙고") return "Auction Bingo · Seven regular players and guest G01 · Seven rounds";
   return gameTitle(title);
 }
 
@@ -230,6 +244,7 @@ function record(event, step) {
       .replace("기금은 초과분까지", "조작에 쓴 크레딧은 초과분까지").replace("납부 금액", "사용한 크레딧 수") : ruleText(content),
     action: () => {
       if (credit) return credit.text;
+      if (data.phase.startsWith("bingo_")) return bingoActionText(data.phase, data.action);
       if (data.phase.startsWith("pig_")) return pigActionText(data.phase, data.action);
       if (["gem_bid", "gem_auction_agreement", "gem_peek", "gem_swap"].includes(data.phase)) return gemActionText(data.phase, data.action);
       if (["gem_talk", "gem_opening_talk", "gem_auction_talk", "gem_after_auction_talk"].includes(data.phase)) {
@@ -333,12 +348,12 @@ function record(event, step) {
   }[type];
   const actor = ["inspection", "shift", "swap", "pass"].includes(type) ? data.player :
     type === "trade_fill" ? event.visible_to[0] : event.agent_name;
-  const fallback = text ? text() : pigEventText(type, data) ?? gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
+  const fallback = text ? text() : bingoEventText(type, data) ?? pigEventText(type, data) ?? gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
   return {...event, agent_name: actor, step, label, creditCost: credit?.cost,
     text: type === "grass_phase" && fallback !== content ? fallback : eventText(event, fallback)};
 }
 
-function matchState(events, match, frame, perspective, isMarket, isGemExchange) {
+function matchState(events, match, frame, perspective, isMarket, isGemExchange, isBingo) {
   const state = {feed: [], stacks: {}, penalties: {}, rounds: 0, pigPerspective: perspective};
   const sceneSteps = [];
   let grassNotes = 0;
@@ -362,8 +377,8 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange) 
       sceneSteps.push({phase, step: index + 1, events: [event],
         round: state.negotiation?.round ?? Math.floor(grassNotes / match.players.length) + 1});
       if (type === "discussion_note" && !state.negotiation) grassNotes++;
-    } else if (isMarket || isGemExchange) {
-      sceneSteps.push({phase: isGemExchange ? "gem_talk" : "market_turn", step: index + 1, events: [event]});
+    } else if (isMarket || isGemExchange || isBingo) {
+      sceneSteps.push({phase: isBingo ? "bingo_discussion" : isGemExchange ? "gem_talk" : "market_turn", step: index + 1, events: [event]});
     }
     // Older logs saved the boards with the result. Rebuild each public reveal at its first recorded phase marker.
     if (state.pokerMode && (type === "action" || type === "decision_note") &&
@@ -380,6 +395,7 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange) 
     if (perspective !== "operator" && event.visible_to !== "all" && !event.visible_to.includes(perspective)) continue;
     state.feed.push({...record(event, index + 1), round: state.rounds});
     if (isGemExchange) applyGemEvent(state, type, data, event);
+    if (isBingo) applyBingoEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("pig_") || (type === "action" && ["pig_doubt", "pig_challenge"].includes(data.phase))) {
       applyPigEvent(state, type, data, state.feed.at(-1));
     }
@@ -530,7 +546,7 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange) 
       case "match_result": state.result = data; break;
     }
   }
-  if (match.board || isMarket || isGemExchange) {
+  if (match.board || isMarket || isGemExchange || isBingo) {
     const scores = match.board ? Object.fromEntries(match.players.map((name) => [name, 0])) : {};
     state.scene = snapshot({scores, steps: sceneSteps}, sceneSteps.length, perspective);
     if (isGemExchange) state.scene.scores = state.gemScores ?? {};
@@ -1022,6 +1038,7 @@ function RouletteInformation({state, replay}) {
 }
 
 function Stage({state, replay, choiceResult, gemExchange}) {
+  if (replay.match.game.endsWith(" · 경매 빙고")) return <BingoStage state={state} replay={replay} />;
   const {match} = replay;
   if (match.game.endsWith(" · 돼지 저금통")) return <PiggyStage state={state} players={match.players} selected={replay.selected} onChoose={replay.choosePlayer} />;
   if (gemExchange) return <GemStage state={state} players={match.players} selected={replay.selected} onChoose={replay.choosePlayer} />;
@@ -1126,6 +1143,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const isHeavy13 = name === "무거운 13";
   const isGemExchange = name === "보석 암시장";
   const isPiggyBank = name === "돼지 저금통";
+  const isBingo = name === "경매 빙고";
   const [tab, setTab] = useState("all");
   const events = useMemo(() => match.steps.map(({events: [event]}) => {
     const data = parse(event.content);
@@ -1134,9 +1152,11 @@ export function MatchReplay({replay, transport, caseName}) {
     }
     return {...event, data};
   }), [match]);
-  const state = useMemo(() => matchState(events, match, frame, view, isMarket, isGemExchange), [events, match, frame, view, isMarket, isGemExchange]);
+  const state = useMemo(() => matchState(events, match, frame, view, isMarket, isGemExchange, isBingo), [events, match, frame, view, isMarket, isGemExchange, isBingo]);
   const {gemCards} = state;
   const drawGemMap = useCallback((canvas) => drawGemSet(canvas, gemCards), [gemCards]);
+  const {bingoChoices} = state;
+  const drawBingoMap = useCallback((canvas) => drawBingoSet(canvas, bingoChoices), [bingoChoices]);
   const choices = useMemo(() => match.board ? choiceResults(state, match.players, view) : [], [state, match, view]);
   const choiceResult = choices.find(({value}) => value === state.choice?.number);
   const chapterOptions = events.flatMap(({msg_type: type, data}, index) => {
@@ -1146,6 +1166,7 @@ export function MatchReplay({replay, transport, caseName}) {
       (type === "gem_discussion" ? gemDiscussionLabel(data) : null) ??
       (type === "gem_auction_round" && data.manito_reveal ? tr("마니또 확인 · 피스 경매", "Manito reveal and Piece auction") : null) ??
       (type === "gem_strategy" ? gemEventText(type, data) : null) ??
+      (["bingo_preparation", "bingo_discussion", "bingo_round", "bingo_result", "bingo_reveal"].includes(type) ? bingoEventText(type, data) : null) ??
       (["pig_setup", "pig_turn", "pig_doubt", "pig_challenge", "pig_reset", "pig_tiebreak_start", "pig_tiebreak_result"].includes(type) ? pigEventText(type, data) : null) ??
       (type === "negotiation_start" ? (data.choice === 2 ? tr("선택 2 팀 구성 협상", "Choice 2 team negotiations") : tr(`선택 ${data.choice} 전 협상`, `Negotiation before Choice ${data.choice}`)) : null) ??
       (type === "grass_phase" && grassPhases[data] === "place" ? tr("잔디 타일 배치", "Grass tile placement") : null);
@@ -1155,11 +1176,16 @@ export function MatchReplay({replay, transport, caseName}) {
     ...match.players.map((name) => ({value: name, label: tr(`${name} 시점`, `${name}’s view`)}))];
   const Venue = matchVenues[name];
   const dialogueTabs = state.scene || isRoulette || isPiggyBank;
-  const ranking = isMarket || isGemExchange ? state.result?.ranking ?? state.market?.ranking : null;
-  const playerDetails = ranking && new Map(ranking.map((player, index) => [player, {
+  const ranking = isMarket || isGemExchange || isBingo ? state.result?.ranking ?? state.market?.ranking ?? state.bingoReveal?.ranking : null;
+  const playerDetails = ranking ? new Map(ranking.map((player, index) => [player, {
     rank: tr(`${index + 1}위`, `Rank ${index + 1}`), status: state.result?.eliminated.includes(player) ? "탈락" :
       state.result?.living.includes(player) ? "생활동" : state.result?.prison.includes(player) ? "감옥동" : null,
-  }]));
+  }])) : isBingo ? new Map() : null;
+  if (isBingo && state.bingoSubmission) {
+    for (const player of state.bingoSubmission.submitted) playerDetails.set(player, {
+      ...playerDetails.get(player), badge: tr("제출 완료", "Submitted"),
+    });
+  }
   const participantState = state.scene ? {
     ...state.scene, feed: state.feed,
     participantRecords: state.scene.participantRecords.filter((event) => event.msg_type === "grass_choices"),
@@ -1190,19 +1216,21 @@ export function MatchReplay({replay, transport, caseName}) {
         {nextMatch ?
           <Button label={`${tr("다음 매치 보기", "Watch next match")} · ${gameTitle(nextMatch.game)}`}
             href={runHref(nextMatch.id, caseRecord?.id)} variant="primary" size="sm" /> :
-          state.result && caseRecord && <p className="muted">{isPiggyBank ?
+          state.result && caseRecord && <p className="muted">{isBingo ?
+            tr("4일차 메인 매치를 마쳤어요.", "End of Day 4 Main Match.") : isPiggyBank ?
             tr("3일차까지 마쳤어요.", "End of Day 3.") : isGemExchange ?
             tr("3일차 메인 매치를 마쳤어요.", "End of Day 3 Main Match.") : caseRecord.matches.length === 4 ?
               tr("2일차까지 마쳤어요.", "End of Day 2.") : tr("이어지는 매치 기록이 아직 없어요.", "No follow-up match has been recorded yet.")}</p>}
         <p className="muted match-models">{modelLabel(match)}</p>
       </div>
     </div>
-    <div className={match.board ? "either-or-stage" : isMarket || isGemExchange || Venue ? "venue-stage" : undefined}>
+    <div className={match.board ? "either-or-stage" : isMarket || isGemExchange || isBingo || Venue ? "venue-stage" : undefined}>
       {state.scene && <RoomScene state={state.scene} players={match.players} frame={frame} following={replay.mode === "follow"}
           row={latest?.step === frame ? {player: latest.agent_name} : undefined} selected={selected}
-          onChoose={replay.choosePlayer} playerDetails={playerDetails} drawMap={isGemExchange ? drawGemMap : undefined}
-          getPoint={isGemExchange ? gemSetPoint : undefined}
-          label={isGemExchange ? tr("보석 암시장 메인홀", "Gem Black Market main hall") :
+          onChoose={replay.choosePlayer} playerDetails={playerDetails} drawMap={isBingo ? drawBingoMap : isGemExchange ? drawGemMap : undefined}
+          getPoint={isBingo ? bingoSetPoint : isGemExchange ? gemSetPoint : undefined}
+          dealerVisits={isBingo ? state.bingoDealerVisits : undefined} dealerPhase={isBingo ? state.bingoDealerPhase : undefined}
+          label={isBingo ? tr("경매 빙고 메인홀", "Auction Bingo main hall") : isGemExchange ? tr("보석 암시장 메인홀", "Gem Black Market main hall") :
             isMarket ? tr("미스터리 거래소 메인홀", "Mystery Stock Exchange main hall") : tr("전체 세트장", "Full set")} />}
       {Venue && <Venue players={match.players} state={state} frame={frame} selected={selected} onChoose={replay.choosePlayer} />}
       <section className="match-state" aria-label={tr("현재 판세", "Current game state")}><Stage state={state} replay={replay} choiceResult={choiceResult} gemExchange={isGemExchange} /></section>
@@ -1221,13 +1249,14 @@ export function MatchReplay({replay, transport, caseName}) {
         <Selector label={tr("관전 시점", "Viewpoint")} isLabelHidden value={view} size="sm" options={views} onChange={replay.chooseView} />
       </div>
     </div>
-    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange || isPiggyBank ? <div className="match-details">
+    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange || isPiggyBank || isBingo ? <div className="match-details">
       {records}
       {isMarket && <MarketInformation key={replay.id} state={state} replay={replay} />}
       {isRoulette && <RouletteInformation key={replay.id} state={state} replay={replay} />}
       {isHeavy13 && <Heavy13Information key={replay.id} state={state} replay={replay} />}
       {isGemExchange && <GemInformation key={replay.id} state={state} replay={replay} />}
       {isPiggyBank && <PiggyInformation key={replay.id} state={state} replay={replay} />}
+      {isBingo && <BingoInformation key={replay.id} state={state} replay={replay} />}
       {match.board && <MatchInformation key={replay.id} state={state} replay={replay} choices={choices} />}
     </div> : records}
   </main>;

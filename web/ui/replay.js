@@ -2,6 +2,9 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  bingo_shape: tr("도형 선택", "Shape selection"), bingo_bid: tr("비공개 입찰", "Sealed bid"),
+  bingo_strategy: tr("입찰 전 전략 정리", "Planning before bidding"), bingo_preparation: tr("비공개 전략 준비", "Private preparation"),
+  bingo_discussion: tr("경매 빙고 대화", "Auction Bingo discussion"),
   choice_2_negotiation: tr("팀 구성 협상", "Team formation talks"),
   choice_4_negotiation: tr("공공의 이익 협상", "Public benefit talks"),
   choice_9_negotiation: tr("피스 모금 협상", "Piece pledge talks"),
@@ -84,6 +87,13 @@ const relationshipCheckpoints = {
 
 export function checkpointLabel(checkpoint, translated) {
   if (!en || !checkpoint) return checkpoint;
+  if (checkpoint === "경매 빙고 획득 도형·빙고판 공개") return "Acquired shapes and bingo cards revealed · Auction Bingo";
+  if (checkpoint === "경매 빙고 연맹의 징표 사용") return "Alliance Token used · Auction Bingo";
+  const bingo = checkpoint.match(/^경매 빙고 (\d+)라운드 (.+)$/);
+  if (bingo) {
+    const phase = {"opening 대화 종료": "End of opening discussion", "before_shape 대화 종료": "End of discussion before shape selection", "before_bid 대화 종료": "End of discussion before bidding", "도형 선택 공개": "Shape choices revealed", "낙찰가 발표": "Winning prices announced"}[bingo[2]] ?? bingo[2];
+    return `${phase}${bingo[1] === "0" ? "" : ` · Round ${bingo[1]}`} · Auction Bingo`;
+  }
   if (checkpoint === "돼지 저금통 시작 전 대화 종료") return "End of opening discussions · Piggy Bank";
   const piggy = checkpoint.match(/^돼지 저금통 (\d+)턴 (대화 종료|선언·의심 결과|전체 도전 결과|리셋 완료)$/);
   if (piggy) return `Turn ${piggy[1]} · ${{"대화 종료": "End of discussion", "선언·의심 결과": "Declaration and doubt results", "전체 도전 결과": "All-bank challenge results", "리셋 완료": "Reset complete"}[piggy[2]]} · Piggy Bank`;

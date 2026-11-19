@@ -14,6 +14,7 @@ const games = [
   {session: "2일차 감옥 매치", name: "러시안 룰렛", description: tr("공개된 단서와 각자 확인한 정보로 다음 칸을 추리한다.", "Use public clues and private observations to work out what comes next.")},
   {session: "3일차 메인 매치", name: "보석 암시장", description: tr("카드를 교환해 구매자의 보석을 맞추고, 마니또와의 점수 곱으로 승부한다.", "Swap hidden cards, match the buyers’ gems, and multiply scores with your manito.")},
   {session: "3일차 감옥 매치", name: "돼지 저금통", description: tr("오가는 저금통의 동전을 기억하고, 의심과 리셋 도전으로 승점을 얻는다.", "Remember the coins in circulating banks and score through doubts and reset challenges.")},
+  {session: "4일차 메인 매치", name: "경매 빙고", description: tr("낙찰 결과가 숨겨진 경매에서 도형을 모아 빙고를 완성한다.", "Collect shapes through auctions with hidden outcomes to complete your bingo card.")},
 ];
 
 export function runHref(id = "", caseId) {
