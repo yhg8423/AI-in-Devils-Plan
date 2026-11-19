@@ -1,6 +1,7 @@
 """Seven all-pay auctions with hidden awards and an optimal final bingo board."""
 
 from collections import Counter
+from dataclasses import replace
 import json
 
 from ..either_or.discussion import Discussion
@@ -17,8 +18,10 @@ BOARD = (("triangle", "circle", "triangle"), ("circle", "star", "circle"),
 INITIAL_COINS = {1: 3, 2: 3, 3: 2, 5: 1, 10: 1}
 OPENING_TURNS = 10
 DISCUSSION_TURNS = 6
+MIN_BID_DISCUSSION_TURNS = 3
 FREE_SUBMISSION_HEADING = "\n\n6. 자유 제출\n"
 DEALER_VISIT_HEADING = "\n\n7. 딜러룸 입찰\n"
+MIN_BID_DISCUSSION_HEADING = "\n\n8. 입찰 전 최소 대화\n"
 PREPARATION_STEPS = (
     "목표 설정: 빙고판과 자금 제약을 검토하고, 필요한 도형과 생존·우승 목표를 정하세요.",
     "위험·대안 검토: 낙찰 여부는 본인도 알 수 없고 낙찰 실패에도 코인이 소모됩니다. 이전 계획의 위험과 대안을 검토하세요.",
@@ -102,6 +105,7 @@ def play(match: Match) -> dict:
         log is not None and log.resume) else None
     free_submission = recorded_rules is None or FREE_SUBMISSION_HEADING in recorded_rules
     dealer_visits = recorded_rules is None or DEALER_VISIT_HEADING in recorded_rules
+    minimum_bid_discussion = recorded_rules is None or MIN_BID_DISCUSSION_HEADING in recorded_rules
     opening_turns = OPENING_TURNS if free_submission else 12
     discussion_turns = DISCUSSION_TURNS if free_submission else 4
     base_order = match.rng.sample(list(players), len(players))
@@ -138,7 +142,7 @@ def play(match: Match) -> dict:
         "게스트는 생활동·감옥동·탈락 판정에서 제외되며, 전체 1위와 빙고판 완성에 각각 상금 1,000만 원이 걸려 있습니다.\n\n"
         "5. 시뮬레이터 진행 규칙\n"
         f"규칙 공개 후 첫 대화 전에 비공개 전략 요약을 3단계로 다듬습니다. 시작 전 대화는 참가자마다 {opening_turns}턴, "
-        f"매 라운드 도형 선택 전과 선택 공개 후 입찰 전 대화는 각각 최대 {discussion_turns}턴입니다. 매 라운드 대화는 한 턴에서 전원 패스하면 마칩니다. "
+        f"매 라운드 도형 선택 전과 선택 공개 후 입찰 전 대화는 각각 최대 {discussion_turns}턴입니다. 매 라운드 대화는 전원 패스하면 마치되, 입찰 전 최소 대화 턴은 유지합니다. "
         "전체 대화, 논의실 이동·초대·대화, 같은 장소의 1:1 또는 그룹 귓속말을 사용할 수 있습니다. 입찰 직전에는 비공개 전략 요약을 갱신합니다. "
         "각 대화 구간과 공개 발표가 끝나면 새 근거에 따라 친밀도·신뢰도를 비공개로 검토합니다. "
         "완전 동률과 여러 자동 최하위자 사이의 순서는 시작할 때 추첨한 기본 순서로 판정합니다. "
@@ -148,10 +152,10 @@ def play(match: Match) -> dict:
     if free_submission:
         rules = rules.replace("도형 선택과 입찰은 각각 모두 같은 시점의 정보를 보고 동시에 제출합니다. ", "")
         rules += FREE_SUBMISSION_HEADING + (
-            "도형 선택과 입찰은 각각 최대 6턴의 대화 중 원하는 자기 차례에 비공개로 확정 제출할 수 있습니다. "
+            "도형 선택과 입찰은 각각 최대 6턴의 대화 중 제출이 허용된 자기 차례에 비공개로 확정 제출할 수 있습니다. "
             "한 번 제출하면 바꾸거나 다시 제출할 수 없습니다. 제출한 사람도 다른 참가자가 결정하는 동안 대화하거나 이동할 수 있습니다. "
             "공개되는 제출 현황에는 완료한 참가자만 표시되고 도형과 입찰액은 표시되지 않습니다. "
-            "전원 제출하면 남은 대화 없이 즉시 해당 단계를 끝냅니다. 6턴이 끝나거나 전원 패스하면 미제출자만 마지막으로 제출합니다. "
+            "전원 제출하면 남은 대화 없이 즉시 해당 단계를 끝냅니다. 6턴이 끝나거나 최소 대화 턴을 마친 뒤 전원 패스하면 미제출자만 마지막으로 제출합니다. "
             "도형은 전원 제출 후 함께 공개하고, 개인 입찰액은 계속 비공개입니다. 입찰 전 전략 요약은 입찰 대화를 시작하기 전에 정리하고, "
             "대화 중에는 매 차례 전략 메모를 갱신합니다. 입찰 확정과 동시에 사용 코인과 교환 피스를 정산합니다."
         )
@@ -160,6 +164,14 @@ def play(match: Match) -> dict:
             "입찰을 확정하면 오른쪽 딜러룸에 들러 비공개로 제출한 뒤 즉시 복도로 돌아옵니다. "
             "논의실에 있던 사람도 입찰 후에는 복도에 위치하므로 이후 귓속말과 논의실 대화는 바뀐 위치를 기준으로 합니다. "
             "딜러룸 안에서는 대화하거나 머무를 수 없습니다."
+        )
+    if minimum_bid_discussion:
+        rules += MIN_BID_DISCUSSION_HEADING + (
+            f"도형 선택 공개 후 입찰 전에는 참가자마다 최소 {MIN_BID_DISCUSSION_TURNS}턴의 대화 기회를 갖습니다. "
+            f"1~{MIN_BID_DISCUSSION_TURNS}턴에는 입찰을 제출할 수 없고, 전원 패스해도 최소 대화 턴까지 진행합니다. "
+            f"{MIN_BID_DISCUSSION_TURNS + 1}턴부터 자기 차례에 입찰을 확정할 수 있습니다. "
+            "최소 대화 턴을 마친 뒤 전원 패스하면 대화를 끝내고 미제출자가 입찰합니다. "
+            "도형 선택 전 대화에는 이 제한이 없어 첫 턴부터 도형을 제출할 수 있습니다."
         )
     if recorded_rules is not None:
         rules = recorded_rules
@@ -191,6 +203,7 @@ def play(match: Match) -> dict:
 
     def discuss(stage, round_number, topic, *, decisions=None, on_submit=None):
         turns = opening_turns if stage == "opening" else discussion_turns
+        minimum_turns = MIN_BID_DISCUSSION_TURNS if stage == "before_bid" and minimum_bid_discussion else 0
         discussion.rounds = turns
         context = {"stage": stage, "round": round_number, "rounds": turns}
         match.event("bingo_discussion", context)
@@ -217,7 +230,7 @@ def play(match: Match) -> dict:
                     progress(name)
         reason = "limit"
         for current in range(1, turns + 1):
-            if decisions is not None and len(resolved) == len(players):
+            if current > minimum_turns and decisions is not None and len(resolved) == len(players):
                 reason = "all_submitted"
                 break
             match.event("bingo_discussion_round", {**context, "turn": current})
@@ -226,13 +239,17 @@ def play(match: Match) -> dict:
                 if name not in match.backends or match.live_turns <= 0:
                     continue
                 turn = len(match.events)
-                submission = decisions.get(name) if decisions is not None and name not in resolved else None
+                submission = decisions.get(name) if (
+                    decisions is not None and name not in resolved and current > minimum_turns) else None
                 status = ""
                 if decisions is not None:
                     if name in submitted:
                         status = f"\n나는 이미 비공개로 {submitted[name]}을 확정했습니다. 수정·재제출은 불가능하며 대화와 이동만 할 수 있습니다."
                     elif name in resolved:
                         status = "\n나는 최소 입찰액을 낼 수 없어 자동 최하위로 판정되었습니다. 대화와 이동은 할 수 있습니다."
+                    elif current <= minimum_turns:
+                        status = (f"\n입찰 전 최소 대화 구간 {current}/{minimum_turns}턴입니다. 지금은 입찰을 제출할 수 없습니다. "
+                                  f"{minimum_turns + 1}턴부터 제출할 수 있으므로 대화·이동·패스 중 하나를 선택하세요.")
                     else:
                         example = encode({"type": "submit", "choice": submission.default, "note": "선택 근거와 전략 요약"})
                         status = (
@@ -283,11 +300,15 @@ def play(match: Match) -> dict:
                         break
             if reason == "all_submitted":
                 break
-            if not active and stage != "opening":
+            if not active and stage != "opening" and current >= minimum_turns:
                 reason = "all_passed"
                 break
         if decisions is not None and len(resolved) < len(players):
             pending = {name: decision for name, decision in decisions.items() if name not in resolved}
+            if minimum_turns:
+                pending = {name: replace(decision, prompt=(
+                    f"필수 대화 {minimum_turns}턴이 완료되어 이제 최종 입찰을 제출합니다.\n" + decision.prompt))
+                    for name, decision in pending.items()}
             for name, choice in match.decide_together(f"bingo_{phase}", pending, record_actions=False).items():
                 commit(name, choice)
         match.event("bingo_discussion_end", {**context, "reason": reason})
@@ -325,7 +346,9 @@ def play(match: Match) -> dict:
         match.review_relationships(f"경매 빙고 {round_number}라운드 도형 선택 공개")
         match.event("bingo_round", {"round": round_number, "phase": "bid"})
         bid_topic = (f"{round_number}라운드 도형 선택 공개 후 입찰 단계입니다. 선택 내역 {encode(choices)}. "
-                     "이제 도형은 바꿀 수 없고 입찰액을 논의하거나 먼저 확정할 수 있습니다.")
+                     + (f"이제 도형은 바꿀 수 없고 입찰액을 논의합니다. 최초 {MIN_BID_DISCUSSION_TURNS}턴에는 입찰할 수 없으며 "
+                        f"{MIN_BID_DISCUSSION_TURNS + 1}턴부터 먼저 확정할 수 있습니다." if minimum_bid_discussion else
+                        "이제 도형은 바꿀 수 없고 입찰액을 논의하거나 먼저 확정할 수 있습니다."))
         if not free_submission:
             discuss("before_bid", round_number,
                     f"{round_number}라운드 도형 선택 공개 후 입찰 전입니다. 선택 내역 {encode(choices)}. "

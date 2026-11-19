@@ -35,7 +35,11 @@ export function rulesSummary(heading, body) {
     ) : summary;
     const dealer = body.includes("\n\n7. 딜러룸 입찰\n") ?
       " Submitting a bid takes the player out of any discussion room to the private dealer room, then back to the hallway. Leaving a discussion room changes who can hear their subsequent room messages and whispers." : "";
-    return submission + dealer + " Individual sealed bids and per-round awards remain private after the final reveal; final acquired-shape totals, bingo cards and previously secret winning prices are public.";
+    const bidding = body.includes("\n\n8. 입찰 전 최소 대화\n") ? submission.replace(
+      "Each player may submit their own shape or bid during that discussion;",
+      "Each player may submit their own shape during its discussion. Bids are locked during bidding discussion turns 1–3 and may be submitted during turns 4–6;",
+    ) + " The bidding discussion always completes at least three turns, even if everyone passes. An all-pass turn may end it only after the third turn has completed; any remaining bids are collected when the discussion ends." : submission;
+    return bidding + dealer + " Individual sealed bids and per-round awards remain private after the final reveal; final acquired-shape totals, bingo cards and previously secret winning prices are public.";
   }
   if (heading.startsWith("돼지 저금통")) {
     if (heading.includes("최하위 동점 추가 경기")) return piggyTiebreak +

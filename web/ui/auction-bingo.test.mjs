@@ -267,6 +267,22 @@ test("English rules preserve archived discussion limits and explain new free sub
   assert.match(dealer, /changes who can hear their subsequent room messages and whispers/);
 });
 
+test("English minimum-talk rules lock bids for three turns without changing older replays", () => {
+  const heading = "경매 빙고 · 게임 규칙";
+  const previous = "rules\n\n6. 자유 제출\n\n\n7. 딜러룸 입찰\n";
+  const old = rulesSummary(heading, previous);
+  assert.match(old, /Each player may submit their own shape or bid during that discussion/);
+  assert.doesNotMatch(old, /Bids are locked|at least three turns/);
+  const current = rulesSummary(heading, previous + "\n\n8. 입찰 전 최소 대화\n");
+  assert.match(current, /Bids are locked during bidding discussion turns 1–3/);
+  assert.match(current, /may be submitted during turns 4–6/);
+  assert.match(current, /at least three turns, even if everyone passes/);
+  assert.match(current, /only after the third turn has completed/);
+  assert.match(current, /any remaining bids are collected when the discussion ends/);
+  assert.match(current, /submissions are final and cannot be revised/);
+  assert.doesNotMatch(current, /submit their own shape or bid during that discussion/);
+});
+
 test("final reveal shows cards and prices while sealed bids stay private", () => {
   const results = Object.fromEntries(players.map((player) => [player, {shapes: {triangle: 3, circle: 4, star: 2}, board: bingoBoard, lines: 8, filled: 9, remaining_value: 10, coins: {10: 1}, pieces: 1}]));
   const reveal = event("bingo_reveal", {ranking: regular, all_ranking: ["G01", ...regular], players: results, guest: "G01",

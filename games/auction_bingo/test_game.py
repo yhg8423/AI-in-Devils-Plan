@@ -8,7 +8,6 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
-from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
@@ -319,7 +318,7 @@ class AuctionBingoTest(unittest.TestCase):
             with self.subTest(players=players), self.assertRaises(ValueError):
                 play(Match(players, 11))
 
-    def test_all_players_can_submit_during_first_talk_turn_without_another_batch(self):
+    def test_players_submit_shapes_first_and_bids_after_three_full_talk_turns(self):
         testcase = self
 
         def reply(match, name, prompt):
@@ -329,6 +328,9 @@ class AuctionBingoTest(unittest.TestCase):
                            if event.msg_type == "bingo_discussion_round")
             if context["stage"] == "opening":
                 return PASS
+            if context["stage"] == "before_bid" and context["turn"] <= 3:
+                return json.dumps({"type": "speak", "channel": "public", "text": "입찰 전에 제안을 검토한다.",
+                                   "note": "최소 대화 구간 뒤 입찰을 제출한다."})
             for event in match.observations(name):
                 if event.msg_type == "action" and json.loads(event.content)["phase"] in {"bingo_shape", "bingo_bid"}:
                     testcase.assertEqual(event.agent_name, name)
@@ -348,8 +350,10 @@ class AuctionBingoTest(unittest.TestCase):
         self.assertIn("\n\n6. 자유 제출\n", rules)
         talks = [json.loads(event.content) for event in match.events if event.msg_type == "bingo_discussion_round"]
         self.assertEqual([talk["turn"] for talk in talks if talk["stage"] == "opening"], list(range(1, 11)))
-        self.assertEqual(len([talk for talk in talks if talk["stage"] != "opening"]), 14)
-        self.assertTrue(all(talk["turn"] == 1 and talk["rounds"] == 6 for talk in talks if talk["stage"] != "opening"))
+        for round_number in range(1, 8):
+            self.assertEqual([talk["turn"] for talk in talks if talk["round"] == round_number and talk["stage"] == "before_shape"], [1])
+            self.assertEqual([talk["turn"] for talk in talks if talk["round"] == round_number and talk["stage"] == "before_bid"], [1, 2, 3, 4])
+        self.assertTrue(all(talk["rounds"] == 6 for talk in talks if talk["stage"] != "opening"))
         endings = [json.loads(event.content) for event in match.events if event.msg_type == "bingo_discussion_end"]
         self.assertTrue(all(ending["reason"] == "all_submitted" for ending in endings if ending["stage"] != "opening"))
         self.assertFalse(any(phase in {"bingo_shape", "bingo_bid"} and players for phase, players in match.batches))
@@ -386,17 +390,20 @@ class AuctionBingoTest(unittest.TestCase):
             if context["stage"] == "opening":
                 return PASS
             if name == "P01":
-                if context["stage"] == "before_bid" and context["turn"] == 2:
+                current = context["turn"] - (3 if context["stage"] == "before_bid" else 0)
+                if current < 1:
+                    return PASS
+                if context["stage"] == "before_bid" and current == 2:
                     bank = next(event for event in reversed(match.events)
                                 if event.msg_type == "bingo_bank" and event.agent_name == name)
                     testcase.assertEqual(json.loads(bank.content)["coins"]["1"], 2)
                     testcase.assertIn('"1":2', prompt)
-                if context["turn"] <= 2:
-                    choice = ("triangle" if context["turn"] == 1 else "circle") if context["stage"] == "before_shape" else json.dumps({
-                        "coins": {"1" if context["turn"] == 1 else "2": 1}, "pieces": 0,
+                if current <= 2:
+                    choice = ("triangle" if current == 1 else "circle") if context["stage"] == "before_shape" else json.dumps({
+                        "coins": {"1" if current == 1 else "2": 1}, "pieces": 0,
                     })
                     return json.dumps({"type": "submit", "choice": choice, "note": "입장을 확정한다."})
-                if context["turn"] == 3:
+                if current == 3:
                     return json.dumps({"type": "speak", "channel": "public", "text": "제출 후에도 협상을 계속한다.",
                                        "note": "이미 확정한 선택을 유지하며 대화한다."})
                 return PASS
@@ -432,6 +439,78 @@ class AuctionBingoTest(unittest.TestCase):
         self.assertEqual(sum(event.msg_type == "public" and event.agent_name == "P01" and
                              event.content == "제출 후에도 협상을 계속한다." for event in match.events), 2)
 
+    def test_first_three_bid_talk_turns_reject_submission_without_spending(self):
+        class FirstRoundComplete(Exception):
+            pass
+
+        class GatedMatch(DiscussionMatch):
+            def event(self, kind, data, **kwargs):
+                super().event(kind, data, **kwargs)
+                if kind == "bingo_result":
+                    raise FirstRoundComplete
+
+        testcase = self
+        locked_queries = set()
+
+        def reply(match, name, prompt):
+            if match.phase != "bingo_discussion":
+                return match.defaults[name]
+            context = next(json.loads(event.content) for event in reversed(match.events)
+                           if event.msg_type == "bingo_discussion_round")
+            if context["stage"] != "before_bid":
+                return PASS
+            if context["turn"] <= 3:
+                locked_queries.add((name, context["turn"]))
+                testcase.assertIn("지금은 입찰을 제출할 수 없습니다.", prompt)
+                testcase.assertNotIn('{"type":"submit"', prompt)
+                testcase.assertFalse(any(event.msg_type == "bingo_bank" for event in match.events))
+                testcase.assertFalse(any(event.msg_type == "action" and json.loads(event.content)["phase"] == "bingo_bid"
+                                         for event in match.events))
+                if name == "P01":
+                    return json.dumps({"type": "submit", "choice": '{"coins":{"1":1},"pieces":1}',
+                                       "note": "아직 열리지 않은 입찰 제출을 시도한다."})
+                return json.dumps({"type": "speak", "channel": "public", "text": "입찰 전에 제안을 더 논의한다.",
+                                   "note": "최소 대화 구간 뒤 입찰한다."})
+            return json.dumps({"type": "submit", "choice": '{"coins":{"1":1},"pieces":0}',
+                               "note": "대화가 끝나 입찰을 확정한다."})
+
+        match = GatedMatch(reply)
+        with self.assertRaises(FirstRoundComplete):
+            play(match)
+        self.assertEqual(locked_queries, {(name, turn) for name in PLAYERS for turn in (1, 2, 3)})
+        fourth = next(event.turn for event in match.events if event.msg_type == "bingo_discussion_round" and
+                      json.loads(event.content)["stage"] == "before_bid" and json.loads(event.content)["turn"] == 4)
+        bids = [event for event in match.events if event.msg_type == "action" and json.loads(event.content)["phase"] == "bingo_bid"]
+        banks = [event for event in match.events if event.msg_type == "bingo_bank"]
+        self.assertEqual(len(bids), 8)
+        self.assertEqual(len(banks), 8)
+        self.assertTrue(all(event.turn > fourth for event in bids + banks))
+        bank = next(json.loads(event.content) for event in banks if event.agent_name == "P01")
+        self.assertEqual((bank["coins"]["1"], bank["pieces"], bank["spent"]), (2, 1, 0))
+        invalid = [event for event in match.events if event.msg_type == "invalid_action"]
+        self.assertEqual(len(invalid), 3)
+        self.assertTrue(all(event.visible_to == ["P01"] for event in invalid))
+
+    def test_all_pass_waits_three_bid_talk_turns_but_saved_rules_keep_one(self):
+        heading = "\n\n8. 입찰 전 최소 대화\n"
+        match = Match(PLAYERS, 0)
+        play(match)
+        rules = next(event.content for event in match.events if event.msg_type == "rules")
+        self.assertIn(heading, rules)
+        for saved in (False, True):
+            with self.subTest(saved=saved):
+                if saved:
+                    match = Match(PLAYERS, 0)
+                    old_rules = rules.split(heading)[0]
+                    match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": old_rules}])
+                    play(match)
+                    self.assertEqual(match.events[0].content, old_rules)
+                for round_number in range(1, 8):
+                    turns = [json.loads(event.content)["turn"] for event in match.events
+                             if event.msg_type == "bingo_discussion_round" and
+                             json.loads(event.content)["round"] == round_number and json.loads(event.content)["stage"] == "before_bid"]
+                    self.assertEqual(turns, [1] if saved else [1, 2, 3])
+
     def test_bidder_returns_to_the_hall_before_progress_and_uses_hall_speech_permissions(self):
         class FirstRoundComplete(Exception):
             pass
@@ -446,7 +525,7 @@ class AuctionBingoTest(unittest.TestCase):
 
         probe = Match(PLAYERS, 0)
         play(probe)
-        rules = next(event.content for event in probe.events if event.msg_type == "rules")
+        rules = next(event.content for event in probe.events if event.msg_type == "rules").split("\n\n8. 입찰 전 최소 대화\n")[0]
         heading = "\n\n7. 딜러룸 입찰\n"
         self.assertIn(heading, rules)
         old_rules = rules.split(heading)[0]
@@ -484,8 +563,7 @@ class AuctionBingoTest(unittest.TestCase):
                                        "note": "남은 선택지를 검토한다."})
 
                 match = HallExitMatch(reply)
-                if not hall_exit:
-                    match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": old_rules}])
+                match.resume_log = SimpleNamespace(resume=True, events=[{"msg_type": "rules", "content": rules if hall_exit else old_rules}])
                 with self.assertRaises(FirstRoundComplete):
                     play(match)
                 actual_rules = next(event.content for event in match.events if event.msg_type == "rules")
@@ -518,11 +596,14 @@ class AuctionBingoTest(unittest.TestCase):
 
         def reply(prompt):
             exercise = prompt.rsplit("Exercise:", 1)[-1]
+            submission = next((line.strip() for line in exercise.splitlines()
+                               if line.strip().startswith('{"type":"submit"')), None)
             if "비공개 관계 평가를 갱신하세요" in prompt:
                 action = "{}"
-            elif "나는 아직 제출하지 않았습니다." in exercise:
-                action = next(line.strip() for line in exercise.splitlines()
-                              if line.strip().startswith('{"type":"submit"'))
+            elif submission is not None:
+                action = submission
+            elif "도형 선택 공개 후 입찰 단계입니다." in exercise:
+                action = '{"type":"speak","channel":"public","text":"입찰 전 협상을 계속한다.","note":"확정 전 제안을 검토한다."}'
             elif "경기 시작 전 협상입니다." in exercise and "대화 1/10턴" in exercise:
                 action = '{"type":"move","room":1,"note":"논의실에서 협상을 준비한다."}'
             else:
