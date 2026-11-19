@@ -90,6 +90,30 @@ test("all three equal maximum prices remain secret", () => {
   assert.equal((html.match(/class="bingo-price" data-secret="true"/g) ?? []).length, 3);
 });
 
+test("only operator round history shows verified secret winning prices", () => {
+  const amounts = {P01: 997, P02: 2, P03: 2, P04: 1, P05: 1, P06: 997, P07: 1, G01: 1};
+  const bids = players.filter((player) => player !== "P01").map((player) =>
+    event("action", {phase: "bingo_bid", action: JSON.stringify({coins: {1: amounts[player]}, pieces: 2})}, [player], player));
+  const complete = [...pending.slice(0, -1), ...bids, pending.at(-1)];
+  for (const selected of ["", "P02", "G01"]) {
+    const html = render(complete, "operator", selected);
+    assert.equal((html.match(/시크릿\(997원\)/g) ?? []).length, 2);
+    assert.equal((html.match(/class="bingo-price" data-secret="true"/g) ?? []).length, 2);
+  }
+  for (const view of ["public", ...players]) assert.doesNotMatch(render(complete, view), /시크릿\(997원\)/);
+  assert.doesNotMatch(render(complete.slice(0, -1), "operator"), /시크릿\(997원\)/);
+  assert.doesNotMatch(render(pending, "operator"), /시크릿\(997원\)/);
+  const withForfeit = [...pending.slice(0, -1), ...bids.slice(1),
+    event("bingo_forfeit", {round: 1, player: "P02"}), pending.at(-1)];
+  assert.equal((render(withForfeit, "operator").match(/시크릿\(997원\)/g) ?? []).length, 2);
+  const threeTies = [...complete.slice(0, -1),
+    event("action", {phase: "bingo_bid", action: JSON.stringify({coins: {1: 997}, pieces: 0})}, ["P03"], "P03"),
+    event("bingo_result", {round: 1, prices: {triangle: null, circle: null, star: null}, secret: ["triangle", "circle", "star"]})];
+  assert.equal((render(threeTies, "operator").match(/시크릿\(997원\)/g) ?? []).length, 3);
+  assert.match(render(complete, "operator", "", "en"), /Secret \(997 won\)/);
+  assert.doesNotMatch(render(complete, "P01", "", "en"), /Secret \(997 won\)/);
+});
+
 test("a new round clears the previous public choices and prices", () => {
   const html = render([...pending, event("bingo_round", {round: 2, phase: "shape"})]);
   const stage = html.slice(html.indexOf('class="bingo-stage"'), html.indexOf('class="context"'));
@@ -272,7 +296,10 @@ test("final reveal shows cards and prices while sealed bids stay private", () =>
   assert.doesNotMatch(html, /997원/);
   assert.doesNotMatch(render([...pending, reveal, result], "P02", "P01"), /997원/);
   assert.match(render([...pending, reveal, result], "P01", "P01"), /997원/);
-  assert.match(render([...pending, reveal, result], "operator", "P01"), /997원/);
+  const operator = render([...pending, reveal, result], "operator", "P01");
+  assert.match(operator, /997원/);
+  assert.match(operator, /시크릿\(777원\)/);
+  assert.doesNotMatch(operator, /시크릿\(997원\)/);
   assert.doesNotMatch(arena(html).match(/<button[^>]*data-player="G01"[^>]*>/)[0], /data-status="탈락"/);
 });
 

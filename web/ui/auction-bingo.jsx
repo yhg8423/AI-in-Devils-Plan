@@ -161,9 +161,11 @@ export function BingoInformation({state, replay}) {
   const choices = audit?.choices ?? shapeEvent?.data.choices ?? {};
   const visiblePlayers = selected ? [selected] : players;
   const privateBids = new Map();
+  const forfeits = new Set();
   let bidRound = 0;
   for (const event of state.feed) {
     if (event.msg_type === "bingo_round") bidRound = event.data.round;
+    if (event.msg_type === "bingo_forfeit" && event.data.round === round) forfeits.add(event.data.player);
     if (event.msg_type === "action" && event.data.phase === "bingo_bid" && bidRound === round) {
       const bid = parseBingoBid(event.data.action);
       if (bid) privateBids.set(event.agent_name, {amount: coinValue(bid.coins), pieces: bid.pieces, step: event.step});
@@ -175,6 +177,18 @@ export function BingoInformation({state, replay}) {
     return [player, choices[player] ? `${shapeGlyph(choices[player])} ${shapeLabel(choices[player])}` : "–",
       amount == null ? tr("비공개", "Private") : <button type="button" className="result-link" onClick={() => seek(bid.step)}>{priceLabel(amount)}</button>];
   });
+  const roundPrices = audit ?? resultEvent?.data;
+  const roundPrice = (shape) => {
+    if (!roundPrices) return tr("발표 전", "Not announced");
+    const secret = roundPrices.secret.includes(shape);
+    if (replay.view === "operator" && secret) {
+      const bids = Object.keys(choices).filter((player) => choices[player] === shape && !forfeits.has(player))
+        .map((player) => privateBids.get(player)?.amount);
+      const amount = audit?.prices[shape] ?? (bids.length && bids.every(Number.isFinite) ? Math.max(...bids) : null);
+      return amount == null ? priceLabel(null, true) : tr(`시크릿(${amount}원)`, `Secret (${amount} won)`);
+    }
+    return priceLabel(roundPrices.prices[shape], !audit && secret);
+  };
   const guest = state.bingoSetup?.guest ?? "G01";
   return <aside className="caption match-info bingo-info" aria-label={tr("경매 빙고 결과와 기록", "Auction Bingo results and records")}>
     <TabList role="tablist" aria-label={tr("경매 빙고 정보 종류", "Auction Bingo information tabs")} size="sm" value={tab} onChange={setTab} hasDivider>
@@ -193,9 +207,10 @@ export function BingoInformation({state, replay}) {
       {!state.bingoRound ? <p className="empty">{tr("아직 시작한 라운드가 없어요.", "No rounds have started yet.")}</p> : <>
         <Table caption={tr(`${round}라운드 도형 선택·낙찰가`, `Round ${round} · Shape choices and winning prices`)} headers={tr(["도형", "선택한 참가자", audit ? "최종 공개 낙찰가" : "발표 낙찰가"], ["Shape", "Players", audit ? "Final revealed price" : "Announced price"])}
           rows={bingoShapes.map((shape) => [`${shapeGlyph(shape)} ${shapeLabel(shape)}`, Object.entries(choices).filter(([, chosen]) => chosen === shape).map(([player]) => player).join(" · ") || "–",
-            audit ? priceLabel(audit.prices[shape]) : resultEvent ? priceLabel(resultEvent.data.prices[shape], resultEvent.data.secret.includes(shape)) : tr("발표 전", "Not announced")])} />
+            roundPrice(shape)])} />
         {resultEvent && <button type="button" className="result-link" onClick={() => seek(resultEvent.step)}>{tr("낙찰가 발표 기록 보기", "View the price announcement")}</button>}
         <p className="muted">{audit ? tr("경기 종료 후 시크릿 낙찰가도 공개되었습니다. 개인별 비공개 입찰 내역은 공개하지 않습니다.", "Secret winning prices are revealed after the match. Individual sealed bids remain private.") : tr("각 라운드에서 발표된 금액입니다. 낙찰자·획득 도형은 최종 공개 전까지 숨깁니다.", "These are the prices announced in each round. Winners and acquired shapes remain hidden until the final reveal.")}</p>
+        {replay.view === "operator" && roundPrices && <p className="muted">{tr("시크릿의 괄호 안 금액은 운영자에게만 표시합니다.", "Amounts in parentheses next to Secret are shown only to the operator.")}</p>}
       </>}
     </div>
     <div id="bingo-bids-panel" className="match-info-scroll" role="tabpanel" aria-labelledby="bingo-bids" hidden={tab !== "bids"} tabIndex={0}>
