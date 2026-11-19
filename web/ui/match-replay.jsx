@@ -3,7 +3,7 @@ import {Button} from "@astryxdesign/core/Button";
 import {Selector} from "@astryxdesign/core/Selector";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {choiceCountLabel, choiceOptionLabel, choiceResults, optionsByChoice} from "./choice-results.js";
-import {BingoInformation, BingoStage, bingoSetPoint, drawBingoSet} from "./auction-bingo.jsx";
+import {BingoInformation, BingoStage, bingoSetPoint, bingoWhisperPoints, drawBingoSet} from "./auction-bingo.jsx";
 import {applyBingoEvent, bingoActionText, bingoEventText} from "./auction-bingo-state.js";
 import {RouletteInspection, RouletteInspectionLegend, RouletteScene} from "./day-two-scenes.jsx";
 import {applyGemEvent, gemActionText, gemDiscussionLabel, gemEventText, gemSlotLabel, GemStage} from "./gem-exchange.jsx";
@@ -1183,7 +1183,7 @@ export function MatchReplay({replay, transport, caseName}) {
   }])) : isBingo ? new Map() : null;
   if (isBingo && state.bingoSubmission) {
     for (const player of state.bingoSubmission.submitted) playerDetails.set(player, {
-      ...playerDetails.get(player), badge: tr("제출 완료", "Submitted"),
+      ...playerDetails.get(player), badge: tr("제출 완료", "Submitted"), submitted: true,
     });
   }
   const participantState = state.scene ? {
@@ -1229,6 +1229,7 @@ export function MatchReplay({replay, transport, caseName}) {
           row={latest?.step === frame ? {player: latest.agent_name} : undefined} selected={selected}
           onChoose={replay.choosePlayer} playerDetails={playerDetails} drawMap={isBingo ? drawBingoMap : isGemExchange ? drawGemMap : undefined}
           getPoint={isBingo ? bingoSetPoint : isGemExchange ? gemSetPoint : undefined}
+          getWhisperPoints={isBingo ? bingoWhisperPoints : undefined}
           dealerVisits={isBingo ? state.bingoDealerVisits : undefined} dealerPhase={isBingo ? state.bingoDealerPhase : undefined}
           label={isBingo ? tr("경매 빙고 메인홀", "Auction Bingo main hall") : isGemExchange ? tr("보석 암시장 메인홀", "Gem Black Market main hall") :
             isMarket ? tr("미스터리 거래소 메인홀", "Mystery Stock Exchange main hall") : tr("전체 세트장", "Full set")} />}

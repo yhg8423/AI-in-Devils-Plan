@@ -1,7 +1,7 @@
 import React, {useState} from "react";
 import {Selector} from "@astryxdesign/core/Selector";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
-import {drawSet, setPoint, setWidth, setHeight} from "./floor.js";
+import {drawSet, rooms, setPoint, setWidth, setHeight} from "./floor.js";
 import {tr} from "./locale.js";
 import {Table} from "./records.jsx";
 import {bingoBoard, bingoPhaseLabel, bingoShapes, coinValue, parseBingoBid, priceLabel, shapeGlyph, shapeLabel} from "./auction-bingo-state.js";
@@ -9,6 +9,34 @@ import "./auction-bingo.css";
 
 export function bingoSetPoint(room, index, count) {
   return room ? setPoint(room, index) : [256 + (index - (count - 1) / 2) * 39, 252];
+}
+
+export function bingoWhisperPoints(points, pair, room) {
+  const [first, second] = pair;
+  const center = [(points[first][0] + points[second][0]) / 2, (points[first][1] + points[second][1]) / 2];
+  const gap = room ? 30 : 40;
+  const height = room ? 36 : 52;
+  const candidates = [];
+  if (room) {
+    const {x, y} = rooms[room - 1];
+    for (const cy of [y + 38, y + 78]) {
+      for (let cx = x + 32; cx <= x + 70; cx += 4) candidates.push([[cx - gap / 2, cy], [cx + gap / 2, cy]]);
+    }
+  } else {
+    for (let cx = 100; cx <= 380; cx += 4) candidates.push([[cx - gap / 2, 252], [cx + gap / 2, 252]]);
+    // This vertical pair stays on the hallway floor, clear of the stairs and ticket table.
+    candidates.push([[78, 218], [78, 270]]);
+  }
+  const distance = (pair) => Math.hypot((pair[0][0] + pair[1][0]) / 2 - center[0], (pair[0][1] + pair[1][1]) / 2 - center[1]);
+  candidates.sort((a, b) => distance(a) - distance(b));
+  const occupied = Object.entries(points).filter(([name]) => !pair.includes(name)).map(([, point]) => point);
+  for (const positions of candidates) {
+    if (positions.every(([x, y]) => occupied.every(([ox, oy]) => Math.abs(x - ox) >= gap || Math.abs(y - oy) >= height))) {
+      const leftFirst = points[first][0] <= points[second][0];
+      return {[first]: positions[leftFirst ? 0 : 1], [second]: positions[leftFirst ? 1 : 0]};
+    }
+  }
+  return {}; // A crowded room keeps its existing positions instead of obscuring another player.
 }
 
 export function drawBingoSet(canvas, choices = {}) {

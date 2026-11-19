@@ -19,6 +19,7 @@ for (const language of ["ko", "en"]) {
   await build({
     stdin: {contents: `import React from "react"; import {renderToStaticMarkup} from "react-dom/server";
       import {MatchReplay} from "./match-replay.jsx";
+      export {bingoWhisperPoints, bingoSetPoint} from "./auction-bingo.jsx";
       export const render = (replay) => renderToStaticMarkup(<MatchReplay replay={replay} transport={null} />);`,
     resolveDir: dirname(fileURLToPath(import.meta.url)), loader: "jsx"},
     outfile: bundle, bundle: true, platform: "node", format: "cjs", logLevel: "silent",
@@ -334,4 +335,38 @@ test("English UI includes translated game, phases, guest and rule summary", () =
   const summary = rulesSummary("경매 빙고 · 본선 7명과 게스트 G01 · 7라운드", "");
   assert.match(summary, /every shape tied for the round’s highest price/);
   assert.match(summary, /total value of remaining coins/);
+});
+
+test("whisper pairs stay on the hallway floor and avoid bystanders and the ticket table", () => {
+  const {bingoWhisperPoints, bingoSetPoint} = require(join(temporary, "ko.cjs"));
+  const points = Object.fromEntries(players.map((p, i) => [p, bingoSetPoint(0, i, players.length)]));
+  for (let a = 0; a < players.length; a++) for (let b = a + 1; b < players.length; b++) {
+    const pair = [players[a], players[b]];
+    const moved = bingoWhisperPoints(points, pair, 0);
+    assert.equal(Object.keys(moved).length, 2);
+    for (const [x, y] of Object.values(moved)) {
+      for (const name of players.filter((p) => !pair.includes(p))) {
+        const [ox, oy] = points[name];
+        assert.ok(Math.abs(x - ox) >= 40 || Math.abs(y - oy) >= 52);
+      }
+      assert.ok(y < 274 || x + 20 < 153 || x - 20 > 360);
+      for (const px of [x - 20, x + 20]) for (const py of [y - 52, y]) {
+        assert.ok(((px - 256) / 234) ** 2 + ((py - 207) / 125) ** 2 < 1, "entire token stays inside the floor ellipse");
+      }
+    }
+    const [x1, y1] = moved[pair[0]], [x2, y2] = moved[pair[1]];
+    assert.ok(Math.abs(x1 - x2) >= 40 || Math.abs(y1 - y2) >= 52);
+  }
+  const blocked = Object.fromEntries(Array.from({length: 100}, (_, i) => [`other${i}`, [30 + i % 10 * 10, 90 + Math.floor(i / 10) * 10]]));
+  assert.deepEqual(bingoWhisperPoints({...blocked, P01: [46, 96], P02: [68, 96]}, ["P01", "P02"], 1), {});
+});
+
+test("submitted players render behind others while retaining their badge", () => {
+  const html = arena(render([setup, event("bingo_round", {round: 1, phase: "shape"}),
+    event("bingo_submission", {round: 1, phase: "shape", player: "P01", submitted: ["P01"], total: 8})]));
+  const token = html.match(/<button[^>]*data-player="P01"[^>]*>/)?.[0];
+  assert.match(token, /data-submitted="true"/);
+  assert.match(token, /z-index:0/);
+  assert.match(html.match(/<button[^>]*data-player="P02"[^>]*>/)?.[0], /z-index:252/);
+  assert.match(html, /token-badge">제출 완료/);
 });
