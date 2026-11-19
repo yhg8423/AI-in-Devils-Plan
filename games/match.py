@@ -26,6 +26,7 @@ from .resume_legacy import LegacyDecisions
 
 REVIEWABLE_BATCH_PHASES = {"representative", "memory_poker", "submit"}
 EFFORTS = ("low", "medium", "high", "xhigh")
+DEFAULT_GUEST_MODEL = ("codex", "gpt-6.1-sol", "low")
 DAY_ONE_MAIN = "1일차 메인 매치 · 양자택일"
 DAY_ONE_PRISON = "1일차 감옥 매치 · 무거운 13"
 DAY_TWO_MAIN = "2일차 메인 매치 · 미스터리 거래소"
@@ -551,6 +552,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             if name not in live_players or name in overrides:
                 parser.error(f"--player-model은 모델 참가자 {name}에게 한 번만 지정할 수 있습니다.")
             overrides[name] = (player_provider or provider, model, player_effort)
+        if saved is None and model_name and guest is not None and guest in live_players:
+            overrides.setdefault(guest, DEFAULT_GUEST_MODEL)
 
         group_image_models = {(image_provider or provider, model, level): (image_model, image_effort)
                               for image_provider, model, level, image_model, image_effort in args.image_model_for}
@@ -740,6 +743,8 @@ def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
         overrides.append((name, player_provider, config["model"], config["effort"]))
     provided_overrides = [(name, player_provider or args.provider, model, level)
                           for name, player_provider, model, level in args.player_model if name in players]
+    if provided_overrides and not any(config[0] == guest for config in provided_overrides):
+        provided_overrides.extend(config for config in overrides if config[0] == guest)
     if provided_overrides and model_players and sorted(provided_overrides) != sorted(overrides):
         raise ValueError("--player-model 값이 저장된 설정과 일치하지 않습니다.")
     if not model_players:

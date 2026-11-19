@@ -1,4 +1,4 @@
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import nullcontext, redirect_stderr, redirect_stdout
 from io import StringIO
 import json
 from pathlib import Path
@@ -7,6 +7,10 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ..match import DAY_FOUR_MAIN, DAY_THREE_MAIN, DAY_THREE_PRISON, run_cli
+
+
+def fake_model(provider, model, *, effort, **kwargs):
+    return nullcontext(Mock(calls=0, config=(provider, model, effort)))
 
 
 class AuctionBingoCliTest(unittest.TestCase):
@@ -83,6 +87,88 @@ class AuctionBingoCliTest(unittest.TestCase):
             self.assertEqual(header["model_overrides"]["G01"], {
                 "provider": "anthropic", "model": "guest-model", "effort": "low",
             })
+
+    def test_guest_defaults_to_codex_sol_low_with_openai_main_players(self):
+        with TemporaryDirectory() as directory, patch("games.match.open_model", side_effect=fake_model) as opened:
+            output = Path(directory) / "events.jsonl"
+
+            def play(match):
+                self.assertEqual(match.models["G01"].config, ("codex", "gpt-6.1-sol", "low"))
+                self.assertTrue(all(match.models[name].config == ("openai", "main-luna", "high")
+                                    for name in match.players if name != "G01"))
+                return {"ranking": list(match.players[:-1])}
+
+            self.run_match(play, ["--provider", "openai", "--model", "main-luna", "--effort", "high",
+                                  "--output", str(output)])
+            self.assertEqual(opened.call_count, 2)
+            header = json.loads(output.read_text().splitlines()[0])
+            self.assertEqual(header["model_overrides"]["G01"], {
+                "provider": "codex", "model": "gpt-6.1-sol", "effort": "low",
+            })
+
+    def test_scripted_or_unselected_guest_does_not_open_a_guest_model(self):
+        for args, live_players in (([], set()),
+                                   (["--provider", "openai", "--model", "main-luna", "--model-player", "P01"], {"P01"})):
+            with self.subTest(live_players=live_players), TemporaryDirectory() as directory, patch(
+                "games.match.open_model", side_effect=fake_model,
+            ) as opened:
+                output = Path(directory) / "events.jsonl"
+
+                def play(match):
+                    self.assertEqual(set(match.models), live_players)
+                    return {"ranking": list(match.players[:-1])}
+
+                self.run_match(play, [*args, "--output", str(output)])
+                self.assertEqual(opened.call_count, len(live_players))
+                header = json.loads(output.read_text().splitlines()[0])
+                self.assertNotIn("G01", header.get("model_overrides", {}))
+
+    def test_resume_keeps_guest_default_and_accepts_repeated_regular_override(self):
+        attempts = []
+
+        def play(match):
+            attempts.append(tuple(match.models[name].config for name in ("P01", "P02", "G01")))
+            match.event("bingo_setup", {"guest": "G01"})
+            if len(attempts) == 1:
+                raise KeyboardInterrupt
+            return {"ranking": list(match.players[:-1])}
+
+        with TemporaryDirectory() as directory, patch("games.match.open_model", side_effect=fake_model):
+            output = Path(directory) / "events.jsonl"
+            override = "P01:openai:player-terra:medium"
+            with self.assertRaises(KeyboardInterrupt):
+                self.run_match(play, ["--provider", "openai", "--model", "main-luna", "--effort", "high",
+                                      "--player-model", override, "--output", str(output)])
+            header = output.read_text().splitlines()[0]
+            self.run_match(play, ["--resume", "--output", str(output), "--player-model", override])
+            self.assertEqual(output.read_text().splitlines()[0], header)
+            self.assertEqual(attempts, [(('openai', 'player-terra', 'medium'), ('openai', 'main-luna', 'high'),
+                                         ('codex', 'gpt-6.1-sol', 'low'))] * 2)
+
+    def test_older_saved_guest_keeps_the_main_luna_model(self):
+        attempts = []
+
+        def play(match):
+            attempts.append(match.models["G01"].config)
+            self.assertIs(match.models["G01"], match.models["P01"])
+            match.event("bingo_setup", {"guest": "G01"})
+            if len(attempts) == 1:
+                raise KeyboardInterrupt
+            return {"ranking": list(match.players[:-1])}
+
+        with TemporaryDirectory() as directory, patch("games.match.open_model", side_effect=fake_model):
+            output = Path(directory) / "events.jsonl"
+            with self.assertRaises(KeyboardInterrupt):
+                self.run_match(play, ["--model", "gpt-6-luna", "--effort", "medium", "--player-model",
+                                      "G01:codex:gpt-6-luna:medium", "--output", str(output)])
+            rows = [json.loads(line) for line in output.read_text().splitlines()]
+            rows[0].pop("model_overrides")  # Before guest defaults, G01 inherited the match model.
+            output.write_text("\n".join(json.dumps(row, ensure_ascii=False) for row in rows) + "\n")
+            prefix = output.read_text().splitlines()[:-1]
+            self.run_match(play, ["--resume", "--output", str(output)])
+            self.assertEqual(attempts, [("codex", "gpt-6-luna", "medium")] * 2)
+            self.assertEqual(output.read_text().splitlines()[:len(prefix)], prefix)
+            self.assertNotIn("model_overrides", json.loads(output.read_text().splitlines()[0]))
 
     def test_resume_restores_regular_roster_and_only_one_guest(self):
         attempts = []

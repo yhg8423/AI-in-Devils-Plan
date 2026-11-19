@@ -198,7 +198,7 @@ uv run --locked --python 3.12 python -m games.auction_bingo \
 
 매치 하나만 따로 돌릴 때는 해당 모듈에 `--output`만 지정할 수 있습니다. 자체 명단과 시작 피스를 쓰려면 `--players`와 `--pieces`를 같은 순서로 넘깁니다.
 
-경매 빙고는 본선 참가자 7명에 게스트 `G01`이 자동으로 합류합니다. `--players`와 `--pieces`에는 본선 참가자만 지정합니다. 게스트도 기본 모델을 사용하며, `--player-model G01:제공자:모델:effort`로 별도 설정할 수 있습니다.
+경매 빙고는 본선 참가자 7명에 게스트 `G01`이 자동으로 합류합니다. `--players`와 `--pieces`에는 본선 참가자만 지정합니다. 모델 실행 시 게스트의 기본 설정은 Codex · `gpt-6.1-sol` · `low`이며, `--player-model G01:제공자:모델:effort`로 변경할 수 있습니다.
 
 ## 중단 시점부터 재개하기
 

@@ -198,7 +198,7 @@ uv run --locked --python 3.12 python -m games.auction_bingo \
 
 To play a single match on its own, you can pass just `--output` to that module. For a custom lineup and initial Piece counts, list `--players` and `--pieces` in matching order.
 
-Auction Bingo automatically adds guest `G01` to the seven regular players. List only regular players in `--players` and `--pieces`. The guest uses the default model, with an optional override via `--player-model G01:PROVIDER:MODEL:EFFORT`.
+Auction Bingo automatically adds guest `G01` to the seven regular players. List only regular players in `--players` and `--pieces`. In model runs, the guest defaults to Codex · `gpt-6.1-sol` · `low`; override it with `--player-model G01:PROVIDER:MODEL:EFFORT`.
 
 ## Resume an interrupted match
 
