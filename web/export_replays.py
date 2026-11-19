@@ -28,6 +28,7 @@ RESULT_FIELDS = (
     "living", "prison", "eliminated", "pieces", "prize_token", "penalties",
     "pieces_awarded", "assets", "rounds", "credits", "seats", "survivors", "model_calls",
     "raw_scores", "manitos", "pieces_spent", "turns", "resets",
+    "turn_limit", "end_reason", "main_turns", "tiebreaks",
 )
 
 
