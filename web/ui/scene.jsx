@@ -133,16 +133,16 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
             const room = state.locations[player] ?? 0;
             const [x, y] = points[player];
             const score = state.scores[player];
-            const {rank, status} = playerDetails?.get(player) ?? {};
+            const {rank, status, badge} = playerDetails?.get(player) ?? {};
             const label = [player, locationName(room), score == null ? null : `${scoreText(score)}${tr("점", " VP")}`,
-              rank, statusLabels[status] ?? status].filter(Boolean).join(" · ");
+              rank, statusLabels[status] ?? status, badge].filter(Boolean).join(" · ");
             return <button key={player} className={row?.player === player ? "token acting" : "token"}
               type="button" data-player={player} data-room={room} data-status={status} aria-pressed={player === selected}
               data-speaking={showSpeech && player === speech.agent_name ? "true" : undefined}
               data-whispering={showSpeech && whispering.includes(player) ? "true" : undefined}
               aria-label={label} title={label} style={{...position(x, y), zIndex: Math.floor(y)}}
               onClick={() => onChoose(player)}>
-              <Sprite player={player} /><span>{player}</span>
+              <Sprite player={player} /><span>{player}{badge && <small className="token-badge">{badge}</small>}</span>
             </button>;
           })}
         </div>

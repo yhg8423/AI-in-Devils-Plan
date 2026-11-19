@@ -1,4 +1,5 @@
 const cast = new Map([
+  ["G01", {color: "#c6ae76", skin: "#d8ab86", hair: "#343441", head: "part", outfit: "vest", accessory: "glasses"}],
   ["P01", {color: "#c69858", skin: "#efba93", hair: "#30252a", head: "bob", outfit: "coat", accessory: "glasses"}],
   ["P02", {color: "#74a6ad", skin: "#c99676", hair: "#302320", head: "crop", outfit: "vest"}],
   ["P03", {color: "#a79bbb", skin: "#edb492", hair: "#422936", head: "bun", outfit: "sweater"}],

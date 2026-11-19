@@ -15,6 +15,9 @@ class ExportReplaysTest(unittest.TestCase):
         self.check_round_trip(STAGES[:5])
 
     def test_exports_day_three_prison_after_its_main_match(self):
+        self.check_round_trip(STAGES[:6])
+
+    def test_exports_day_four_main_after_day_three(self):
         self.check_round_trip(STAGES)
 
     def check_round_trip(self, stages):
@@ -44,6 +47,15 @@ class ExportReplaysTest(unittest.TestCase):
                                   pieces_awarded={"P01": 1, "P02": 0, "P03": 1, "P04": 1},
                                   turns=101, resets=0, turn_limit=100, end_reason="turn_limit", main_turns=100,
                                   tiebreaks=[report])
+                if stages[index] == "day4-main":
+                    header["players"] = ["P01", "G01"]
+                    result.update(all_ranking=["G01", "P01"], scores={"P01": 0, "G01": 8},
+                                  filled={"P01": 0, "G01": 9}, remaining_value={"P01": 18, "G01": 4},
+                                  shapes={"P01": {"triangle": 0}, "G01": {"triangle": 3}},
+                                  boards={"P01": [[None]], "G01": [["triangle"]]},
+                                  coins={"P01": {"10": 1}, "G01": {"2": 2}}, guest="G01",
+                                  guest_result={"player": "G01", "rank": 1, "first": True,
+                                                "full_board": True, "prize_won": 20_000_000}, forced_last=[])
                 results.append(result)
                 log.write_text(encode_rows([header, event, result]), encoding="utf-8")
                 (log.parent / "events.decisions.jsonl").write_text("private", encoding="utf-8")

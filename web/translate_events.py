@@ -16,7 +16,7 @@ from .spectator import find_matches
 HANGUL = re.compile(r"[가-힣ㄱ-ㅎㅏ-ㅣ]")
 MASKED_CLUE = re.compile(r"([□▧]+)")
 ROOM_INVITE = re.compile(r"^초대 #(\d+) · ([1-4])번\s*(?:논의실|룸) · (.*)$", re.S)
-ROOM_MOVE = re.compile(r"^(P\d+ → )(?:(\d+)번\s*(?:논의실|룸)|복도)$")
+ROOM_MOVE = re.compile(r"^([PG]\d+ → )(?:(\d+)번\s*(?:논의실|룸)|복도)$")
 GLOSSARY = {
     "성과금": "Bonus", "보험금": "Insurance", "개인": "Solo", "팀": "Team",
     "공공": "Public", "헌신": "Devotion", "양보": "Concession", "점수": "Points",
@@ -34,9 +34,10 @@ GAME_TERMS = {
     "방어제철": "Bangeo Steel", "알트엔터": "Alt Entertainment", "열림보안": "Yeollim Security",
     "코요테크": "Koyo Tech", "후자전자": "Huja Electronics",
     "돼지 저금통": "Piggy Bank",
+    "경매 빙고": "Auction Bingo",
 }
 TERM_PATTERN = re.compile("|".join(map(re.escape, GAME_TERMS)))
-PLAYER_ID = re.compile(r"(?i)\bp([0-9]{2})(?![0-9])")
+PLAYER_ID = re.compile(r"(?i)\b([pg])([0-9]{2})(?![0-9])")
 
 
 def source_events(snapshot: bytes):
@@ -123,7 +124,7 @@ def translate_batch(process, texts):
     if (not isinstance(translations, list) or len(translations) != len(texts)
             or any(not isinstance(text, str) or not text.strip() for text in translations)):
         raise RuntimeError("Translator must return a nonempty string for each input, in order.")
-    return [PLAYER_ID.sub(r"P\1", text) for text in translations]
+    return [PLAYER_ID.sub(lambda match: match[1].upper() + match[2], text) for text in translations]
 
 
 def translate_logs(root, logs, command, batch_size):
