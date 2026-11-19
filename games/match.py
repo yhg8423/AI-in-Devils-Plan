@@ -31,11 +31,15 @@ DAY_ONE_PRISON = "1일차 감옥 매치 · 무거운 13"
 DAY_TWO_MAIN = "2일차 메인 매치 · 미스터리 거래소"
 DAY_TWO_PRISON = "2일차 감옥 매치 · 러시안 룰렛"
 DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
-PRISON_STAGES = {DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6)}
+DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
+PRISON_STAGES = {
+    DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
+}
 RELATIONSHIP_EVIDENCE = {
     "room_move", "teams", "rectangle_result", "team_vote", "choice_4_result", "grass_choices", "grass_placement",
     "grass_bonus", "choice_9_result", "poker_ranking", "placement", "market", "trade_fill", "inspection", "shift", "swap",
     "gem_auction", "gem_swap", "gem_bonus", "gem_reveal", "gem_card", "gem_peek", "gem_final",
+    "pig_deposit", "pig_claim", "pig_doubt", "pig_replace", "pig_reset", "pig_challenge", "pig_reset_vote",
 }
 
 
@@ -79,9 +83,11 @@ class Match:
         if models is not None:
             self.models.update(models)
         self.allow_review = allow_review
+        self.relationship_reviews_enabled = True
         self.on_event = on_event
         self.resume_log = resume_log
         self.count_calls = count_calls
+        self.model_observations: Callable[[str, list[Message]], list[Message]] | None = None
         self.legacy = (LegacyDecisions(resume_log.events)
                        if resume_log and resume_log.resume and not resume_log.journal.remaining else None)
         previous = relationships or {}
@@ -131,7 +137,7 @@ class Match:
         return saved["value"]
 
     def review_relationships(self, checkpoint: str) -> None:
-        if not self.backends or not self.live_turns:
+        if not self.relationship_reviews_enabled or not self.backends or not self.live_turns:
             return
         through = len(self.events)
         prompts = {}
@@ -139,8 +145,12 @@ class Match:
             evidence = []
             context = deque(maxlen=64)
             reviewed = self._relationship_reviewed.get(name, 0)
+            allowed = ({event.msg_hash for event in self.model_observations(name, self.observations(name))}
+                       if self.model_observations is not None else None)
             for index, event in enumerate(self.events[:through]):
                 if event.visible_to != "all" and name not in event.visible_to:
+                    continue
+                if allowed is not None and event.msg_hash not in allowed:
                     continue
                 if event.msg_type in CHANNEL_NAMES:
                     observed = format_speech(event)
@@ -158,7 +168,7 @@ class Match:
             if not evidence:
                 continue
             others = ", ".join(other for other in self.players if other != name)
-            previous = format_ratings(self.relationships[name]) or "아직 평가 없음"
+            previous = format_ratings(self._model_ratings(name)) or "아직 평가 없음"
             prompts[name] = (
                 f"Exercise: {name}의 비공개 관계 평가를 갱신하세요. 시점: {checkpoint}.\n"
                 f"평가 가능한 상대: {others}\n"
@@ -291,6 +301,12 @@ class Match:
     def _record_review(self, name, phase, review: Review) -> None:
         self.event("decision_note", {"phase": phase, "note": review.summary()}, private=[name], actor=name)
 
+    def _model_ratings(self, name: str) -> Ratings:
+        ratings = self.relationships[name]
+        if self.model_observations is None:
+            return ratings
+        return {other: {**rating, "reason": ""} for other, rating in ratings.items()}
+
     def _query(self, name, prompt, request_type="match_request", images=(), *,
                record_strategy=False, allow_review=False) -> tuple[str, StrategyNote]:
         request = Message(
@@ -298,12 +314,23 @@ class Match:
             msg_type=request_type, visible_to=[name],
         )
         model = self.models[name]
+        history = self.observations(name)
+        backend = self.backends[name]
+        if self.model_observations is not None:
+            history = self.model_observations(name, history)
+            # Concordia also keeps observations internally; discarded history must not survive there.
+            backend.reset()
+        relationships = backend.relationships
+        backend.relationships = self._model_ratings(name)
         capture = (record_strategy or allow_review) and isinstance(model, ActionLanguageModel)
-        with (
-            model.attached_images(images) if images else nullcontext(),
-            model.capture_strategy(allow_review=allow_review) if capture else nullcontext() as strategy,
-        ):
-            action = self.backends[name].query(name, "경기 참가자", [*self.observations(name), request])
+        try:
+            with (
+                model.attached_images(images) if images else nullcontext(),
+                model.capture_strategy(allow_review=allow_review) if capture else nullcontext() as strategy,
+            ):
+                action = backend.query(name, "경기 참가자", [*history, request])
+        finally:
+            backend.relationships = relationships
         return action, strategy if strategy is not None else StrategyNote()
 
     def _resolve(self, name, phase, proposed, default, valid, *, note=""):
@@ -576,6 +603,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             label = None
             if event.msg_type in {"rules", "grass_phase"}:
                 label = event.content.split("\n", 1)[0]
+            elif event.msg_type == "pig_turn":
+                label = f"{json.loads(event.content)['turn']}턴"
             elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round"}:
                 data = json.loads(event.content)
                 label = f"{data['round']}라운드"

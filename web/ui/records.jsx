@@ -15,7 +15,8 @@ const playerTextTypes = new Set(["public", "room", "whisper", "discussion_note",
 export function MatchFeed({events, onSeek, unit = "턴", emptyText = tr("이 시점에 볼 수 있는 플레이 기록이 없어요.", "No play records to show at this point.")}) {
   if (!events.length) return <p className="empty">{emptyText}</p>;
   return <ol className="feed">{events.map((event, index) => {
-    const recipients = Array.isArray(event.visible_to) ? event.visible_to.filter((name) => name !== event.agent_name) : [];
+    const recipients = Array.isArray(event.visible_to) ? event.visible_to.filter((name) => name !== event.agent_name)
+      .map((name) => name === "__operator__" ? tr("운영자", "Operator") : name) : [];
     const speaker = event.agent_name === "System" || event.msg_type === "room_move" ? "" : event.agent_name;
     const text = event.msg_type === "grass_choices" ? choiceOptionLabel(event.text) : event.text;
     const textLanguage = playerTextTypes.has(event.msg_type) && /[가-힣]/.test(text) ? "ko" : undefined;

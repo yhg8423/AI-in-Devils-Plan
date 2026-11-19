@@ -221,7 +221,7 @@ class CodexLanguageModel(ActionLanguageModel):
                     image_args.extend(("--image", str(path)))
                 command = [*command[:2], *image_args, *command[2:]]
             completed = subprocess.run(
-                command, input=model_input, text=True, capture_output=True, timeout=90, check=False,
+                command, input=model_input, text=True, capture_output=True, timeout=300, check=False,
             )
         answer = None
         error = None

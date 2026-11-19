@@ -2,9 +2,11 @@ const attack = "Attack uses the uncut tile. A successful placement earns twice i
 const partner = "Two players who select each other cooperate. If both tiles are placed, the pair earns 1 bonus point per shared edge. Their submitted shares must add up to the full bonus. A player who chooses to compete earns 5 extra points if their tile is placed and no more than nine players place tiles in total.";
 const obstacle = "Choose one tree or two manholes worth +1 and −1. A tile may cover a tree only with a hole. Covering a manhole adds or subtracts one point. Place manholes first, then trees, then tiles. Obstacles go on empty board cells in tile placement order.";
 const points = "Choose Points for 5 Victory Points or Information for a private preview of Choices 6–8 before picking a tile.";
+const piggyTiebreak = "Players tied for last place play fresh tiebreaks with separate scores starting at zero. At the first score change, losing extra Victory Points means elimination; gaining points secures safety. Remaining tied players start another fresh tiebreak, and the last remaining tied player is eliminated even if their score is unchanged. Each tiebreak uses one more bank than active players, three memory slots, and a reset threshold of one fewer than the active player count. The main match’s five-point target and 100-turn limit do not apply to tiebreaks. Extra scores do not change main-match Victory Points. Eliminated players do not share first-place rewards.";
 
 // Replay logs retain the original rules. Summaries cover known headings without changing archived data.
 const summaries = [
+  ["돼지 저금통", "Four players circulate five numbered banks, each starting with one black and one white coin. Deposit one to five coins into your lower bank, announce the added colors and amounts truthfully, and pass it to another player. Move your upper bank down. The receiver declares the black or white total, alternating each turn. Only the first doubt is judged: a successful doubter gains one point and the declarer loses one; a failed doubter loses one. The opened bank is replaced, and the player who lost a point acts next. Three reset requests trigger a reset. Before it, the remaining player may recall both colors in all five banks for +3 points or −2 on failure. End immediately when anyone reaches five points. Last place is eliminated; first place shares three Pieces, discarding any remainder. Coin counting aids are prohibited. In the simulation, drawn order resolves simultaneous doubts and final score ties; discussion and decision windows replace the timers."],
   ["보석 암시장", "Play three rounds with hidden gem and bomb cards. Nine players use 13 cards. A ten-player continuation adds one Copper 1. Secretly bid Pieces for the lead. Ties trigger another auction, then agreement, with base order resolving failed agreement. Swap once in forward order and once in reverse. The three-minute turn becomes one discussion action per player. Bomb holders must swap with another player. Losing your bomb to someone else’s swap earns 3 points. Once per game, a Piece inspects one buyer or trash card. At reveal, each matching buyer earns your card’s value. A scoring diamond also earns one Piece. Bombs score their printed negative value. The −6 holder leads next, then −4, then the previous leader. Final VP equals your cumulative VP times your incoming manito’s VP. Base order breaks final ties. The top three enter the Living Quarters, the bottom player is eliminated, and the winner saves one prisoner with the Alliance Token. Final VP of at least 1 earns one Piece, or two at 10 or more."],
   ["양자택일 ·", "Sixteen players face ten choices and four minigames. Everyone starts at 0 Victory Points and normally holds one Piece. Scores are public. By default, the top six are assigned to the Living Quarters, the next eight to the Prison Wing, and the bottom two are eliminated. First place may move one player from the Prison Wing to the Living Quarters."],
   ["선택 1 ·", "Performance Pay awards one Piece if you end up in the Living Quarters. Insurance awards two Pieces if you end up in the Prison Wing. The final assignments after the alliance token decide the payout."],
@@ -24,6 +26,37 @@ const summaries = [
 ];
 
 export function rulesSummary(heading, body) {
+  if (heading.startsWith("돼지 저금통")) {
+    if (heading.includes("최하위 동점 추가 경기")) return piggyTiebreak +
+      " Normal deposits, passes, claims, doubts and all-bank challenge scoring still apply. Players privately choose three fresh memories and update them each turn. There are no discussion or relationship assessments.";
+    const turns = body.includes("전원에게 두 턴씩") ? "two discussion turns" : "one discussion turn";
+    const silent = body.includes("\n\n6. 대화 없는 진행\n");
+    const memory = body.includes("\n\n5. 변경 가능한 기억 슬롯\n") ?
+      " Each player keeps black and white estimates for three banks and may choose any three current banks at each memory update. Estimates can be wrong or unknown and are never corrected from hidden totals. Each update replaces the previous three-bank memory, so dropping a bank forgets its old totals; selecting it again does not recover that memory. Resets begin with fresh banks. A retired remembered bank is replaced by its fresh replacement with one coin of each color." : body.includes("\n\n5. 비공개 기억 요약\n") ?
+        " Each player maintains a private summary of at most 300 characters, choosing which facts, doubts, or plans to retain. There are no fixed banks or slots. The summary is rewritten after opening discussions and completed turns; it can omit facts, contain mistakes, or be cleared. Resets retain the previous summary until the player rewrites it. The engine supplies no hidden totals, automatic correction, or earlier transcript beyond the retained summary." : body.includes("\n\n6. 기억 직접 갱신\n") ?
+        " Each player maintains their own black and white estimates for three chosen banks, updating those memories after each deposit. Estimates can be wrong, and uncertain counts may be left unknown; the engine never corrects them with hidden totals. Players choose banks at the start and after each reset, keeping those slots until the next reset. A retired selected bank is replaced by the fresh bank with one coin of each color. Earlier bank-count records are unavailable outside these memories." : body.includes("\n\n5. 기억 슬롯\n") ?
+        " The simulation privately retains exact black and white counts for three chosen banks. Players choose at the start and after each reset; slots stay fixed between resets and follow fresh replacements, which start with one coin of each color. Earlier bank-count records are unavailable outside these slots." : "";
+    let summary = summaries.find(([prefix]) => prefix === "돼지 저금통")[1];
+    if (body.includes("\n\n100턴 상한\n")) summary = summary.replace(
+      "End immediately when anyone reaches five points.",
+      "End immediately when anyone reaches five points, or after Turn 100, including its reset requests and any eligible all-bank challenge. At the turn limit, rank players by their current Victory Points without resetting banks or updating memory.",
+    );
+    if (body.includes("\n\n8. 리셋 동시 판단\n")) summary = summary.replace(
+      "Three reset requests trigger a reset. Before it, the remaining player may recall both colors in all five banks for +3 points or −2 on failure.",
+      "A reset occurs when at least three players have requested it. Players who have not already requested one decide simultaneously in private, and all responses are collected before any new requests are announced. At exactly three cumulative requests, the sole non-requester may recall both colors in all five banks for +3 points or −2 on failure. If all four request a reset, reset directly without a challenge.",
+    );
+    const relationships = body.includes("\n\n7. 관계 평가 없음\n") ?
+      " Relationship assessments are disabled during and at the end of this match." : "";
+    const initialMemory = body.includes("\n\n초기 기억 선택\n") ?
+      " Memory slots start empty. At the start and after each reset, each player independently chooses three current banks in private." : "";
+    const tiebreak = body.includes("\n\n최하위 동점 추가 경기\n") ?
+      " " + piggyTiebreak : "";
+    if (tiebreak) summary = summary.replace("End immediately", "The main match ends immediately")
+      .replace("drawn order resolves simultaneous doubts and final score ties", "drawn order resolves simultaneous doubts");
+    return (silent ? summary.replace("discussion and decision windows replace the timers", "decision windows replace the timers") : summary) +
+      (silent ? " There are no discussion or whisper phases. Players privately prepare and update their initial memory before the first deposit. Coin deposits, count declarations, and verdicts remain public." :
+        ` Each player has four opening discussion turns and ${turns} before each deposit.`) + memory + initialMemory + relationships + tiebreak;
+  }
   if (heading.startsWith("보석 암시장")) {
     const relationships = body.includes("\n\n8. 관계 평가 갱신\n") ?
       " Players review affinity and trust after discussions, auction results, swaps, card reveals, final scoring, and the Alliance Token decision. Updates require new evidence visible to that player." : "";

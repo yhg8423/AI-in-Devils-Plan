@@ -9,9 +9,12 @@ from .spectator import CASE_STAGES, case_catalog, find_matches, next_match, read
 
 class ExportReplaysTest(unittest.TestCase):
     def test_exports_portable_playable_matches_in_both_languages(self):
-        self.check_round_trip(STAGES[:-1])
+        self.check_round_trip(STAGES[:4])
 
     def test_exports_day_three_after_its_day_two_predecessors(self):
+        self.check_round_trip(STAGES[:5])
+
+    def test_exports_day_three_prison_after_its_main_match(self):
         self.check_round_trip(STAGES)
 
     def check_round_trip(self, stages):
@@ -21,6 +24,7 @@ class ExportReplaysTest(unittest.TestCase):
             output = root / "play_results"
             campaign = source / "matches" / "example"
             logs = [campaign / stage / "events.jsonl" for stage in stages]
+            results = []
             for index, log in enumerate(logs):
                 log.parent.mkdir(parents=True)
                 header = {"type": "match", "game": CASE_STAGES[index], "players": ["P01"], "seed": 1,
@@ -28,7 +32,20 @@ class ExportReplaysTest(unittest.TestCase):
                 header.update({key: str(logs[prior]) for key, prior in PREDECESSORS[index].items()})
                 event = {"type": "event", "turn": 5, "msg_type": "decision_note", "agent_name": "P01",
                          "content": "계획", "visible_to": ["P01"], "timestamp": 123}
-                log.write_text(encode_rows([header, event, {"type": "result", "ranking": ["P01"]}]), encoding="utf-8")
+                result = {"type": "result", "ranking": ["P01"]}
+                if stages[index] == "day3-prison":
+                    header["players"] = ["P01", "P02", "P03", "P04"]
+                    report = {"round": 1, "players": header["players"],
+                              "scores": {"P01": 1, "P02": -1, "P03": 0, "P04": 0},
+                              "safe": ["P01", "P03", "P04"], "eliminated": ["P02"], "remaining": [], "turns": 1}
+                    result.update(ranking=["P01", "P03", "P04", "P02"],
+                                  scores=dict.fromkeys(header["players"], 0),
+                                  eliminated=["P02"], survivors=report["safe"],
+                                  pieces_awarded={"P01": 1, "P02": 0, "P03": 1, "P04": 1},
+                                  turns=101, resets=0, turn_limit=100, end_reason="turn_limit", main_turns=100,
+                                  tiebreaks=[report])
+                results.append(result)
+                log.write_text(encode_rows([header, event, result]), encoding="utf-8")
                 (log.parent / "events.decisions.jsonl").write_text("private", encoding="utf-8")
                 (log.parent / "events.en.jsonl").write_text(
                     encode_rows([{"turn": 5, "text": "Plan"}]), encoding="utf-8",
@@ -53,6 +70,9 @@ class ExportReplaysTest(unittest.TestCase):
                 self.assertEqual(korean["content"], "계획")
                 self.assertEqual(english, {**korean, "translation": {"text": "Plan"}})
                 self.assertEqual(english["visible_to"], ["P01"])
+                for language in ("ko", "en"):
+                    final = read_match(log, language=language)["steps"][-1]["events"][0]
+                    self.assertEqual(json.loads(final["content"]), results[index])
                 if index + 1 < len(run_ids):
                     self.assertEqual(next_match(output, exported, run_id)["id"], run_ids[index + 1])
 
