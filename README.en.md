@@ -245,8 +245,22 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 3 prison match | Piggy Bank | 4 | Play without discussion or relationship assessments, deciding reset requests in seat order. Each model updates its memories of three banks and may change which banks it retains at every update. Mistaken memories are not corrected from the true contents. Score by calling doubt or recalling all banks before a reset. The main match ends at five points or after at most 100 turns. Last-place ties play extra rounds: losing points eliminates a player, gaining points secures safety, and the last remaining tied player is eliminated. |
 | Day 4 main match | Auction Bingo | 7 regular + 1 guest | Choose shapes and bid privately over seven rounds. Won shapes are automatically arranged at the end; rank by bingo lines, filled spaces, then the total value of unused coins. |
 | Day 4 prison match | Wall Go II | 3 | Move counters and build walls to claim territory without discussion. The three-player winner survives; the other two play a duel to determine elimination. Complete ties replay with only tied players and reversed turn order. |
+| Exile match 1 | Piece Puzzle | 4 | Assemble eight slotted pieces into a lattice by matching notch directions and depths. Players build privately; the first three to finish survive. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
+
+### Run the first exile match
+
+List completed matches in order, starting with Day 1 main, up to the point where four eliminated players have accumulated. If only three have been eliminated after Day 1, as in the mixed-model run, include Day 2 main too.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile1/events.jsonl
+```
+
+Use the same `--provider`, `--model`, and `--player-model` options as other matches for model play. Resume an interrupted run with `--resume --output <events.jsonl>`.
 
 ## Read play logs on the website
 

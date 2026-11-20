@@ -1,0 +1,58 @@
+.exile-arena { min-width: 0; align-self: start; background: #151c24; overflow: hidden; }
+.exile-room { position: relative; }
+.exile-room > svg { width: 100%; height: auto; display: block; }
+.exile-room-title, .exile-room-caption, .exile-axis, .exile-slat-label, .exile-board-cover text { fill: #e8d2a8; font-family: var(--pixel-font); text-anchor: middle; }
+.exile-room-title { font-size: 14px; font-weight: 700; }
+.exile-room-caption { font-size: 12px; }
+.exile-axis { font-size: 10px; }
+.exile-slat-label { font-size: 10px; fill: #fff1bf; paint-order: stroke; stroke: #2a211b; stroke-width: 3px; stroke-linejoin: bevel; }
+.exile-board-cover text { font-size: 13px; }
+.exile-board-cover text:last-child { font-size: 10px; fill: #b2b9bd; }
+.exile-player { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 3px; border: 0; background: none; color: #e2e4e6; font: 700 12px var(--pixel-font); cursor: pointer; padding: 0; min-width: 60px; }
+.exile-player canvas { width: 30px; height: 43px; image-rendering: pixelated; }
+.exile-player > span { display: grid; gap: 2px; padding: 3px 6px; background: #141c26; border: 1px solid #73808b; }
+.exile-player small { font-size: 9px; }
+.exile-player:disabled { opacity: 1; cursor: default; }
+.exile-player[aria-pressed="true"] > span { border-color: #eecb86; color: #ffdfa0; }
+.exile-player[data-status="safe"] > span { border-color: #a6c69a; color: #d0e5bb; }
+.exile-player[data-status="eliminated"] > span { border-color: #ba786f; color: #e99c8d; }
+.exile-player[data-status="eliminated"] canvas { filter: grayscale(.9); opacity: .55; }
+.exile-player-call { position: absolute; bottom: calc(100% + 7px); padding: 5px 7px; border: 2px solid #d8b471; background: #292724; color: #f5dca3; font-size: 10px; white-space: nowrap; }
+.exile-player[data-status="eliminated"] .exile-player-call, .exile-player[data-call="incorrect"] .exile-player-call { color: #ffb2a4; border-color: #bc7d72; background: #3d292c; }
+.exile-player-picker { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px 12px; border-top: 2px solid #414852; }
+.exile-player-picker button { padding: 5px 10px; font: 700 12px var(--pixel-font); color: #d0dae4; border: 1px solid #5c6976; background: #232d38; cursor: pointer; }
+.exile-player-picker button[aria-pressed="true"] { border-color: #edc987; color: #ffe3a7; background: #3b342a; }
+.exile-player-picker button:disabled { cursor: default; color: #89929b; border-color: #3a4652; }
+.exile-stage { min-width: 0; color: #e1e6eb; }
+.exile-stage h2 { margin-top: 0; }
+.exile-phase { color: #eac88e; font-weight: 700; }
+.exile-stage .match-table { font-size: 12px; }
+.exile-stage .match-table :is(th, td) { padding: 5px 7px; }
+.exile-stage .match-table caption { padding-bottom: 4px; }
+.exile-own-board { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 7px; margin: 10px 0 8px; padding-top: 8px; border-top: 1px solid #47515b; }
+.exile-own-board h3 { margin: 0; font: 700 13px var(--pixel-font); color: #e2c79c; }
+.exile-own-board p, .exile-private-status { font-size: 12px; margin: 0; }
+.exile-piece-tray { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 7px; margin-top: 10px; }
+.exile-piece-card { display: grid; justify-items: center; align-content: start; gap: 4px; min-width: 0; padding: 6px 4px; border: 1px solid #46505c; background: #17212b; }
+.exile-piece-card > strong { font: 700 11px var(--pixel-font); color: #e6c793; }
+.exile-piece-card[data-placed="true"] { border-color: #8c784f; }
+.exile-piece-diagram { display: block; width: min(100%, 60px); height: auto; max-height: 45px; }
+.exile-piece-card small { font-size: 10px; line-height: 1.4; text-align: center; overflow-wrap: anywhere; min-height: 14px; color: #bbc6d0; }
+.exile-instructions { margin: 6px 0 0; font-size: 11px; line-height: 1.6; }
+.exile-rules p { line-height: 1.7; }
+.exile-information.caption { display: block; min-width: 0; }
+.exile-information [role="tablist"] { max-width: 100%; overflow-x: auto; margin-bottom: 12px; }
+.exile-history { list-style: none; padding: 0; margin-top: 14px; }
+.exile-history li { border-bottom: 1px solid #3a4552; padding: 9px 0; }
+.exile-history button { display: grid; gap: 5px; border: 0; padding: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; width: 100%; }
+.exile-history small { font-size: 11px; color: #aab7c4; }
+.exile-history li[data-correct="true"] button { color: #d1e5b9; }
+.exile-history li[data-correct="false"] button { color: #e6aaa0; }
+.exile-information.caption > .exile-tie-order { font-size: 11px; color: #c7b696; line-height: 1.6; margin: 5px 0 12px; }
+.exile-history-owner { font: 700 13px var(--pixel-font); margin: 14px 0 5px; color: #e2c79c; }
+@media (max-width: 540px) {
+  .exile-player canvas { width: 23px; height: 33px; }
+  .exile-player { font-size: 9px; min-width: 44px; }
+  .exile-player small, .exile-player-call { font-size: 8px; }
+  .exile-player-call { padding: 3px 4px; bottom: calc(100% + 4px); }
+}

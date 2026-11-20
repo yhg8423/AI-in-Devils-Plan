@@ -35,6 +35,7 @@ DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
 DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
 DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
+FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
     DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),
@@ -231,7 +232,7 @@ class Match:
 
     def decide_together(
         self, phase: str, decisions: Mapping[str, Decision], *, response_times: dict[str, int] | None = None,
-        record_actions: bool = True,
+        record_actions: bool = True, images: Sequence[bytes] = (),
     ) -> dict[str, str]:
         """Resolve simultaneous decisions and optionally record response times in nanoseconds."""
         for decision in decisions.values():
@@ -249,7 +250,7 @@ class Match:
         start = monotonic_ns()
 
         def query(name, prompt, *, review=False):
-            candidate, strategy = self._query(name, prompt, record_strategy=True, allow_review=review)
+            candidate, strategy = self._query(name, prompt, images=images, record_strategy=True, allow_review=review)
             return candidate, asdict(strategy), monotonic_ns() - start
 
         def reserve():
@@ -452,13 +453,16 @@ def parse_group_image_model(value: str) -> tuple[str | None, str, str, str, str 
 
 def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             previous_main: str | None = None, after_prison: bool = False,
-            guest: str | None = None, argv=None) -> None:
+            guest: str | None = None, exile_roster: bool = False, argv=None) -> None:
     seat_counts = (seats,) if isinstance(seats, int) else seats
     roster_args = seat_counts[0] if len(seat_counts) == 1 else "+"
     parser = argparse.ArgumentParser(description=title)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--players", nargs=roster_args, metavar="ID", help="순서대로 참가자 ID 지정")
     parser.add_argument("--pieces", nargs=roster_args, type=int, metavar="N", help="참가자 순서대로 시작 피스 지정")
+    if exile_roster:
+        parser.add_argument("--from-matches", nargs="+", type=Path, metavar="EVENTS",
+                            help="첫 유배지 참가자 4명이 모이는 시점까지, 1일차 메인부터 순서대로 완료 기록 지정")
     if previous_main:
         parser.add_argument("--from-main", type=Path, help=f"완료된 {previous_main}의 events.jsonl")
     if after_prison:
@@ -512,10 +516,22 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             model_name = DEFAULT_MODELS[provider]
         main_path = getattr(args, "from_main", None)
         prison_path = getattr(args, "from_prison", None)
+        source_matches = getattr(args, "from_matches", None)
+        inherited_roster = bool(main_path or source_matches)
         if after_prison and bool(main_path) != bool(prison_path):
             parser.error("연속 실행에는 --from-main과 --from-prison을 함께 지정하세요.")
         relationships = {}
-        if main_path:
+        if source_matches:
+            if args.players is not None or args.pieces is not None:
+                parser.error("--from-matches로 참가자를 이어받을 때는 --players와 --pieces를 생략하세요.")
+            try:
+                from .exile_match.roster import collect_exile_players
+
+                players = collect_exile_players(source_matches)
+                pieces = [0] * len(players)
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                parser.error(f"유배지 참가자를 읽을 수 없습니다. {error}")
+        elif main_path:
             if previous_main is None or (prison_path and not after_prison):
                 parser.error("이 매치는 저장된 선행 매치 설정을 지원하지 않습니다.")
             if args.players is not None or args.pieces is not None:
@@ -548,7 +564,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         overrides: dict[str, tuple[str, str, str]] = {}
         for name, player_provider, model, player_effort in args.player_model:
             if name not in players:
-                if main_path:
+                if inherited_roster:
                     continue
                 parser.error(f"--player-model에 지정한 {name}은 참가자 명단에 없습니다.")
             if name not in live_players or name in overrides:
@@ -564,7 +580,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
 
         default = (provider, model_name, effort)
         settings = {name: overrides.get(name, default) for name in live_players} if model_name else {}
-        if not main_path and group_image_models.keys() - set(settings.values()):
+        if not inherited_roster and group_image_models.keys() - set(settings.values()):
             parser.error("--image-model-for에 지정한 제공자, 모델, effort를 쓰는 참가자가 없습니다.")
         image_settings = {name: group_image_models[config] for name, config in settings.items()
                           if config in group_image_models}
@@ -656,6 +672,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             header["from_main"] = str(main_path)
         if prison_path:
             header["from_prison"] = str(prison_path)
+        if source_matches:
+            header["from_matches"] = [str(path) for path in source_matches]
         try:
             if log is not None:
                 log.write(header)
@@ -717,6 +735,17 @@ def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
             raise ValueError(f"--{option.replace('_', '-')} 값이 저장된 설정과 일치하지 않습니다.")
         setattr(args, option, path)
 
+    if hasattr(args, "from_matches"):
+        sources = saved.get("from_matches")
+        if sources is not None and (not isinstance(sources, list) or not sources
+                                   or any(not isinstance(path, str) or not path for path in sources)):
+            raise ValueError("저장된 유배지 선행 기록이 올바르지 않습니다.")
+        paths = [Path(path) for path in sources] if sources else None
+        if args.from_matches is not None and (paths is None or
+                [path.resolve() for path in paths] != [path.resolve() for path in args.from_matches]):
+            raise ValueError("--from-matches 값이 저장된 설정과 일치하지 않습니다.")
+        args.from_matches = paths
+
     roster = [name for name in players if name != guest]
     if guest is not None and (players != [*roster, guest] or pieces.get(guest) != 1):
         raise ValueError("저장된 게스트 명단이나 시작 피스가 올바르지 않습니다.")
@@ -727,7 +756,7 @@ def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
         raise ValueError("--pieces 값이 저장된 설정과 일치하지 않습니다.")
     if args.model_player is not None and model_players and list(dict.fromkeys(args.model_player)) != model_players:
         raise ValueError("--model-player 값이 저장된 설정과 일치하지 않습니다.")
-    if args.from_main is None:
+    if args.from_main is None and not getattr(args, "from_matches", None):
         args.players, args.pieces = roster, ordered_pieces
     else:
         args.players = args.pieces = None

@@ -28,11 +28,12 @@ const chapters = [
 
 function CaseNavigation({replay}) {
   const {caseRecord, chosen, chooseRun} = replay;
+  const matches = [...caseRecord.matches, ...(caseRecord.exile_matches ?? [])];
   const selectorLabel = tr("매치 선택", "Choose a match");
   return <Selector label={selectorLabel} aria-label={selectorLabel} isLabelHidden size="sm" variant="secondary"
-    value={chosen} options={caseRecord.matches.map(({id, game}) => ({value: id, label: gameTitle(game)}))}
+    value={chosen} options={matches.map(({id, game}) => ({value: id, label: gameTitle(game)}))}
     onChange={(id) => {
-      if (!caseRecord.matches.some((match) => match.id === id)) return;
+      if (!matches.some((match) => match.id === id)) return;
       window.history.replaceState(null, "", runHref(id, caseRecord.id));
       chooseRun(id);
     }} />;
