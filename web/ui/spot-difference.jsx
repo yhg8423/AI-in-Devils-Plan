@@ -96,11 +96,21 @@ function Drawing({picture}) {
 function Picture({picture, marks, targets, ...props}) {
   return <svg {...props} viewBox={`0 0 ${picture.width} ${picture.height}`} data-picture-id={picture.id} role="img" aria-label={tr(`${themes[picture.theme] ?? picture.theme} 그림`, `${themes[picture.theme] ?? picture.theme} picture`)} shapeRendering={picture.image ? "auto" : "crispEdges"}>
     <Drawing picture={picture} />
-    {targets.map((target) => <rect key={target.id} className="spot-target" data-target={target.id} x={target.x} y={target.y} width={target.w} height={target.h} fill="none" stroke="#ffe68c" strokeWidth="5" strokeDasharray="10 6" />)}
-    {marks.map((mark, index) => <g key={index} className="spot-mark" data-correct={mark.correct} data-mark={`${mark.x},${mark.y}`}>
-      <path d={`M${mark.x - 11} ${mark.y - 11}l22 22m0-22l-22 22`} fill="none" stroke="#151a21" strokeWidth="10" />
-      <path d={`M${mark.x - 11} ${mark.y - 11}l22 22m0-22l-22 22`} fill="none" stroke={mark.correct === true ? "#bcf49c" : mark.correct === false ? "#ff9182" : "#fff2a7"} strokeWidth="5" />
-    </g>)}
+    {targets.map((target) => {
+      const bounds = {x: target.x, y: target.y, width: target.w, height: target.h};
+      return <g key={target.id} className="spot-target" data-target={target.id} fill="none" strokeDasharray="10 6">
+        <rect {...bounds} stroke="#111827" strokeWidth="9" />
+        <rect {...bounds} stroke="#ff208c" strokeWidth="5" />
+      </g>;
+    })}
+    {marks.map((mark, index) => {
+      const cross = `M${mark.x - 16} ${mark.y - 16}l32 32m0-32l-32 32`;
+      return <g key={index} className="spot-mark" data-correct={mark.correct} data-mark={`${mark.x},${mark.y}`} fill="none" strokeLinecap="round">
+        <path d={cross} stroke="#111827" strokeWidth="16" />
+        <path d={cross} stroke="#ffffff" strokeWidth="11" />
+        <path d={cross} stroke={mark.correct === true ? "#39ff6a" : mark.correct === false ? "#ff3347" : "#00e5ff"} strokeWidth="7" />
+      </g>;
+    })}
   </svg>;
 }
 
