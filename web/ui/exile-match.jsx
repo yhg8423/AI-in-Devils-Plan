@@ -138,12 +138,46 @@ function Assembly({board, pieces, owner}) {
   </g>;
 }
 
+const exilePositions = [[11.5, 29], [88.5, 29], [11.5, 76], [88.5, 76]];
+
+export function ExileCast({players, selected, onChoose, statuses, canChoose = () => true, positions = exilePositions}) {
+  return <div className="exile-cast">{players.map((player, index) => {
+    const status = statuses[player];
+    const [left, top] = positions[index] ?? [50, 50];
+    return <button key={player} type="button" className="exile-player" style={{left: `${left}%`, top: `${top}%`}}
+      data-status={status.status} data-call={status.incorrect ? "incorrect" : undefined} aria-pressed={selected === player} disabled={!canChoose(player)}
+      aria-label={`${player} · ${status.label}`} onClick={() => onChoose(player)}>
+      {status.call && <strong className="exile-player-call">{status.call}</strong>}
+      <span className="exile-lift-window" aria-hidden="true">
+        <span className="exile-shaft" />
+        <span className="exile-lift">
+          <Sprite player={player} />
+          <svg className="exile-platform" viewBox="0 0 86 49" shapeRendering="crispEdges">
+            <rect x="2" y="2" width="82" height="45" fill="#11171d" stroke="#5c605e" strokeWidth="3" />
+            <rect x="6" y="6" width="74" height="7" fill="#7a674a" />
+            <path d="M11 21h64" stroke="#3a424b" strokeWidth="3" />
+          </svg>
+        </span>
+      </span>
+      <span className="exile-nameplate">{player}{status.detail && <small>{status.detail}</small>}</span>
+    </button>;
+  })}</div>;
+}
+
 export function ExileScene({state, players, selected, onChoose}) {
   const {owner, board} = exileBoardFor(state, players, selected);
   const view = state.exilePerspective ?? "operator";
   const completed = (state.exileAttempts ?? []).filter((attempt) => attempt.correct && attempt.place && attempt.place <= 3);
   const latest = state.exileAttempts?.at(-1);
-  const positions = [[11.5, 29], [88.5, 29], [11.5, 76], [88.5, 76]];
+  const statuses = Object.fromEntries(players.map((player) => {
+    const finish = completed.find((attempt) => attempt.player === player);
+    const out = state.result?.eliminated?.includes(player);
+    const failed = latest?.player === player && !latest.correct && latest.turn === state.exileTurn?.turn;
+    const detail = finish ? tr(`${finish.place}위 생존`, `Rank ${finish.place} · Safe`) : undefined;
+    return [player, {status: out ? "eliminated" : finish ? "safe" : "assembling", incorrect: failed,
+      label: out ? tr("탈락", "Eliminated") : finish ? tr(`${finish.place}위 생존`, `Rank ${finish.place}, safe`) : tr("조립 중", "Assembling"),
+      call: out ? tr("탈락", "OUT") : finish ? tr("완성!", "COMPLETE!") : failed ? tr("오답", "INCORRECT") : undefined, detail}];
+  }));
   return <section className="exile-arena pixel-frame" aria-label={tr("유배지 피스 퍼즐 세트장", "Exile Piece Puzzle arena")}>
     <div className="exile-room">
       <svg viewBox="0 0 640 470" role="img" aria-label={tr("네 참가자의 발판과 피스 조립판", "Four player platforms and the Piece assembly")} shapeRendering="crispEdges">
@@ -161,33 +195,8 @@ export function ExileScene({state, players, selected, onChoose}) {
           <text x="320" y="251">{tr("목표 · 4×4 교차 격자", "Target · 4×4 crossing grid")}</text></g>}
         <text x="320" y="435" className="exile-room-caption">{board ? tr(`${owner} 조립판 · ${board.placed} / 8개`, `${owner}’s assembly · ${board.placed} of 8 Pieces`) : tr("먼저 완성한 세 명이 생존합니다", "The first three to finish survive")}</text>
       </svg>
-      <div className="exile-cast">
-        {players.map((player, index) => {
-          const finish = completed.find((attempt) => attempt.player === player);
-          const out = state.result?.eliminated?.includes(player);
-          const failed = latest?.player === player && !latest.correct && latest.turn === state.exileTurn?.turn;
-          const [left, top] = positions[index] ?? [50, 50];
-          const canChoose = view === "operator" || state.exileRevealed || view === player;
-          return <button key={player} type="button" className="exile-player" style={{left: `${left}%`, top: `${top}%`}}
-            data-status={out ? "eliminated" : finish ? "safe" : "assembling"} data-call={failed ? "incorrect" : undefined} aria-pressed={owner === player} disabled={!canChoose}
-            aria-label={`${player} · ${out ? tr("탈락", "Eliminated") : finish ? tr(`${finish.place}위 생존`, `Rank ${finish.place}, safe`) : tr("조립 중", "Assembling")}`}
-            onClick={() => onChoose(player)}>
-            {(finish || failed || out) && <strong className="exile-player-call">{out ? tr("탈락", "OUT") : finish ? tr("완성!", "COMPLETE!") : tr("오답", "INCORRECT")}</strong>}
-            <span className="exile-lift-window" aria-hidden="true">
-              <span className="exile-shaft" />
-              <span className="exile-lift">
-                <Sprite player={player} />
-                <svg className="exile-platform" viewBox="0 0 86 49" shapeRendering="crispEdges">
-                  <rect x="2" y="2" width="82" height="45" fill="#11171d" stroke="#5c605e" strokeWidth="3" />
-                  <rect x="6" y="6" width="74" height="7" fill="#7a674a" />
-                  <path d="M11 21h64" stroke="#3a424b" strokeWidth="3" />
-                </svg>
-              </span>
-            </span>
-            <span className="exile-nameplate">{player}{finish && <small>{tr(`${finish.place}위 생존`, `Rank ${finish.place} · Safe`)}</small>}</span>
-          </button>;
-        })}
-      </div>
+      <ExileCast players={players} selected={owner} onChoose={onChoose} statuses={statuses}
+        canChoose={(player) => view === "operator" || state.exileRevealed || view === player} />
     </div>
     {boardPicker(state, players, selected, onChoose)}
   </section>;

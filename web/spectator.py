@@ -12,8 +12,8 @@ from threading import Lock
 from urllib.parse import parse_qs, urlsplit
 
 from games.either_or.lay_the_grass.board import PARK_ROWS
-from games.exile_match.roster import collect_exile_players
-from games.match import FIRST_EXILE
+from games.exile_match.roster import collect_exile_players, collect_second_exile_players
+from games.match import FIRST_EXILE, SECOND_EXILE
 
 
 UI = Path(__file__).with_name("ui")
@@ -33,6 +33,7 @@ EVENT_TYPES = {
 }
 EVENT_FIELDS = ("msg_type", "agent_name", "content", "visible_to")
 CASE_STAGES = ("1일차 메인 매치", "1일차 감옥 매치", "2일차 메인 매치", "2일차 감옥 매치", "3일차 메인 매치", "3일차 감옥 매치", "4일차 메인 매치", "4일차 감옥 매치")
+EXILE_GAMES = (FIRST_EXILE, SECOND_EXILE)
 
 
 def find_matches(root: Path) -> dict[str, Path]:
@@ -104,10 +105,10 @@ def source_paths(root: Path, previous: object) -> tuple[Path, ...]:
         return ()
 
 
-def exile_sources(root: Path, header: dict, logs) -> list[Path]:
-    """Validate the first exile roster against a known campaign's source prefix."""
-    if header.get("game") != FIRST_EXILE or any(key in header for key in ("from_main", "from_prison")):
-        raise ValueError("Expected the first exile match with from_matches source links.")
+def exile_sources(root: Path, header: dict, logs, *, previous_exile: Path | None = None) -> list[Path]:
+    """Validate an exile roster against its campaign and optional predecessor."""
+    if header.get("game") not in EXILE_GAMES or any(key in header for key in ("from_main", "from_prison")):
+        raise ValueError("Expected an exile match with from_matches source links.")
     links = header.get("from_matches")
     if not isinstance(links, list) or not links:
         raise ValueError("The first exile match needs a from_matches source prefix.")
@@ -120,8 +121,16 @@ def exile_sources(root: Path, header: dict, logs) -> list[Path]:
         sources.append(path)
     if any(match_status(path) != "complete" for path in sources):
         raise ValueError("Exile sources must be completed matches.")
-    if header.get("players") != collect_exile_players(sources):
-        raise ValueError("The exile roster must match the first four entrants in source order.")
+    if header["game"] == FIRST_EXILE:
+        if "from_exile" in header:
+            raise ValueError("The first exile match cannot have a previous exile match.")
+        players = collect_exile_players(sources)
+    else:
+        if (previous_exile is None or previous_exile.resolve() not in source_paths(root, header.get("from_exile"))):
+            raise ValueError("The second exile match must point to this campaign's first exile match.")
+        players = collect_second_exile_players(previous_exile, sources)
+    if header.get("players") != players:
+        raise ValueError("The exile roster must match the campaign's entrants and survivors in source order.")
     return sources
 
 
@@ -161,7 +170,7 @@ def case_catalog(root: Path) -> list[dict]:
         header = read_match_header(log)
         if header is None:
             continue
-        if header["game"] == FIRST_EXILE:
+        if header["game"] in EXILE_GAMES:
             destination = exile_records
         elif header["game"].split(" · ", 1)[0] in CASE_STAGES:
             destination = records
@@ -224,9 +233,11 @@ def case_catalog(root: Path) -> list[dict]:
             "id": run_id, "started_at": started_at, "matches": chain(run_id, 0), "model": model,
             **{key: header[key] for key in ("provider", "effort", "image_model", "model_overrides") if header.get(key)},
         })
+    exile_paths = {record[0] for record in exile_records.values()}
     for run_id, (_, header, _, status) in exile_records.items():
         try:
-            sources = exile_sources(root, header, by_path)
+            previous = next((path for path in source_paths(root, header.get("from_exile")) if path in exile_paths), None)
+            sources = exile_sources(root, header, by_path, previous_exile=previous)
             source_ids = [by_path[path] for path in sources]
             case = next((case for case in cases
                          if [match["id"] for match in case["matches"][:len(source_ids)]] == source_ids), None)
@@ -234,6 +245,9 @@ def case_catalog(root: Path) -> list[dict]:
                 case.setdefault("exile_matches", []).append(summary(run_id, header, status))
         except (OSError, RuntimeError, ValueError, KeyError, TypeError):
             continue
+    for case in cases:
+        if "exile_matches" in case:
+            case["exile_matches"].sort(key=lambda match: EXILE_GAMES.index(match["game"]))
     real = [case for case in cases if case["model"]]
     linked = [case for case in real if len(case["matches"]) > 1]
     return linked or real or cases
@@ -241,10 +255,24 @@ def case_catalog(root: Path) -> list[dict]:
 
 def next_match(root: Path, logs: dict[str, Path], run_id: str) -> dict | None:
     current = logs[run_id].resolve()
+    current_header = read_match_header(current)
+    if current_header and current_header["game"] in EXILE_GAMES:
+        if current_header["game"] != FIRST_EXILE:
+            return None
+        for candidate, log in logs.items():
+            header = read_match_header(log)
+            if not header or header["game"] != SECOND_EXILE:
+                continue
+            try:
+                exile_sources(root, header, logs.values(), previous_exile=current)
+            except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+                continue
+            return {"id": candidate, "game": header["game"]}
+        return None
     for candidate, log in logs.items():
         if candidate == run_id or (header := read_match_header(log)) is None:
             continue
-        if header["game"] == FIRST_EXILE:
+        if header["game"] in EXILE_GAMES:
             continue
         # A main match after a prison match records both sources. Continue from the prison match.
         previous = header.get("from_prison") or header.get("from_main")
