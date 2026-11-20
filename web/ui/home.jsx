@@ -16,6 +16,7 @@ const games = [
   {session: "3일차 감옥 매치", name: "돼지 저금통", description: tr("오가는 저금통의 동전을 기억하고, 의심과 리셋 도전으로 승점을 얻는다.", "Remember the coins in circulating banks and score through doubts and reset challenges.")},
   {session: "4일차 메인 매치", name: "경매 빙고", description: tr("낙찰 결과가 숨겨진 경매에서 도형을 모아 빙고를 완성한다.", "Collect shapes through auctions with hidden outcomes to complete your bingo card.")},
   {session: "4일차 감옥 매치", name: "벽바둑 2", description: tr("서로 다른 말을 움직이고 벽을 세워 가장 넓은 영역을 확보한다.", "Move two kinds of counters and build walls to claim the largest territory.")},
+  {session: "유배지 매치 1", name: "피스 퍼즐", description: tr("홈의 방향과 깊이를 살펴 8개의 피스로 격자를 완성한다.", "Match notch directions and depths to assemble eight pieces into a lattice.")},
 ];
 
 export function runHref(id = "", caseId) {
@@ -159,7 +160,7 @@ export function CasePicker({game, onClose}) {
   }, [open]);
 
   const available = cases?.flatMap((record) => {
-    const match = game ? record.matches.find((item) => item.game === game) : record.matches[0];
+    const match = game ? [...record.matches, ...(record.exile_matches ?? [])].find((item) => item.game === game) : record.matches[0];
     return match ? [{record, match}] : [];
   });
 

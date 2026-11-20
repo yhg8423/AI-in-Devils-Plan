@@ -12,6 +12,8 @@ from threading import Lock
 from urllib.parse import parse_qs, urlsplit
 
 from games.either_or.lay_the_grass.board import PARK_ROWS
+from games.exile_match.roster import collect_exile_players
+from games.match import FIRST_EXILE
 
 
 UI = Path(__file__).with_name("ui")
@@ -102,6 +104,27 @@ def source_paths(root: Path, previous: object) -> tuple[Path, ...]:
         return ()
 
 
+def exile_sources(root: Path, header: dict, logs) -> list[Path]:
+    """Validate the first exile roster against a known campaign's source prefix."""
+    if header.get("game") != FIRST_EXILE or any(key in header for key in ("from_main", "from_prison")):
+        raise ValueError("Expected the first exile match with from_matches source links.")
+    links = header.get("from_matches")
+    if not isinstance(links, list) or not links:
+        raise ValueError("The first exile match needs a from_matches source prefix.")
+    available = {path.resolve() for path in logs}
+    sources = []
+    for link in links:
+        path = next((path for path in source_paths(root, link) if path in available), None)
+        if path is None:
+            raise ValueError("Exile sources must point to this campaign's recorded matches.")
+        sources.append(path)
+    if any(match_status(path) != "complete" for path in sources):
+        raise ValueError("Exile sources must be completed matches.")
+    if header.get("players") != collect_exile_players(sources):
+        raise ValueError("The exile roster must match the first four entrants in source order.")
+    return sources
+
+
 def model_counts(header: dict) -> list[dict]:
     roster = header.get("players")
     default = (header.get("model"), header.get("effort"))
@@ -133,14 +156,21 @@ def model_counts(header: dict) -> list[dict]:
 
 def case_catalog(root: Path) -> list[dict]:
     records = {}
+    exile_records = {}
     for run_id, log in find_matches(root).items():
         header = read_match_header(log)
-        if header is None or header["game"].split(" · ", 1)[0] not in CASE_STAGES:
+        if header is None:
+            continue
+        if header["game"] == FIRST_EXILE:
+            destination = exile_records
+        elif header["game"].split(" · ", 1)[0] in CASE_STAGES:
+            destination = records
+        else:
             continue
         try:
             stat = log.stat()
             started_at = int(getattr(stat, "st_birthtime", stat.st_mtime) * 1000)
-            records[run_id] = (log.resolve(), header, started_at, match_status(log))
+            destination[run_id] = (log.resolve(), header, started_at, match_status(log))
         except (OSError, RuntimeError, ValueError):
             continue
 
@@ -161,8 +191,7 @@ def case_catalog(root: Path) -> list[dict]:
         if parent is not None:
             children.setdefault(parent, []).append(run_id)
 
-    def chain(run_id: str, stage: int, previous: str | None = None) -> list[dict]:
-        _, header, _, status = records[run_id]
+    def summary(run_id, header, status):
         counts = model_counts(header)
         match = {"id": run_id, "game": header["game"], "status": status,
                  "model_counts": counts}
@@ -170,6 +199,11 @@ def case_catalog(root: Path) -> list[dict]:
         if (image_model and image_model != header.get("model") and not header.get("image_model_overrides")
                 and not any(group.get("provider") for group in counts)):
             match["image_model"] = image_model
+        return match
+
+    def chain(run_id: str, stage: int, previous: str | None = None) -> list[dict]:
+        _, header, _, status = records[run_id]
+        match = summary(run_id, header, status)
         path = [match]
         if stage == len(CASE_STAGES) - 1 or status != "complete":
             return path
@@ -190,6 +224,16 @@ def case_catalog(root: Path) -> list[dict]:
             "id": run_id, "started_at": started_at, "matches": chain(run_id, 0), "model": model,
             **{key: header[key] for key in ("provider", "effort", "image_model", "model_overrides") if header.get(key)},
         })
+    for run_id, (_, header, _, status) in exile_records.items():
+        try:
+            sources = exile_sources(root, header, by_path)
+            source_ids = [by_path[path] for path in sources]
+            case = next((case for case in cases
+                         if [match["id"] for match in case["matches"][:len(source_ids)]] == source_ids), None)
+            if case is not None:
+                case.setdefault("exile_matches", []).append(summary(run_id, header, status))
+        except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+            continue
     real = [case for case in cases if case["model"]]
     linked = [case for case in real if len(case["matches"]) > 1]
     return linked or real or cases
@@ -199,6 +243,8 @@ def next_match(root: Path, logs: dict[str, Path], run_id: str) -> dict | None:
     current = logs[run_id].resolve()
     for candidate, log in logs.items():
         if candidate == run_id or (header := read_match_header(log)) is None:
+            continue
+        if header["game"] == FIRST_EXILE:
             continue
         # A main match after a prison match records both sources. Continue from the prison match.
         previous = header.get("from_prison") or header.get("from_main")
@@ -270,6 +316,9 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
             "seed": header["seed"],
             "model_players": header.get("model_players"),
             "model_overrides": header.get("model_overrides"),
+            "image_model": header.get("image_model"),
+            "image_model_overrides": header.get("image_model_overrides"),
+            "image_effort_overrides": header.get("image_effort_overrides"),
             "board": PARK_ROWS if header["game"].endswith(" · 양자택일") else None,
             "complete": complete, "interrupted": interrupted, "model_calls": last.get("model_calls"), "steps": steps,
             **translated,

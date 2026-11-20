@@ -212,7 +212,7 @@ button:focus-visible, a:focus-visible { outline: 2px solid var(--color-accent); 
 .match-set { aspect-ratio: 512 / 348; align-self: start; }
 .match-set .floor { width: 100%; }
 :is(.either-or-stage, .venue-stage) .match-state { min-width: 0; contain: size; overflow: auto; }
-.match-log:has([role="tablist"]) { display: block; }
+.match-log.caption { display: block; min-width: 0; }
 .match-log [role="tablist"] { margin-bottom: 6px; }
 .match-info.caption { display: block; min-width: 0; }
 .match-info [role="tablist"] { margin-bottom: 6px; }
