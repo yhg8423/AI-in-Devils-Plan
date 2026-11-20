@@ -68,7 +68,7 @@ def _asset_scene(theme):
         targets = _targets(entry["targets"])
         original, edited = (_asset_image(entry[key]) for key in ("original", "edited"))
     except (FileNotFoundError, KeyError, TypeError, json.JSONDecodeError) as error:
-        raise ValueError("달라진 그림 찾기의 생성 그림과 manifest.json이 필요합니다.") from error
+        raise ValueError("틀린 그림 찾기의 생성 그림과 manifest.json이 필요합니다.") from error
     changed = original.copy()
     for target in targets:
         area = pygame.Rect(*(target[key] for key in ("x", "y", "w", "h")))

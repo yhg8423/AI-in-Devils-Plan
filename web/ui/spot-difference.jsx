@@ -136,14 +136,14 @@ export function SpotScene({state, players, selected, onChoose}) {
     const safe = state.result?.survivors?.includes(player);
     return [player, {status: out ? "eliminated" : safe ? "safe" : "assembling", label: out ? tr("탈락", "Eliminated") : safe ? tr("생존", "Survived") : tr(`${state.pictureTotals?.[player] ?? 0}점`, `${state.pictureTotals?.[player] ?? 0} points`), detail: out ? tr("탈락", "Eliminated") : safe ? tr("생존", "Survived") : undefined}];
   }));
-  return <section className="exile-arena spot-arena pixel-frame" aria-label={tr("유배지 달라진 그림 찾기 세트장", "Exile Spot the Changes arena")}>
+  return <section className="exile-arena spot-arena pixel-frame" aria-label={tr("유배지 틀린 그림 찾기 세트장", "Exile Spot the Difference arena")}>
     <div className="exile-room spot-room">
       <svg viewBox="0 0 640 620" role="img" aria-label={tr("관찰 화면과 네 참가자의 발판", "Picture screen and four player platforms")} shapeRendering="crispEdges">
         <rect width="640" height="620" fill="#151c24" />
         <path d="M12 12H628V608H12Z" fill="none" stroke="#48515b" strokeWidth="6" />
         <path d="M28 460H612V590H28Z" fill="#20252c" stroke="#333c46" strokeWidth="3" />
         <path d="M28 590L114 604H526L612 590" fill="none" stroke="#555047" strokeWidth="4" />
-        <text x="320" y="34" className="exile-room-title">{tr("유배지 · 달라진 그림 찾기", "EXILE · SPOT THE CHANGES")}</text>
+        <text x="320" y="34" className="exile-room-title">{tr("유배지 · 틀린 그림 찾기", "EXILE · SPOT THE DIFFERENCE")}</text>
         <rect x="24" y="50" width="592" height="398" fill="#0b121a" stroke="#6c716f" strokeWidth="4" />
         {picture ? <Picture x="28" y="54" width="584" height="389.333" picture={picture} marks={visibleMarks} targets={targets} /> :
           <g className="spot-screen-cover"><text x="320" y="226">{phase?.stage === "blank" ? tr("원본 그림이 사라졌습니다", "THE ORIGINAL IS HIDDEN") : tr("그림 공개 대기", "WAITING FOR THE PICTURE")}</text>
@@ -169,7 +169,7 @@ export function SpotStage({state, replay}) {
   const result = state.result;
   const latest = state.pictureResults?.findLast((entry) => entry.round === phase?.round);
   return <div className="spot-stage">
-    <h2>{tr("달라진 그림 찾기", "Spot the Changes")}</h2>
+    <h2>{tr("틀린 그림 찾기", "Spot the Difference")}</h2>
     {!phase ? <div className="spot-rules"><h3>{tr("게임 규칙", "Game rules")}</h3>
       <p>{tr("원본을 3분간 관찰하고, 그림이 사라진 뒤 10초 후 달라진 그림을 봅니다. 2분 안에 바뀐 5곳을 찾아 표시합니다.", "Observe the original for three minutes. It disappears, and the changed picture follows ten seconds later. Mark up to five changed areas within two minutes.")}</p>
       <p>{tr("정답당 1점, 3라운드 총점 하위 2명이 탈락합니다. 생존 경계의 동점자는 원본 관찰 시간이 2분인 연장전을 진행합니다.", "Each correct mark scores one point. The bottom two after three rounds are eliminated. Boundary-tied players play overtime with a two-minute original observation phase.")}</p>
@@ -206,8 +206,8 @@ export function SpotInformation({state, replay}) {
   const results = state.pictureResults ?? [];
   const {owner} = pictureSelection(state, players, replay.selected, replay.view);
   const submissions = Object.values(state.pictureSubmissions ?? {}).filter((entry) => !owner || entry.player === owner);
-  return <aside className="caption spot-information" aria-label={tr("달라진 그림 찾기 결과와 기록", "Spot the Changes results and records")}>
-    <TabList role="tablist" aria-label={tr("달라진 그림 찾기 정보 종류", "Spot the Changes information categories")} value={tab} onChange={setTab} size="sm" hasDivider>
+  return <aside className="caption spot-information" aria-label={tr("틀린 그림 찾기 결과와 기록", "Spot the Difference results and records")}>
+    <TabList role="tablist" aria-label={tr("틀린 그림 찾기 정보 종류", "Spot the Difference information categories")} value={tab} onChange={setTab} size="sm" hasDivider>
       <Tab id="spot-rounds" value="rounds" label={tr("라운드 점수", "Round scores")} panelId="spot-records-panel" />
       <Tab id="spot-marks" value="marks" label={tr("표시 기록", "Mark history")} panelId="spot-records-panel" />
     </TabList>

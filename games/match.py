@@ -36,7 +36,7 @@ DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
 DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
 FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
-SECOND_EXILE = "유배지 매치 2 · 달라진 그림 찾기"
+SECOND_EXILE = "유배지 매치 2 · 틀린 그림 찾기"
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
     DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),

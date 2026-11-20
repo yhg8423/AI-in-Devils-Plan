@@ -28,7 +28,7 @@ const marks2 = event("picture_marks", {round: 1, player: "P02", marks: [{x: 250,
 const resultData = {round: 1, players, overtime: false, scores: {P01: 1, P02: 0, P03: 0, P04: 0}, totals: {P01: 1, P02: 0, P03: 0, P04: 0}, answers: {P01: [{x: 100, y: 120, correct: true, target: "change-1"}], P02: [{x: 250, y: 350, correct: false, target: null}], P03: [], P04: []}, targets: Array.from({length: 5}, (_, i) => ({id: `change-${i + 1}`, x: i * 160 + 50, y: 110, w: 40, h: 40})), picture: changed};
 const result = event("picture_result", resultData);
 function render(steps, {language = "ko", view = "operator", selected = "", frame = steps.length} = {}) {
-  return api[language].render({id: "spot-demo", match: {game: "유배지 매치 2 · 달라진 그림 찾기", players, steps}, frame, view, selected, choosePlayer: noop, chooseView: noop, seek: noop, mode: "paused"});
+  return api[language].render({id: "spot-demo", match: {game: "유배지 매치 2 · 틀린 그림 찾기", players, steps}, frame, view, selected, choosePlayer: noop, chooseView: noop, seek: noop, mode: "paused"});
 }
 
 for (const language of ["ko", "en"]) {

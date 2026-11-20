@@ -59,7 +59,10 @@ def read_match_header(log: Path) -> dict | None:
         header = json.loads(line) if line.endswith(b"\n") else None
     except (OSError, ValueError):
         return None
-    return header if isinstance(header, dict) and isinstance(header.get("game"), str) else None
+    if isinstance(header, dict) and isinstance(header.get("game"), str):
+        header["game"] = header["game"].replace("달라진 그림 찾기", "틀린 그림 찾기")
+        return header
+    return None
 
 
 def match_catalog(root: Path) -> list[dict]:
@@ -107,6 +110,7 @@ def source_paths(root: Path, previous: object) -> tuple[Path, ...]:
 
 def exile_sources(root: Path, header: dict, logs, *, previous_exile: Path | None = None) -> list[Path]:
     """Validate an exile roster against its campaign and optional predecessor."""
+    header = {**header, "game": str(header.get("game", "")).replace("달라진 그림 찾기", "틀린 그림 찾기")}
     if header.get("game") not in EXILE_GAMES or any(key in header for key in ("from_main", "from_prison")):
         raise ValueError("Expected an exile match with from_matches source links.")
     links = header.get("from_matches")

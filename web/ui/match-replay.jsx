@@ -21,11 +21,11 @@ import {applyPictureEvent, pictureActionText, pictureEventText, SpotScene, SpotS
 import {isStrategy, MatchFeed, Participant, Standings, Table} from "./records.jsx";
 import {BoardScene, RoomScene} from "./scene.jsx";
 import {checkpointLabel, decisionNoteLabel, eventFields, eventText, grassBonusText, phaseNames, roomRecordText, scoreText, snapshot} from "./replay.js";
-import {en, gameTitle, tr} from "./locale.js";
+import {canonicalGameTitle, en, gameTitle, tr} from "./locale.js";
 import {rulesSummary} from "./rule-summaries.js";
 
 const labels = {
-  picture_setup: tr("달라진 그림 찾기 준비", "Spot the Changes setup"), picture_phase: tr("그림 공개 단계", "Picture phase"),
+  picture_setup: tr("틀린 그림 찾기 준비", "Spot the Difference setup"), picture_phase: tr("그림 공개 단계", "Picture phase"),
   picture_memory: tr("비공개 기억", "Private memory"), picture_marks: tr("달라진 부분 표시", "Changed areas marked"),
   picture_result: tr("라운드 정답·점수", "Round answers and scores"), picture_tiebreak: tr("동점자 연장전", "Tied-player overtime"),
   picture_timeout: tr("제한 시간 초과", "Time limit exceeded"),
@@ -131,7 +131,7 @@ const dialogueTypes = new Set(["public", "room", "whisper", "room_invite", "room
 const rouletteObservations = new Set(["inspection", "shift", "swap"]);
 const rouletteStartingCredits = 16;
 const pokerPhases = {nominate: tr("대결 상대 지목", "Choose an opponent"), memorize: tr("카드 암기 중", "Memorizing cards"), memory_poker: tr("카드 선택 중", "Selecting cards")};
-const matchVenues = {"무거운 13": PrisonScene, "러시안 룰렛": RouletteScene, "돼지 저금통": PiggyScene, "벽바둑 2": WallGoScene, "피스 퍼즐": ExileScene, "달라진 그림 찾기": SpotScene};
+const matchVenues = {"무거운 13": PrisonScene, "러시안 룰렛": RouletteScene, "돼지 저금통": PiggyScene, "벽바둑 2": WallGoScene, "피스 퍼즐": ExileScene, "틀린 그림 찾기": SpotScene};
 const marketActions = {trade: tr("주문", "Order"), speak: tr("발언", "Speak"), move: tr("이동", "Move"), move_room: tr("이동", "Move"), pass: tr("패스", "Pass"),
   respond_invite: tr("초대 응답", "Invitation response"), piece: tr("피스 사용", "Spend a Piece"), secret: tr("시크릿 예약", "Schedule Secret")};
 const marketStartingCash = 100_000;
@@ -178,6 +178,7 @@ function rouletteCreditAction(action) {
 }
 
 function ruleText(content) {
+  content = canonicalGameTitle(content);
   if (content.startsWith("보석 암시장")) content = content.replaceAll("회전", "턴");
   return content.replaceAll("경기 규칙", "게임 규칙")
     .replace(/(선택 5 전후로 각각 \d+)라운드 협상/g, "$1턴 협상")
@@ -1064,7 +1065,7 @@ function RouletteInformation({state, replay}) {
 }
 
 function Stage({state, replay, choiceResult, gemExchange}) {
-  if (replay.match.game.endsWith(" · 달라진 그림 찾기")) return <SpotStage state={state} replay={replay} />;
+  if (canonicalGameTitle(replay.match.game).endsWith(" · 틀린 그림 찾기")) return <SpotStage state={state} replay={replay} />;
   if (replay.match.game.endsWith(" · 피스 퍼즐")) return <ExileStage state={state} players={replay.match.players} selected={replay.selected} onChoose={replay.choosePlayer} perspective={replay.view} />;
   if (replay.match.game.endsWith(" · 벽바둑 2")) return <WallGoStage state={state} players={replay.match.players} />;
   if (replay.match.game.endsWith(" · 경매 빙고")) return <BingoStage state={state} replay={replay} />;
@@ -1176,7 +1177,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const {caseRecord, match, frame, view, selected} = replay;
   const indexInCase = caseRecord?.matches.findIndex(({id}) => id === replay.id) ?? -1;
   const nextMatch = indexInCase >= 0 ? caseRecord.matches[indexInCase + 1] : match.next_match;
-  const [subtitle, name] = match.game.split(" · ");
+  const [subtitle, name] = canonicalGameTitle(match.game).split(" · ");
   const isMarket = name === "미스터리 거래소";
   const isRoulette = name === "러시안 룰렛";
   const isHeavy13 = name === "무거운 13";
@@ -1185,7 +1186,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const isBingo = name === "경매 빙고";
   const isWallGo = name === "벽바둑 2";
   const isExile = name === "피스 퍼즐";
-  const isSpot = name === "달라진 그림 찾기";
+  const isSpot = name === "틀린 그림 찾기";
   const [tab, setTab] = useState("all");
   const events = useMemo(() => match.steps.map(({events: [event]}) => {
     const data = parse(event.content);

@@ -17,14 +17,19 @@ const gameNames = new Map([
   ["4일차 메인 매치", "Day 4 Main Match"], ["경매 빙고", "Auction Bingo"],
   ["4일차 감옥 매치", "Day 4 Prison Match"], ["벽바둑 2", "Wall Go II"],
   ["유배지 매치 1", "Exile Match 1"], ["피스 퍼즐", "Piece Puzzle"],
-  ["유배지 매치 2", "Exile Match 2"], ["달라진 그림 찾기", "Spot the Changes"],
+  ["유배지 매치 2", "Exile Match 2"], ["틀린 그림 찾기", "Spot the Difference"],
   ["양자택일", "Either/Or"], ["무거운 13", "Heavy 13"],
   ["미스터리 거래소", "Mystery Stock Exchange"], ["러시안 룰렛", "Russian Roulette"],
   ["큐브 세기", "Cube Counting"], ["네모 세기", "Rectangle Counting"],
   ["잔디 깔기", "Lay the Grass"], ["기억 포커", "Memory Poker"],
 ]);
 
+export function canonicalGameTitle(title) {
+  return title.replaceAll("달라진 그림 찾기", "틀린 그림 찾기");
+}
+
 export function gameTitle(title) {
+  title = canonicalGameTitle(title);
   return en ? title.split(" · ").map((part) => gameNames.get(part) ?? part).join(" · ") : title;
 }
 

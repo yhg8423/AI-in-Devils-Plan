@@ -1,4 +1,4 @@
-"""Run the second exile match: Spot the Changes."""
+"""Run the second exile match: Spot the Difference."""
 
 from ...match import FIRST_EXILE, SECOND_EXILE, run_cli
 from .game import play

@@ -15,7 +15,7 @@ from . import game
 
 
 PLAYERS = ("P01", "P02", "P03", "P04")
-TITLE = "유배지 매치 2 · 달라진 그림 찾기"
+TITLE = "유배지 매치 2 · 틀린 그림 찾기"
 TARGETS = [{"id": f"D{index}", "x": index * 100, "y": 100, "w": 40, "h": 40}
            for index in range(1, 6)]
 
