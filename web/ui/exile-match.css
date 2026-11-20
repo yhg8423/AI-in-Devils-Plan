@@ -8,15 +8,21 @@
 .exile-slat-label { font-size: 10px; fill: #fff1bf; paint-order: stroke; stroke: #2a211b; stroke-width: 3px; stroke-linejoin: bevel; }
 .exile-board-cover text { font-size: 13px; }
 .exile-board-cover text:last-child { font-size: 10px; fill: #b2b9bd; }
-.exile-player { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 3px; border: 0; background: none; color: #e2e4e6; font: 700 12px var(--pixel-font); cursor: pointer; padding: 0; min-width: 60px; }
+.exile-player { --lift-width: 86px; --lift-face: 49px; --lift-gap: 20px; --sprite-height: 43px; position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 3px; border: 0; background: none; color: #e2e4e6; font: 700 12px var(--pixel-font); cursor: pointer; padding: 0; min-width: 60px; }
 .exile-player canvas { width: 30px; height: 43px; image-rendering: pixelated; }
-.exile-player > span { display: grid; gap: 2px; padding: 3px 6px; background: #141c26; border: 1px solid #73808b; }
+.exile-player > .exile-nameplate { position: relative; display: grid; gap: 2px; padding: 3px 6px; background: #141c26; border: 1px solid #73808b; }
+.exile-lift-window { position: relative; width: var(--lift-width); height: calc(var(--sprite-height) + var(--lift-gap) + var(--lift-face)); margin-bottom: calc(-1 * (var(--lift-gap) + var(--lift-face))); overflow: hidden; }
+.exile-shaft { position: absolute; inset: auto 0 0; height: var(--lift-face); box-sizing: border-box; border: 3px solid #424952; background: linear-gradient(90deg, #070b10 10%, #30363d 11%, #0b1017 14%, #070b10 86%, #30363d 89%, #070b10 90%); }
+.exile-lift { position: relative; display: grid; justify-items: center; gap: var(--lift-gap); }
+.exile-platform { display: block; width: var(--lift-width); height: var(--lift-face); }
+.exile-player[data-status="eliminated"] .exile-lift { transform: translateY(100%); animation: exile-descend 2.4s cubic-bezier(.45, 0, .75, 1) both; }
+@keyframes exile-descend { 0%, 20% { transform: translateY(0); } 100% { transform: translateY(100%); } }
+@media (prefers-reduced-motion: reduce) { .exile-player[data-status="eliminated"] .exile-lift { animation: none; } }
 .exile-player small { font-size: 9px; }
 .exile-player:disabled { opacity: 1; cursor: default; }
-.exile-player[aria-pressed="true"] > span { border-color: #eecb86; color: #ffdfa0; }
-.exile-player[data-status="safe"] > span { border-color: #a6c69a; color: #d0e5bb; }
-.exile-player[data-status="eliminated"] > span { border-color: #ba786f; color: #e99c8d; }
-.exile-player[data-status="eliminated"] canvas { filter: grayscale(.9); opacity: .55; }
+.exile-player[aria-pressed="true"] > .exile-nameplate { border-color: #eecb86; color: #ffdfa0; }
+.exile-player[data-status="safe"] > .exile-nameplate { border-color: #a6c69a; color: #d0e5bb; }
+.exile-player[data-status="eliminated"] > .exile-nameplate { border-color: #ba786f; color: #e99c8d; }
 .exile-player-call { position: absolute; bottom: calc(100% + 7px); padding: 5px 7px; border: 2px solid #d8b471; background: #292724; color: #f5dca3; font-size: 10px; white-space: nowrap; }
 .exile-player[data-status="eliminated"] .exile-player-call, .exile-player[data-call="incorrect"] .exile-player-call { color: #ffb2a4; border-color: #bc7d72; background: #3d292c; }
 .exile-player-picker { display: flex; flex-wrap: wrap; gap: 7px; padding: 10px 12px; border-top: 2px solid #414852; }
@@ -52,7 +58,7 @@
 .exile-history-owner { font: 700 13px var(--pixel-font); margin: 14px 0 5px; color: #e2c79c; }
 @media (max-width: 540px) {
   .exile-player canvas { width: 23px; height: 33px; }
-  .exile-player { font-size: 9px; min-width: 44px; }
+  .exile-player { --lift-width: 60px; --lift-face: 34px; --lift-gap: 8px; --sprite-height: 33px; font-size: 9px; min-width: 44px; }
   .exile-player small, .exile-player-call { font-size: 8px; }
   .exile-player-call { padding: 3px 4px; bottom: calc(100% + 4px); }
 }

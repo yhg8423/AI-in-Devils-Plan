@@ -155,11 +155,6 @@ export function ExileScene({state, players, selected, onChoose}) {
         <path d="M282 60l18-13h40l18 13-18 13h-40z" fill="#7f3f3e" stroke="#c0755e" strokeWidth="3" />
         <path d="M315 46h10v29h-10z" fill="#15171d" />
         <text x="320" y="31" className="exile-room-title">{tr("유배지 · 피스 퍼즐", "EXILE · PIECE PUZZLE")}</text>
-        {positions.map(([x, y], index) => <g key={index}>
-          <rect x={640 * x / 100 - 43} y={470 * y / 100 + 25} width="86" height="49" fill="#11171d" stroke="#5c605e" strokeWidth="3" />
-          <rect x={640 * x / 100 - 39} y={470 * y / 100 + 29} width="78" height="7" fill="#7a674a" />
-          <path d={`M${640 * x / 100 - 32} ${470 * y / 100 + 43}h64`} stroke="#3a424b" strokeWidth="3" />
-        </g>)}
         <Assembly board={board} pieces={state.exileSetup?.pieces ?? []} owner={owner} />
         {!board && <g className="exile-board-cover"><rect x="224" y="205" width="192" height="61" fill="#141d27" stroke="#6e6756" strokeWidth="2" />
           <text x="320" y="230">{owner ? tr("배치 기록 대기", "Awaiting assembly") : tr("비공개 조립 중", "PRIVATE ASSEMBLY")}</text>
@@ -178,7 +173,18 @@ export function ExileScene({state, players, selected, onChoose}) {
             aria-label={`${player} · ${out ? tr("탈락", "Eliminated") : finish ? tr(`${finish.place}위 생존`, `Rank ${finish.place}, safe`) : tr("조립 중", "Assembling")}`}
             onClick={() => onChoose(player)}>
             {(finish || failed || out) && <strong className="exile-player-call">{out ? tr("탈락", "OUT") : finish ? tr("완성!", "COMPLETE!") : tr("오답", "INCORRECT")}</strong>}
-            <Sprite player={player} /><span>{player}{finish && <small>{tr(`${finish.place}위 생존`, `Rank ${finish.place} · Safe`)}</small>}</span>
+            <span className="exile-lift-window" aria-hidden="true">
+              <span className="exile-shaft" />
+              <span className="exile-lift">
+                <Sprite player={player} />
+                <svg className="exile-platform" viewBox="0 0 86 49" shapeRendering="crispEdges">
+                  <rect x="2" y="2" width="82" height="45" fill="#11171d" stroke="#5c605e" strokeWidth="3" />
+                  <rect x="6" y="6" width="74" height="7" fill="#7a674a" />
+                  <path d="M11 21h64" stroke="#3a424b" strokeWidth="3" />
+                </svg>
+              </span>
+            </span>
+            <span className="exile-nameplate">{player}{finish && <small>{tr(`${finish.place}위 생존`, `Rank ${finish.place} · Safe`)}</small>}</span>
           </button>;
         })}
       </div>
