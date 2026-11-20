@@ -1,9 +1,6 @@
-.spot-arena { background: #151c24; }
+.spot-screen { transform-origin: 320px 235px; }
 .spot-screen-cover text { fill: #e8d2a8; text-anchor: middle; font: 700 15px var(--pixel-font); }
 .spot-screen-cover text:last-child { fill: #abb9c6; font-size: 12px; }
-.spot-room .exile-room-title { font-size: 13px; }
-.spot-room .exile-player { min-width: 60px; }
-.spot-room .exile-room-caption { font-size: 11px; }
 .spot-target, .spot-mark { pointer-events: none; }
 .spot-raster { image-rendering: auto; }
 .spot-view-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; padding: 10px 12px; border-top: 2px solid #414852; }
@@ -40,6 +37,5 @@
 .spot-information .match-table { font-size: 12px; }
 .spot-information .match-table :is(th, td) { padding: 6px; }
 @media (max-width: 540px) {
-  .spot-room .exile-player { min-width: 44px; }
-  .spot-room .exile-room-title { font-size: 12px; }
+  .spot-screen { transform: scale(.90625); }
 }

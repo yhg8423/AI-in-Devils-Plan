@@ -140,10 +140,10 @@ function Assembly({board, pieces, owner}) {
 
 const exilePositions = [[11.5, 29], [88.5, 29], [11.5, 76], [88.5, 76]];
 
-export function ExileCast({players, selected, onChoose, statuses, canChoose = () => true, positions = exilePositions}) {
+export function ExileCast({players, selected, onChoose, statuses, canChoose = () => true}) {
   return <div className="exile-cast">{players.map((player, index) => {
     const status = statuses[player];
-    const [left, top] = positions[index] ?? [50, 50];
+    const [left, top] = exilePositions[index] ?? [50, 50];
     return <button key={player} type="button" className="exile-player" style={{left: `${left}%`, top: `${top}%`}}
       data-status={status.status} data-call={status.incorrect ? "incorrect" : undefined} aria-pressed={selected === player} disabled={!canChoose(player)}
       aria-label={`${player} · ${status.label}`} onClick={() => onChoose(player)}>
@@ -164,6 +164,21 @@ export function ExileCast({players, selected, onChoose, statuses, canChoose = ()
   })}</div>;
 }
 
+export function ExileRoom({title, label, caption, children}) {
+  return <svg viewBox="0 0 640 470" role="img" aria-label={label} shapeRendering="crispEdges">
+    <rect width="640" height="470" fill="#151c24" />
+    <path d="M12 12H628V458H12Z" fill="none" stroke="#48515b" strokeWidth="6" />
+    <path d="M28 102H612V426H28Z" fill="#20252c" stroke="#333c46" strokeWidth="4" />
+    <path d="M28 102L114 66H526L612 102M28 426L116 446H524L612 426" fill="none" stroke="#555047" strokeWidth="4" />
+    {Array.from({length: 7}, (_, index) => <path key={index} d={`M${46 + index * 90} 106v316M30 ${138 + index * 43}H610`} stroke="#353a41" strokeWidth="1" />)}
+    <path d="M282 60l18-13h40l18 13-18 13h-40z" fill="#7f3f3e" stroke="#c0755e" strokeWidth="3" />
+    <path d="M315 46h10v29h-10z" fill="#15171d" />
+    <text x="320" y="31" className="exile-room-title">{title}</text>
+    {children}
+    <text x="320" y="435" className="exile-room-caption">{caption}</text>
+  </svg>;
+}
+
 export function ExileScene({state, players, selected, onChoose}) {
   const {owner, board} = exileBoardFor(state, players, selected);
   const view = state.exilePerspective ?? "operator";
@@ -180,21 +195,14 @@ export function ExileScene({state, players, selected, onChoose}) {
   }));
   return <section className="exile-arena pixel-frame" aria-label={tr("유배지 피스 퍼즐 세트장", "Exile Piece Puzzle arena")}>
     <div className="exile-room">
-      <svg viewBox="0 0 640 470" role="img" aria-label={tr("네 참가자의 발판과 피스 조립판", "Four player platforms and the Piece assembly")} shapeRendering="crispEdges">
-        <rect width="640" height="470" fill="#151c24" />
-        <path d="M12 12H628V458H12Z" fill="none" stroke="#48515b" strokeWidth="6" />
-        <path d="M28 102H612V426H28Z" fill="#20252c" stroke="#333c46" strokeWidth="4" />
-        <path d="M28 102L114 66H526L612 102M28 426L116 446H524L612 426" fill="none" stroke="#555047" strokeWidth="4" />
-        {Array.from({length: 7}, (_, index) => <path key={index} d={`M${46 + index * 90} 106v316M30 ${138 + index * 43}H610`} stroke="#353a41" strokeWidth="1" />)}
-        <path d="M282 60l18-13h40l18 13-18 13h-40z" fill="#7f3f3e" stroke="#c0755e" strokeWidth="3" />
-        <path d="M315 46h10v29h-10z" fill="#15171d" />
-        <text x="320" y="31" className="exile-room-title">{tr("유배지 · 피스 퍼즐", "EXILE · PIECE PUZZLE")}</text>
+      <ExileRoom title={tr("유배지 · 피스 퍼즐", "EXILE · PIECE PUZZLE")}
+        label={tr("네 참가자의 발판과 피스 조립판", "Four player platforms and the Piece assembly")}
+        caption={board ? tr(`${owner} 조립판 · ${board.placed} / 8개`, `${owner}’s assembly · ${board.placed} of 8 Pieces`) : tr("먼저 완성한 세 명이 생존합니다", "The first three to finish survive")}>
         <Assembly board={board} pieces={state.exileSetup?.pieces ?? []} owner={owner} />
         {!board && <g className="exile-board-cover"><rect x="224" y="205" width="192" height="61" fill="#141d27" stroke="#6e6756" strokeWidth="2" />
           <text x="320" y="230">{owner ? tr("배치 기록 대기", "Awaiting assembly") : tr("비공개 조립 중", "PRIVATE ASSEMBLY")}</text>
           <text x="320" y="251">{tr("목표 · 4×4 교차 격자", "Target · 4×4 crossing grid")}</text></g>}
-        <text x="320" y="435" className="exile-room-caption">{board ? tr(`${owner} 조립판 · ${board.placed} / 8개`, `${owner}’s assembly · ${board.placed} of 8 Pieces`) : tr("먼저 완성한 세 명이 생존합니다", "The first three to finish survive")}</text>
-      </svg>
+      </ExileRoom>
       <ExileCast players={players} selected={owner} onChoose={onChoose} statuses={statuses}
         canChoose={(player) => view === "operator" || state.exileRevealed || view === player} />
     </div>

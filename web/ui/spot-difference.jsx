@@ -2,7 +2,7 @@ import React, {useEffect, useId, useRef, useState} from "react";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {tr} from "./locale.js";
 import {Table} from "./records.jsx";
-import {ExileCast} from "./exile-match.jsx";
+import {ExileCast, ExileRoom} from "./exile-match.jsx";
 import "./spot-difference.css";
 
 const roundText = (round, overtime = false) => overtime ? tr(`연장 ${Math.max(1, round - 3)}라운드`, `Overtime ${Math.max(1, round - 3)}`) : tr(`${round}라운드`, `Round ${round}`);
@@ -147,20 +147,18 @@ export function SpotScene({state, players, selected, onChoose}) {
     return [player, {status: out ? "eliminated" : safe ? "safe" : "assembling", label: out ? tr("탈락", "Eliminated") : safe ? tr("생존", "Survived") : tr(`${state.pictureTotals?.[player] ?? 0}점`, `${state.pictureTotals?.[player] ?? 0} points`), detail: out ? tr("탈락", "Eliminated") : safe ? tr("생존", "Survived") : undefined}];
   }));
   return <section className="exile-arena spot-arena pixel-frame" aria-label={tr("유배지 틀린 그림 찾기 세트장", "Exile Spot the Difference arena")}>
-    <div className="exile-room spot-room">
-      <svg viewBox="0 0 640 620" role="img" aria-label={tr("관찰 화면과 네 참가자의 발판", "Picture screen and four player platforms")} shapeRendering="crispEdges">
-        <rect width="640" height="620" fill="#151c24" />
-        <path d="M12 12H628V608H12Z" fill="none" stroke="#48515b" strokeWidth="6" />
-        <path d="M28 460H612V590H28Z" fill="#20252c" stroke="#333c46" strokeWidth="3" />
-        <path d="M28 590L114 604H526L612 590" fill="none" stroke="#555047" strokeWidth="4" />
-        <text x="320" y="34" className="exile-room-title">{tr("유배지 · 틀린 그림 찾기", "EXILE · SPOT THE DIFFERENCE")}</text>
-        <rect x="24" y="50" width="592" height="398" fill="#0b121a" stroke="#6c716f" strokeWidth="4" />
-        {picture ? <Picture x="28" y="54" width="584" height="389.333" picture={picture} marks={visibleMarks} targets={targets} /> :
-          <g className="spot-screen-cover"><text x="320" y="226">{phase?.stage === "blank" ? tr("원본 그림이 사라졌습니다", "THE ORIGINAL IS HIDDEN") : tr("그림 공개 대기", "WAITING FOR THE PICTURE")}</text>
-            <text x="320" y="260">{phase?.stage === "blank" ? tr(`${phase.blank_seconds}초 뒤 변경된 그림 공개`, `The changed picture follows after ${phase.blank_seconds} seconds`) : tr("원본을 기억하고 달라진 5곳을 찾으세요", "Remember the original and find five changes")}</text></g>}
-        <text x="320" y="603" className="exile-room-caption">{phase ? `${roundText(phase.round, phase.overtime)} · ${stageText(phase.stage)}${owner && phase.stage !== "observe" && phase.stage !== "blank" ? tr(` · ${owner}의 표시`, ` · ${owner}’s marks`) : ""}` : tr("상위 2명이 생존합니다", "The top two survive")}</text>
-      </svg>
-      <ExileCast players={players} selected={owner} onChoose={onChoose} statuses={statuses} positions={[[13, 82], [38, 82], [62, 82], [87, 82]]}
+    <div className="exile-room">
+      <ExileRoom title={tr("유배지 · 틀린 그림 찾기", "EXILE · SPOT THE DIFFERENCE")}
+        label={tr("관찰 화면과 네 참가자의 발판", "Picture screen and four player platforms")}
+        caption={phase ? `${roundText(phase.round, phase.overtime)} · ${stageText(phase.stage)}${owner && phase.stage !== "observe" && phase.stage !== "blank" ? tr(` · ${owner}의 표시`, ` · ${owner}’s marks`) : ""}` : tr("상위 2명이 생존합니다", "The top two survive")}>
+        <g className="spot-screen">
+          <rect x="124" y="103" width="392" height="264" fill="#0b121a" stroke="#6c716f" strokeWidth="4" />
+          {picture ? <Picture x="128" y="107" width="384" height="256" picture={picture} marks={visibleMarks} targets={targets} /> :
+            <g className="spot-screen-cover"><text x="320" y="226">{phase?.stage === "blank" ? tr("원본 그림이 사라졌습니다", "THE ORIGINAL IS HIDDEN") : tr("그림 공개 대기", "WAITING FOR THE PICTURE")}</text>
+              <text x="320" y="260">{phase?.stage === "blank" ? tr(`${phase.blank_seconds}초 뒤 변경된 그림 공개`, `The changed picture follows after ${phase.blank_seconds} seconds`) : tr("원본을 기억하고 달라진 5곳을 찾으세요", "Remember the original and find five changes")}</text></g>}
+        </g>
+      </ExileRoom>
+      <ExileCast players={players} selected={owner} onChoose={onChoose} statuses={statuses}
         canChoose={(player) => perspective === "operator" || revealed || perspective === player} />
     </div>
     <div className="spot-view-controls">
