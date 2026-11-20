@@ -1116,17 +1116,20 @@ function Stage({state, replay, choiceResult, gemExchange}) {
   return <p className="match-roster">{match.players.join(" · ")}</p>;
 }
 
-function modelSettings(model, effort, provider) {
+function modelSettings(model, effort, provider, imageModel, imageEffort = effort) {
   const settings = effort ? `${model} ${effort} effort` : model;
-  return provider ? `${provider} · ${settings}` : settings;
+  const text = provider ? `${provider} · ${settings}` : settings;
+  const image = imageEffort ? `${imageModel} ${imageEffort} effort` : imageModel;
+  return imageModel ? `${text} · ${tr("이미지", "Image")}: ${image}` : text;
 }
 
-function modelLabel({provider, model, effort, model_players: modelPlayers, model_overrides: modelOverrides, players}) {
+function modelLabel({provider, model, effort, model_players: modelPlayers, model_overrides: modelOverrides,
+  image_model: imageModel, image_model_overrides: imageModels, image_effort_overrides: imageEfforts, players}) {
   const prefix = tr("사용 모델:", "Model:");
   if (!model || modelPlayers?.length === 0) return `${prefix} ${tr("스크립트", "Scripted")}`;
   const overrides = modelOverrides ?? {};
   const defaultProvider = Object.values(overrides).some((config) => config.provider) ? provider : undefined;
-  const defaults = modelSettings(model, effort, defaultProvider);
+  const defaults = modelSettings(model, effort, defaultProvider, imageModel);
   if (!modelPlayers) return `${prefix} ${defaults}`;
 
   const enabled = new Set(modelPlayers);
@@ -1134,8 +1137,9 @@ function modelLabel({provider, model, effort, model_players: modelPlayers, model
   const scripted = [];
   let guestSettings;
   for (const player of players) {
-    const override = Object.hasOwn(overrides, player) ? overrides[player] : undefined;
-    const settings = override ? modelSettings(override.model, override.effort, override.provider ?? defaultProvider) : defaults;
+    const config = Object.hasOwn(overrides, player) ? overrides[player] : {model, effort};
+    const playerImage = imageModels?.[player] ?? ((config.provider ?? provider) === provider ? imageModel : undefined);
+    const settings = modelSettings(config.model, config.effort, config.provider ?? defaultProvider, playerImage, imageEfforts?.[player]);
     if (player === "G01") {
       guestSettings = enabled.has(player) ? settings : tr("스크립트", "Scripted");
       continue;
