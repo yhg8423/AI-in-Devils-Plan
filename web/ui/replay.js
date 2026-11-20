@@ -2,6 +2,7 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  picture_memorize: tr("원본 기억", "Remember the original"), picture_answer: tr("달라진 부분 표시", "Mark the changes"),
   exile_move: tr("피스 조작", "Move a piece"),
   wall_place: tr("말 배치", "Counter placement"), wall_move: tr("말 이동·벽 설치", "Move and build a wall"),
   bingo_shape: tr("도형 선택", "Shape selection"), bingo_bid: tr("비공개 입찰", "Sealed bid"),

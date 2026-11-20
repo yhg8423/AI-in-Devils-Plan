@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from .spectator import CASE_STAGES, EVENT_FIELDS, FIRST_EXILE, exile_sources, source_paths
+from .spectator import CASE_STAGES, EVENT_FIELDS, exile_sources, source_paths
 from .translate_events import translation_rows
 
 
@@ -32,7 +32,7 @@ RESULT_FIELDS = (
     "raw_scores", "manitos", "pieces_spent", "turns", "resets",
     "turn_limit", "end_reason", "main_turns", "tiebreaks",
     "all_ranking", "filled", "remaining_value", "shapes", "boards", "coins", "guest", "guest_result", "forced_last",
-    "largest", "second_scores", "second_largest", "games", "finish_turns",
+    "largest", "second_scores", "second_largest", "games", "finish_turns", "ranking_groups",
 )
 
 
@@ -104,14 +104,16 @@ def encode_rows(rows):
     return "".join(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n" for row in rows)
 
 
-def prepare_exile_match(log, logs, source_root, campaign):
+def prepare_exile_match(log, logs, source_root, campaign, *, previous_exile=None):
     _, rows = decode_rows(log)
     if not rows:
         raise ValueError(f"{log}: expected a completed full match")
-    sources = exile_sources(source_root, rows[0], logs)
-    events, translated = prepare_match(log, FIRST_EXILE.split(" · ", 1)[0], {}, logs, source_root, campaign)
+    sources = exile_sources(source_root, rows[0], logs, previous_exile=previous_exile)
+    events, translated = prepare_match(log, rows[0]["game"].split(" · ", 1)[0], {}, logs, source_root, campaign)
     stages = {path.resolve(): stage for stage, path in zip(STAGES, logs)}
     events[0]["from_matches"] = [f"matches/{campaign}/{stages[path]}/events.jsonl" for path in sources]
+    if previous_exile is not None:
+        events[0]["from_exile"] = f"matches/{campaign}/exile1/events.jsonl"
     return events, translated
 
 
@@ -126,10 +128,12 @@ def export_replays(campaigns, source_root, output_root):
         if destination in prepared or destination.exists() or destination.is_symlink():
             raise FileExistsError(f"{destination}: export would overwrite an existing campaign")
         logs = [campaign / stage / "events.jsonl" for stage in STAGES]
-        exile_log = campaign / "exile1" / "events.jsonl"
-        if exile_log.parent.is_symlink():
+        exile_logs = [campaign / f"exile{index}" / "events.jsonl" for index in (1, 2)]
+        if any(log.parent.is_symlink() for log in exile_logs):
             raise ValueError(f"{campaign}: symbolic links are not supported")
-        has_exile = exile_log.exists() or exile_log.is_symlink()
+        has_exile = exile_logs[0].exists() or exile_logs[0].is_symlink()
+        if (exile_logs[1].exists() or exile_logs[1].is_symlink()) and not has_exile:
+            raise ValueError(f"{campaign}: the second exile match requires the first exile match")
         if any(log.parent.is_symlink() for log in logs):
             raise ValueError(f"{campaign}: symbolic links are not supported")
         while len(logs) > (2 if has_exile else 4) and not logs[-1].is_symlink() and not logs[-1].exists():
@@ -140,7 +144,10 @@ def export_replays(campaigns, source_root, output_root):
                                               PREDECESSORS[:len(logs)], strict=True)
         }
         if has_exile:
-            matches["exile1"] = prepare_exile_match(exile_log, logs, source_root, campaign.name)
+            matches["exile1"] = prepare_exile_match(exile_logs[0], logs, source_root, campaign.name)
+            if exile_logs[1].exists() or exile_logs[1].is_symlink():
+                matches["exile2"] = prepare_exile_match(exile_logs[1], logs, source_root, campaign.name,
+                                                       previous_exile=exile_logs[0])
         prepared[destination] = matches
 
     destination_root.mkdir(parents=True, exist_ok=True)

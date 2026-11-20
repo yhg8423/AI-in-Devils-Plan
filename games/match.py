@@ -36,6 +36,7 @@ DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
 DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
 FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
+SECOND_EXILE = "유배지 매치 2 · 틀린 그림 찾기"
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
     DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),
@@ -453,7 +454,8 @@ def parse_group_image_model(value: str) -> tuple[str | None, str, str, str, str 
 
 def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             previous_main: str | None = None, after_prison: bool = False,
-            guest: str | None = None, exile_roster: bool = False, argv=None) -> None:
+            guest: str | None = None, exile_roster: bool = False,
+            previous_exile: str | None = None, argv=None) -> None:
     seat_counts = (seats,) if isinstance(seats, int) else seats
     roster_args = seat_counts[0] if len(seat_counts) == 1 else "+"
     parser = argparse.ArgumentParser(description=title)
@@ -462,7 +464,9 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
     parser.add_argument("--pieces", nargs=roster_args, type=int, metavar="N", help="참가자 순서대로 시작 피스 지정")
     if exile_roster:
         parser.add_argument("--from-matches", nargs="+", type=Path, metavar="EVENTS",
-                            help="첫 유배지 참가자 4명이 모이는 시점까지, 1일차 메인부터 순서대로 완료 기록 지정")
+                            help="유배지 참가자가 모이는 시점까지, 1일차 메인부터 순서대로 완료 기록 지정")
+    if previous_exile:
+        parser.add_argument("--from-exile", type=Path, help=f"완료된 {previous_exile}의 events.jsonl")
     if previous_main:
         parser.add_argument("--from-main", type=Path, help=f"완료된 {previous_main}의 events.jsonl")
     if after_prison:
@@ -517,17 +521,21 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         main_path = getattr(args, "from_main", None)
         prison_path = getattr(args, "from_prison", None)
         source_matches = getattr(args, "from_matches", None)
+        exile_path = getattr(args, "from_exile", None)
         inherited_roster = bool(main_path or source_matches)
         if after_prison and bool(main_path) != bool(prison_path):
             parser.error("연속 실행에는 --from-main과 --from-prison을 함께 지정하세요.")
+        if previous_exile and bool(exile_path) != bool(source_matches):
+            parser.error("다음 유배지 매치에는 --from-exile과 --from-matches를 함께 지정하세요.")
         relationships = {}
         if source_matches:
             if args.players is not None or args.pieces is not None:
                 parser.error("--from-matches로 참가자를 이어받을 때는 --players와 --pieces를 생략하세요.")
             try:
-                from .exile_match.roster import collect_exile_players
+                from .exile_match.roster import collect_exile_players, collect_second_exile_players
 
-                players = collect_exile_players(source_matches)
+                players = (collect_second_exile_players(exile_path, source_matches) if exile_path else
+                           collect_exile_players(source_matches))
                 pieces = [0] * len(players)
             except (OSError, ValueError, KeyError, TypeError) as error:
                 parser.error(f"유배지 참가자를 읽을 수 없습니다. {error}")
@@ -674,6 +682,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             header["from_prison"] = str(prison_path)
         if source_matches:
             header["from_matches"] = [str(path) for path in source_matches]
+        if exile_path:
+            header["from_exile"] = str(exile_path)
         try:
             if log is not None:
                 log.write(header)
@@ -728,7 +738,7 @@ def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
             raise ValueError(f"--{option.replace('_', '-')} 값이 저장된 설정과 일치하지 않습니다.")
         setattr(args, option, value)
 
-    for option in ("from_main", "from_prison"):
+    for option in ("from_main", "from_prison", "from_exile"):
         provided = getattr(args, option, None)
         path = Path(saved[option]) if option in saved else None
         if provided is not None and (path is None or path.resolve() != provided.resolve()):
