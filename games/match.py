@@ -37,6 +37,7 @@ DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
 FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
 SECOND_EXILE = "유배지 매치 2 · 틀린 그림 찾기"
+THIRD_EXILE = "유배지 매치 3 · 비밀 코드"
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
     DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),
@@ -532,9 +533,12 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             if args.players is not None or args.pieces is not None:
                 parser.error("--from-matches로 참가자를 이어받을 때는 --players와 --pieces를 생략하세요.")
             try:
-                from .exile_match.roster import collect_exile_players, collect_second_exile_players
+                from .exile_match.roster import (
+                    collect_exile_players, collect_second_exile_players, collect_third_exile_players,
+                )
 
-                players = (collect_second_exile_players(exile_path, source_matches) if exile_path else
+                collectors = {FIRST_EXILE: collect_second_exile_players, SECOND_EXILE: collect_third_exile_players}
+                players = (collectors[previous_exile](exile_path, source_matches) if exile_path else
                            collect_exile_players(source_matches))
                 pieces = [0] * len(players)
             except (OSError, ValueError, KeyError, TypeError) as error:

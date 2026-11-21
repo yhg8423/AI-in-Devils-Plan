@@ -18,6 +18,7 @@ const games = [
   {session: "4일차 감옥 매치", name: "벽바둑 2", description: tr("서로 다른 말을 움직이고 벽을 세워 가장 넓은 영역을 확보한다.", "Move two kinds of counters and build walls to claim the largest territory.")},
   {session: "유배지 매치 1", name: "피스 퍼즐", description: tr("홈의 방향과 깊이를 살펴 8개의 피스로 격자를 완성한다.", "Match notch directions and depths to assemble eight pieces into a lattice.")},
   {session: "유배지 매치 2", name: "틀린 그림 찾기", description: tr("원본을 기억하고 달라진 다섯 곳을 찾아 두 명의 생존자를 가린다.", "Remember the original and find five changes to secure one of two survival places.")},
+  {session: "유배지 매치 3", name: "비밀 코드", description: tr("26장 카드의 단서로 네 글자 코드를 추리하고 버저로 생존을 확정한다.", "Deduce a four-letter code from 26 cards and their clues, then buzz to secure survival.")},
 ];
 
 export function runHref(id = "", caseId) {

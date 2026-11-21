@@ -247,6 +247,7 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 4 prison match | Wall Go II | 3 | Move counters and build walls to claim territory without discussion. The three-player winner survives; the other two play a duel to determine elimination. Complete ties replay with only tied players and reversed turn order. |
 | Exile match 1 | Piece Puzzle | 4 | Assemble eight slotted pieces into a lattice by matching notch directions and depths. Players build privately; the first three to finish survive. |
 | Exile match 2 | Spot the Difference | 4 | Memorize the original picture, then mark five changed areas. The top two survive after three rounds; only ties at the survival boundary play overtime. |
+| Exile match 3 | Secret Code | 4 | Find a four-letter code from illustrated cards and clues. The first correct answer each round secures survival; the last remaining player is eliminated. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
 
@@ -270,6 +271,18 @@ uv run --locked --python 3.12 python -m games.exile_match.spot_difference \
                  play_results/matches/all-luna-16/day1-prison/events.jsonl \
                  play_results/matches/all-luna-16/day2-main/events.jsonl \
   --output runs/matches/exile-demo/exile2/events.jsonl
+```
+
+The third match joins the second exile match's two survivors with the next two eliminated main/prison players. For the mixed-model run, include the Day 3 main result too.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.secret_code \
+  --from-exile play_results/matches/all-luna-16/exile2/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile3/events.jsonl
 ```
 
 Use the same `--provider`, `--model`, and `--player-model` options as other matches for model play. Resume an interrupted run with `--resume --output <events.jsonl>`.
