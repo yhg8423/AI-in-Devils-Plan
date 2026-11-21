@@ -7,8 +7,8 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from ..match import (
-    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON,
-    FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, run_cli,
+    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, DAY_THREE_MAIN,
+    FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, run_cli,
 )
 
 
@@ -177,6 +177,78 @@ class ExileCliTest(unittest.TestCase):
         self.third_cli(resumed, "--resume", "--output", str(target))
         rows = [json.loads(line) for line in target.read_text().splitlines()]
         self.assertEqual(rows[0]["from_exile"], str(second))
+        self.assertEqual(rows[0]["from_matches"], list(map(str, sources)))
+        self.assertEqual(rows[-1]["type"], "result")
+        self.assertEqual(sum(row.get("msg_type") == "rules" for row in rows), 1)
+
+    def fourth_cli(self, play, *args):
+        with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            run_cli(play, title=FOURTH_EXILE, seats=4, exile_roster=True,
+                    previous_exile=THIRD_EXILE, argv=list(args))
+
+    def prepare_fourth(self, *, queued=False):
+        second, sources, third = self.prepare_third()
+        if queued:
+            rows = [json.loads(line) for line in sources[-1].read_text().splitlines()]
+            rows[-1]["eliminated"].append("P05")
+            sources[-1].write_text("".join(json.dumps(row) + '\n' for row in rows))
+        self.third_cli(self.play, "--from-exile", str(second), "--from-matches", *map(str, sources),
+                       "--output", str(third))
+        if not queued:
+            market = self.root / "day3-main.jsonl"
+            header = {"type": "match", "game": DAY_THREE_MAIN, "players": [f"P{i:02}" for i in range(1, 6)],
+                      "from_main": str(sources[2]), "from_prison": str(sources[3])}
+            market.write_text(json.dumps(header) + '\n' + json.dumps({"type": "result", "eliminated": ["P05"]}) + '\n')
+            sources.append(market)
+        return third, sources, self.root / "exile4/events.jsonl"
+
+    def test_fourth_imports_three_survivors_and_one_arrival_with_zero_pieces(self):
+        third, sources, target = self.prepare_fourth()
+        originals = {path: path.read_bytes() for path in [third, *sources]}
+        self.fourth_cli(self.play, "--from-exile", str(third), "--from-matches", *map(str, sources),
+                        "--output", str(target))
+        rows = [json.loads(line) for line in target.read_text().splitlines()]
+        self.assertEqual(rows[0]["players"], ["P08", "P14", "P07", "P05"])
+        self.assertEqual(rows[0]["pieces"], dict.fromkeys(rows[0]["players"], 0))
+        self.assertEqual(rows[0]["from_exile"], str(third))
+        self.assertEqual(rows[0]["from_matches"], list(map(str, sources)))
+        self.assertEqual({path: path.read_bytes() for path in originals}, originals)
+
+    def test_fourth_imports_an_already_queued_arrival_with_the_same_prefix(self):
+        third, sources, target = self.prepare_fourth(queued=True)
+        self.fourth_cli(self.play, "--from-exile", str(third), "--from-matches", *map(str, sources),
+                        "--output", str(target))
+        header = json.loads(target.read_text().splitlines()[0])
+        self.assertEqual(header["players"], ["P08", "P14", "P07", "P05"])
+        self.assertEqual(header["from_matches"], json.loads(third.read_text().splitlines()[0])["from_matches"])
+
+    def test_fourth_requires_both_flags_and_restores_sources_on_resume(self):
+        third, sources, target = self.prepare_fourth()
+        for flags in (("--from-exile", str(third)), ("--from-matches", *map(str, sources))):
+            with self.subTest(flags=flags), self.assertRaises(SystemExit):
+                self.fourth_cli(self.play, *flags, "--output", str(target))
+        self.assertFalse(target.exists())
+
+        def interrupted(match):
+            match.event("rules", "울타리 치기")
+            raise KeyboardInterrupt
+
+        with self.assertRaises(KeyboardInterrupt):
+            self.fourth_cli(interrupted, "--from-exile", str(third), "--from-matches", *map(str, sources),
+                            "--output", str(target))
+        before = target.read_bytes()
+        for flags in (("--from-exile", str(self.output)), ("--from-matches", *map(str, sources[:-1]))):
+            with self.subTest(flags=flags), self.assertRaises(SystemExit):
+                self.fourth_cli(self.play, "--resume", "--output", str(target), *flags)
+            self.assertEqual(target.read_bytes(), before)
+
+        def resumed(match):
+            match.event("rules", "울타리 치기")
+            return {"survivors": list(match.players[:3]), "eliminated": list(match.players[3:])}
+
+        self.fourth_cli(resumed, "--resume", "--output", str(target))
+        rows = [json.loads(line) for line in target.read_text().splitlines()]
+        self.assertEqual(rows[0]["from_exile"], str(third))
         self.assertEqual(rows[0]["from_matches"], list(map(str, sources)))
         self.assertEqual(rows[-1]["type"], "result")
         self.assertEqual(sum(row.get("msg_type") == "rules" for row in rows), 1)
