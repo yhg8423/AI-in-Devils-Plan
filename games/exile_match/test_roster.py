@@ -5,8 +5,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 
-from ..match import DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, FIRST_EXILE
-from .roster import collect_exile_players, collect_second_exile_players
+from ..match import DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, FIRST_EXILE, SECOND_EXILE
+from .roster import collect_exile_players, collect_second_exile_players, collect_third_exile_players
 
 
 PLAYERS = [f"P{number:02}" for number in range(1, 17)]
@@ -157,6 +157,82 @@ class ExileRosterTest(unittest.TestCase):
         previous, logs = self.second_sources()
         self.rewrite(logs[-1], result={"eliminated": ["P08", "P07"]})
         self.assertEqual(collect_second_exile_players(previous, logs), ["P13", "P12", "P09", "P08"])
+
+    def third_sources(self, main_eliminated=None, prison_eliminated=None):
+        first, logs = self.second_sources()
+        main_eliminated = ["P08"] if main_eliminated is None else main_eliminated
+        prison_eliminated = ["P07", "P06"] if prison_eliminated is None else prison_eliminated
+        self.rewrite(logs[-1], result={"eliminated": main_eliminated})
+        players = collect_second_exile_players(first, logs)
+        second = self.write("a", "exile2", SECOND_EXILE, players, players[1:3],
+                            from_matches=[str(path) for path in logs], from_exile=str(first))
+        self.rewrite(second, result={"survivors": [players[3], players[0]]})
+        if prison_eliminated:
+            earlier = {*collect_exile_players(logs[:2]), *main_eliminated}
+            prison = self.write("a", "day2-prison", DAY_TWO_PRISON,
+                                [name for name in PLAYERS if name not in earlier], prison_eliminated,
+                                from_main=str(logs[-1]))
+            logs.append(prison)
+        return first, second, logs
+
+    def test_third_keeps_saved_survivor_order_and_adds_two_arrivals_without_writes(self):
+        first, second, logs = self.third_sources()
+        originals = {path: path.read_bytes() for path in [first, second, *logs]}
+        self.assertEqual(collect_third_exile_players(second, logs), ["P08", "P13", "P07", "P06"])
+        self.assertEqual({path: path.read_bytes() for path in originals}, originals)
+
+    def test_third_includes_queued_arrival_and_leaves_excess_arrivals_waiting(self):
+        _, second, logs = self.third_sources(["P08", "P07"], ["P06", "P05"])
+        self.assertEqual(collect_third_exile_players(second, logs), ["P08", "P13", "P07", "P06"])
+
+    def test_third_can_use_the_same_source_prefix_when_all_arrivals_were_in_one_batch(self):
+        _, second, logs = self.third_sources(["P08", "P07", "P06"], [])
+        self.assertEqual(collect_third_exile_players(second, logs), ["P08", "P13", "P07", "P06"])
+
+    def test_third_requires_the_first_prefix_with_two_new_arrivals(self):
+        _, second, logs = self.third_sources()
+        with self.assertRaisesRegex(ValueError, "새 탈락자 2명"):
+            collect_third_exile_players(second, logs[:3])
+        _, second, logs = self.third_sources(["P08", "P07", "P06"], ["P05"])
+        with self.assertRaisesRegex(ValueError, "첫 경기"):
+            collect_third_exile_players(second, logs)
+
+    def test_third_recursively_rejects_an_invalid_first_match_and_wrong_campaign(self):
+        first, second, logs = self.third_sources()
+        self.rewrite(first, result={"survivors": ["P13", "P13", "P09"]})
+        with self.assertRaisesRegex(ValueError, "생존자 3명"):
+            collect_third_exile_players(second, logs)
+        first, second, logs = self.third_sources()
+        other = self.first_day("b")
+        self.rewrite(first, header={"from_matches": [str(path) for path in other]})
+        with self.assertRaisesRegex(ValueError, "같은 캠페인"):
+            collect_third_exile_players(second, logs)
+
+    def test_third_rejects_wrong_previous_game_links_roster_and_result_partition(self):
+        first, second, logs = self.third_sources()
+        with self.assertRaisesRegex(ValueError, SECOND_EXILE):
+            collect_third_exile_players(first, logs)
+        self.rewrite(second, header={"from_exile": ""})
+        with self.assertRaisesRegex(ValueError, "첫 유배지 매치"):
+            collect_third_exile_players(second, logs)
+        for updates in (
+            {"header": {"players": ["P13", "P12", "P09", "P07"]}},
+            {"result": {"survivors": ["P08", "P08"]}},
+            {"result": {"survivors": ["P08", False]}},
+            {"result": {"eliminated": ["P12", "P08"]}},
+        ):
+            with self.subTest(updates=updates):
+                _, second, logs = self.third_sources()
+                self.rewrite(second, **updates)
+                with self.assertRaisesRegex(ValueError, "생존자 2명"):
+                    collect_third_exile_players(second, logs)
+
+    def test_third_resolves_portable_exported_previous_exile_and_campaign_links(self):
+        first, second, logs = self.third_sources()
+        self.rewrite(first, header={"from_matches": [str(path.relative_to(self.root)) for path in logs[:2]]})
+        self.rewrite(second, header={"from_exile": str(first.relative_to(self.root)),
+                                     "from_matches": [str(path.relative_to(self.root)) for path in logs[:3]]})
+        self.assertEqual(collect_third_exile_players(second, logs), ["P08", "P13", "P07", "P06"])
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
-"""Collect the first four exile entrants from an explicit campaign prefix."""
+"""Collect exile rosters from completed results and explicit campaign prefixes."""
 
 from collections.abc import Sequence
 from pathlib import Path
 
-from ..match import FIRST_EXILE, PRISON_STAGES, read_completed_match
+from ..match import FIRST_EXILE, SECOND_EXILE, PRISON_STAGES, read_completed_match
 
 
 STAGES = tuple(title for main, (prison, _) in PRISON_STAGES.items() for title in (main, prison))
@@ -61,6 +61,26 @@ def collect_exile_players(paths: Sequence[Path]) -> list[str]:
     return entrants
 
 
+def _previous_sources(header, logs, *, allow_equal=False):
+    sources = header.get("from_matches")
+    if (not isinstance(sources, list) or not sources or len(sources) > len(logs)
+            or (not allow_equal and len(sources) == len(logs))
+            or any(not _points_to(source, log) for source, log in zip(sources, logs))):
+        raise ValueError("이전 유배지 매치가 같은 캠페인의 선행 기록을 가리켜야 합니다.")
+    return logs[:len(sources)]
+
+
+def _survivors(header, result, players, count, message):
+    survivors, eliminated = result.get("survivors"), result.get("eliminated")
+    if (header.get("players") != players or not isinstance(survivors, list) or len(survivors) != count
+            or any(not isinstance(name, str) for name in survivors) or len(set(survivors)) != count
+            or not isinstance(eliminated, list) or len(eliminated) != len(players) - count
+            or any(not isinstance(name, str) for name in eliminated)
+            or set(survivors) & set(eliminated) or set(survivors + eliminated) != set(players)):
+        raise ValueError(message)
+    return survivors
+
+
 def collect_second_exile_players(previous: Path, paths: Sequence[Path]) -> list[str]:
     """Join three first-match survivors with the next chronological exile entrant.
 
@@ -69,18 +89,28 @@ def collect_second_exile_players(previous: Path, paths: Sequence[Path]) -> list[
     """
     logs, entrants, counts = _campaign_entrants(paths)
     header, result, _ = read_completed_match(Path(previous), FIRST_EXILE)
-    sources = header.get("from_matches")
-    if (not isinstance(sources, list) or not sources or len(sources) >= len(logs)
-            or any(not _points_to(source, log) for source, log in zip(sources, logs))):
-        raise ValueError("이전 유배지 매치가 같은 캠페인의 선행 기록을 가리켜야 합니다.")
-    first = collect_exile_players(logs[:len(sources)])
-    survivors, eliminated = result.get("survivors"), result.get("eliminated")
-    if (header.get("players") != first or not isinstance(survivors, list) or len(survivors) != 3
-            or any(not isinstance(name, str) for name in survivors) or len(set(survivors)) != 3
-            or not isinstance(eliminated, list) or len(eliminated) != 1
-            or any(not isinstance(name, str) for name in eliminated)
-            or set(survivors) & set(eliminated) or set(survivors + eliminated) != set(first)):
-        raise ValueError("첫 유배지 매치의 생존자 3명과 탈락자 1명이 올바르지 않습니다.")
+    first = collect_exile_players(_previous_sources(header, logs))
+    survivors = _survivors(header, result, first, 3, "첫 유배지 매치의 생존자 3명과 탈락자 1명이 올바르지 않습니다.")
     if len(entrants) < 5 or (len(counts) > 1 and counts[-2] >= 5):
         raise ValueError("첫 유배지 이후 새 탈락자가 합류하는 첫 경기까지의 기록만 지정하세요.")
     return [*survivors, entrants[4]]
+
+
+def collect_third_exile_players(previous: Path, paths: Sequence[Path]) -> list[str]:
+    """Join two second-match survivors with arrivals six and seven, including queued arrivals."""
+    logs, entrants, counts = _campaign_entrants(paths)
+    previous = Path(previous).resolve()
+    header, result, _ = read_completed_match(previous, SECOND_EXILE)
+    sources = _previous_sources(header, logs, allow_equal=True)
+    link = header.get("from_exile")
+    if not isinstance(link, str) or not link:
+        raise ValueError("두 번째 유배지 매치가 첫 유배지 매치의 기록을 가리켜야 합니다.")
+    first = next((path for base in (Path.cwd(), *previous.parents)
+                  if (path := (base / link).resolve()).is_file()), None)
+    if first is None:
+        raise ValueError("두 번째 유배지 매치가 첫 유배지 매치의 기록을 가리켜야 합니다.")
+    second = collect_second_exile_players(first, sources)
+    survivors = _survivors(header, result, second, 2, "두 번째 유배지 매치의 생존자 2명과 탈락자 2명이 올바르지 않습니다.")
+    if len(entrants) < 7 or (len(counts) > 1 and counts[-2] >= 7):
+        raise ValueError("두 번째 유배지 이후 새 탈락자 2명이 모이는 첫 경기까지의 기록만 지정하세요.")
+    return [*survivors, *entrants[5:7]]

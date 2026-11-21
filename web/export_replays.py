@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from .spectator import CASE_STAGES, EVENT_FIELDS, exile_sources, source_paths
+from .spectator import CASE_STAGES, EVENT_FIELDS, EXILE_GAMES, exile_sources, source_paths
 from .translate_events import translation_rows
 
 
@@ -33,6 +33,7 @@ RESULT_FIELDS = (
     "turn_limit", "end_reason", "main_turns", "tiebreaks",
     "all_ranking", "filled", "remaining_value", "shapes", "boards", "coins", "guest", "guest_result", "forced_last",
     "largest", "second_scores", "second_largest", "games", "finish_turns", "ranking_groups",
+    "finish_rounds", "round_winners", "questions",
 )
 
 
@@ -110,10 +111,12 @@ def prepare_exile_match(log, logs, source_root, campaign, *, previous_exile=None
         raise ValueError(f"{log}: expected a completed full match")
     sources = exile_sources(source_root, rows[0], logs, previous_exile=previous_exile)
     events, translated = prepare_match(log, rows[0]["game"].split(" · ", 1)[0], {}, logs, source_root, campaign)
+    events[0]["game"] = rows[0]["game"].replace("달라진 그림 찾기", "틀린 그림 찾기")
     stages = {path.resolve(): stage for stage, path in zip(STAGES, logs)}
     events[0]["from_matches"] = [f"matches/{campaign}/{stages[path]}/events.jsonl" for path in sources]
     if previous_exile is not None:
-        events[0]["from_exile"] = f"matches/{campaign}/exile1/events.jsonl"
+        previous_stage = EXILE_GAMES.index(events[0]["game"])
+        events[0]["from_exile"] = f"matches/{campaign}/exile{previous_stage}/events.jsonl"
     return events, translated
 
 
@@ -128,12 +131,15 @@ def export_replays(campaigns, source_root, output_root):
         if destination in prepared or destination.exists() or destination.is_symlink():
             raise FileExistsError(f"{destination}: export would overwrite an existing campaign")
         logs = [campaign / stage / "events.jsonl" for stage in STAGES]
-        exile_logs = [campaign / f"exile{index}" / "events.jsonl" for index in (1, 2)]
+        exile_logs = [campaign / f"exile{index}" / "events.jsonl" for index in range(1, len(EXILE_GAMES) + 1)]
         if any(log.parent.is_symlink() for log in exile_logs):
             raise ValueError(f"{campaign}: symbolic links are not supported")
         has_exile = exile_logs[0].exists() or exile_logs[0].is_symlink()
-        if (exile_logs[1].exists() or exile_logs[1].is_symlink()) and not has_exile:
-            raise ValueError(f"{campaign}: the second exile match requires the first exile match")
+        for index, log in enumerate(exile_logs[1:], start=1):
+            if (log.exists() or log.is_symlink()) and not exile_logs[index - 1].exists():
+                if index == 1:
+                    raise ValueError(f"{campaign}: the second exile match requires the first exile match")
+                raise ValueError(f"{campaign}: exile{index + 1} requires exile{index}")
         if any(log.parent.is_symlink() for log in logs):
             raise ValueError(f"{campaign}: symbolic links are not supported")
         while len(logs) > (2 if has_exile else 4) and not logs[-1].is_symlink() and not logs[-1].exists():
@@ -144,10 +150,11 @@ def export_replays(campaigns, source_root, output_root):
                                               PREDECESSORS[:len(logs)], strict=True)
         }
         if has_exile:
-            matches["exile1"] = prepare_exile_match(exile_logs[0], logs, source_root, campaign.name)
-            if exile_logs[1].exists() or exile_logs[1].is_symlink():
-                matches["exile2"] = prepare_exile_match(exile_logs[1], logs, source_root, campaign.name,
-                                                       previous_exile=exile_logs[0])
+            for index, log in enumerate(exile_logs):
+                if log.exists() or log.is_symlink():
+                    matches[f"exile{index + 1}"] = prepare_exile_match(
+                        log, logs, source_root, campaign.name,
+                        previous_exile=exile_logs[index - 1] if index else None)
         prepared[destination] = matches
 
     destination_root.mkdir(parents=True, exist_ok=True)
