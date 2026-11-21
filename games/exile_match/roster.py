@@ -3,7 +3,7 @@
 from collections.abc import Sequence
 from pathlib import Path
 
-from ..match import FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, PRISON_STAGES, read_completed_match
+from ..match import FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, PRISON_STAGES, read_completed_match
 
 
 STAGES = tuple(title for main, (prison, _) in PRISON_STAGES.items() for title in (main, prison))
@@ -133,3 +133,17 @@ def collect_fourth_exile_players(previous: Path, paths: Sequence[Path]) -> list[
     if len(entrants) < 8 or (len(counts) > 1 and counts[-2] >= 8):
         raise ValueError("세 번째 유배지 이후 새 탈락자가 합류하는 첫 경기까지의 기록만 지정하세요.")
     return [*survivors, entrants[7]]
+
+
+def collect_fifth_exile_players(previous: Path, paths: Sequence[Path]) -> list[str]:
+    """Keep all three recorded fourth-match survivors and add arrival nine."""
+    logs, entrants, counts = _campaign_entrants(paths)
+    previous = Path(previous).resolve()
+    header, result, _ = read_completed_match(previous, FOURTH_EXILE)
+    sources = _previous_sources(header, logs, allow_equal=True)
+    third = _previous_exile(header, previous, "네 번째 유배지 매치가 세 번째 유배지 매치의 기록을 가리켜야 합니다.")
+    fourth = collect_fourth_exile_players(third, sources)
+    survivors = _survivors(header, result, fourth, 3, "네 번째 유배지 매치의 생존자 3명과 탈락자 1명이 올바르지 않습니다.")
+    if len(entrants) < 9 or (len(counts) > 1 and counts[-2] >= 9):
+        raise ValueError("네 번째 유배지 이후 새 탈락자가 합류하는 첫 경기까지의 기록만 지정하세요.")
+    return [*survivors, entrants[8]]

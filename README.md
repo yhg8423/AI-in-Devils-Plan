@@ -249,6 +249,7 @@ Concordia는 참가자 ID에 해당하는 페르소나와 목표를 불러옵니
 | 유배지 매치 2 | 틀린 그림 찾기 | 4명 | 원본 그림을 기억한 뒤 바뀐 5곳을 표시합니다. 3라운드 총점으로 2명이 생존하며, 생존 경계의 동점자만 연장전을 진행합니다. |
 | 유배지 매치 3 | 비밀 코드 | 4명 | 그림 카드와 조건에서 알파벳 4개의 코드를 찾습니다. 라운드마다 가장 먼저 정답을 맞힌 1명이 생존하고, 마지막 남은 1명은 탈락합니다. |
 | 유배지 매치 4 | 울타리 치기 | 4명 | 숫자 조건을 만족하는 하나의 닫힌 고리를 만듭니다. 각자 비공개로 수정하며 먼저 완성한 3명이 생존합니다. |
+| 유배지 매치 5 | 대칭 퍼즐 | 3~4명 | 파랑·빨강·초록 조각을 뒤집지 않고 각각 선대칭 도형으로 만듭니다. 세 퍼즐을 먼저 완성한 참가자들이 생존하고 마지막 한 명은 탈락합니다. |
 
 각 매치를 따로 실행하거나, 앞 매치에서 살아남은 참가자의 ID·페르소나·피스·관계 평가를 이어받아 연속 실행할 수 있습니다. 자세한 규칙은 재생 화면의 **구간 이동**에서 확인할 수 있습니다.
 
@@ -297,6 +298,20 @@ uv run --locked --python 3.12 python -m games.exile_match.loop_fence \
                  play_results/matches/all-luna-16/day2-prison/events.jsonl \
                  play_results/matches/all-luna-16/day3-main/events.jsonl \
   --output runs/matches/exile-demo/exile4/events.jsonl
+```
+
+다섯 번째 매치는 네 번째 유배지 생존자 3명과 다음 본선 탈락자 1명이 참가합니다. 현재 세 기록 모두 3일차 감옥까지 지정합니다.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.symmetry \
+  --from-exile play_results/matches/all-luna-16/exile4/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day3-main/events.jsonl \
+                 play_results/matches/all-luna-16/day3-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile5/events.jsonl
 ```
 
 모델로 실행하려면 다른 매치와 같은 `--provider`, `--model`, `--player-model` 옵션을 붙입니다. 중단된 기록은 `--resume --output <events.jsonl>`로 이어서 실행합니다.

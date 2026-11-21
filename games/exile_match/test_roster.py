@@ -6,11 +6,12 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from ..match import (
-    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, DAY_THREE_MAIN,
-    FIRST_EXILE, SECOND_EXILE, THIRD_EXILE,
+    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, DAY_THREE_MAIN, DAY_THREE_PRISON,
+    FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE,
 )
 from .roster import (
     collect_exile_players, collect_second_exile_players, collect_third_exile_players, collect_fourth_exile_players,
+    collect_fifth_exile_players,
 )
 
 
@@ -324,6 +325,90 @@ class ExileRosterTest(unittest.TestCase):
                 updates["from_exile"] = str(Path(header["from_exile"]).relative_to(self.root))
             self.rewrite(path, header=updates)
         self.assertEqual(collect_fourth_exile_players(third, logs), ["P07", "P08", "P06", "P05"])
+
+    def fifth_sources(self, *, queued=False, new_eliminated=None):
+        first, second, third, logs = self.fourth_sources(new_eliminated=["P05", "P04"] if queued else None)
+        players = collect_fourth_exile_players(third, logs)
+        fourth = self.write("a", "exile4", FOURTH_EXILE, players, [players[1]],
+                            from_matches=[str(path) for path in logs], from_exile=str(third))
+        self.rewrite(fourth, result={"survivors": [players[3], players[0], players[2]]})
+        if not queued:
+            eliminated = ["P04"] if new_eliminated is None else new_eliminated
+            earlier = {*collect_exile_players(logs[:2]), "P08", "P07", "P06", "P05"}
+            prison = self.write("a", "day3-prison", DAY_THREE_PRISON,
+                                [name for name in PLAYERS if name not in earlier], eliminated,
+                                from_main=str(logs[-1]))
+            logs.append(prison)
+        return first, second, third, fourth, logs
+
+    def test_fifth_keeps_all_three_saved_survivors_and_next_arrival_without_writes(self):
+        first, second, third, fourth, logs = self.fifth_sources()
+        originals = {path: path.read_bytes() for path in [first, second, third, fourth, *logs]}
+        self.assertEqual(collect_fifth_exile_players(fourth, logs), ["P05", "P07", "P06", "P04"])
+        self.assertEqual({path: path.read_bytes() for path in originals}, originals)
+
+    def test_fifth_accepts_queued_arrival_with_same_prefix_and_preserves_batch_order(self):
+        _, _, _, fourth, logs = self.fifth_sources(queued=True)
+        self.assertEqual(len(json.loads(fourth.read_text().splitlines()[0])["from_matches"]), len(logs))
+        self.assertEqual(collect_fifth_exile_players(fourth, logs), ["P05", "P07", "P06", "P04"])
+        _, _, _, fourth, logs = self.fifth_sources(new_eliminated=["P04", "P03"])
+        self.assertEqual(collect_fifth_exile_players(fourth, logs), ["P05", "P07", "P06", "P04"])
+
+    def test_fifth_requires_the_shortest_source_prefix_with_nine_arrivals(self):
+        _, _, _, fourth, logs = self.fifth_sources()
+        with self.assertRaisesRegex(ValueError, "새 탈락자가 합류"):
+            collect_fifth_exile_players(fourth, logs[:-1])
+        _, _, _, fourth, logs = self.fifth_sources(queued=True)
+        prison = self.write("a", "day3-prison", DAY_THREE_PRISON,
+                            [name for name in PLAYERS if name not in {"P13", "P12", "P09", "P14", "P08", "P07", "P06", "P05", "P04"}],
+                            ["P03"], from_main=str(logs[-1]))
+        with self.assertRaisesRegex(ValueError, "첫 경기"):
+            collect_fifth_exile_players(fourth, [*logs, prison])
+
+    def test_fifth_recursively_validates_earlier_outcomes_and_campaign_sources(self):
+        first, _, _, fourth, logs = self.fifth_sources()
+        self.rewrite(first, result={"survivors": ["P13", "P13", "P09"]})
+        with self.assertRaisesRegex(ValueError, "첫 유배지 매치의 생존자"):
+            collect_fifth_exile_players(fourth, logs)
+        _, second, _, fourth, logs = self.fifth_sources()
+        self.rewrite(second, result={"survivors": ["P08", "P08"]})
+        with self.assertRaisesRegex(ValueError, "두 번째 유배지 매치의 생존자"):
+            collect_fifth_exile_players(fourth, logs)
+        _, _, _, fourth, logs = self.fifth_sources()
+        other = self.first_day("b")
+        self.rewrite(fourth, header={"from_matches": [str(path) for path in [*other, *logs[2:5]]]})
+        with self.assertRaisesRegex(ValueError, "같은 캠페인"):
+            collect_fifth_exile_players(fourth, logs)
+
+    def test_fifth_rejects_wrong_predecessor_and_missing_or_invalid_survivors(self):
+        _, _, third, fourth, logs = self.fifth_sources()
+        with self.assertRaisesRegex(ValueError, FOURTH_EXILE):
+            collect_fifth_exile_players(third, logs)
+        self.rewrite(fourth, header={"from_exile": "missing-exile3.jsonl"})
+        with self.assertRaisesRegex(ValueError, "세 번째 유배지 매치의 기록"):
+            collect_fifth_exile_players(fourth, logs)
+        for updates in (
+            {"header": {"players": ["P07", "P08", "P06", "P04"]}},
+            {"result": {"survivors": ["P05", "P07"]}},
+            {"result": {"survivors": ["P05", "P07", "P07"]}},
+            {"result": {"survivors": ["P05", "P07", False]}},
+            {"result": {"eliminated": ["P06"]}},
+        ):
+            with self.subTest(updates=updates):
+                _, _, _, fourth, logs = self.fifth_sources()
+                self.rewrite(fourth, **updates)
+                with self.assertRaisesRegex(ValueError, "네 번째 유배지 매치의 생존자"):
+                    collect_fifth_exile_players(fourth, logs)
+
+    def test_fifth_resolves_the_entire_portable_exported_exile_chain(self):
+        first, second, third, fourth, logs = self.fifth_sources()
+        for path in [first, second, third, fourth]:
+            header = json.loads(path.read_text().splitlines()[0])
+            updates = {"from_matches": [str(Path(source).relative_to(self.root)) for source in header["from_matches"]]}
+            if "from_exile" in header:
+                updates["from_exile"] = str(Path(header["from_exile"]).relative_to(self.root))
+            self.rewrite(path, header=updates)
+        self.assertEqual(collect_fifth_exile_players(fourth, logs), ["P05", "P07", "P06", "P04"])
 
 
 if __name__ == "__main__":

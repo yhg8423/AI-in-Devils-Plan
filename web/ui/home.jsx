@@ -20,6 +20,7 @@ const games = [
   {session: "유배지 매치 2", name: "틀린 그림 찾기", description: tr("원본을 기억하고 달라진 다섯 곳을 찾아 두 명의 생존자를 가린다.", "Remember the original and find five changes to secure one of two survival places.")},
   {session: "유배지 매치 3", name: "비밀 코드", description: tr("26장 카드의 단서로 네 글자 코드를 추리하고 버저로 생존을 확정한다.", "Deduce a four-letter code from 26 cards and their clues, then buzz to secure survival.")},
   {session: "유배지 매치 4", name: "울타리 치기", description: tr("같은 숫자 퍼즐에 하나의 고리를 그려 먼저 완성한 세 명이 생존한다.", "Draw one closed loop on the shared number puzzle; the first three finishers survive.")},
+  {session: "유배지 매치 5", name: "대칭 퍼즐", description: tr("파랑·빨강·초록 조각으로 세 대칭 도형을 완성해 마지막 탈락을 피한다.", "Complete symmetric shapes from blue, red and green pieces to avoid finishing last.")},
 ];
 
 export function runHref(id = "", caseId) {

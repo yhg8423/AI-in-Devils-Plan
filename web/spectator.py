@@ -14,8 +14,9 @@ from urllib.parse import parse_qs, urlsplit
 from games.either_or.lay_the_grass.board import PARK_ROWS
 from games.exile_match.roster import (
     collect_exile_players, collect_second_exile_players, collect_third_exile_players, collect_fourth_exile_players,
+    collect_fifth_exile_players,
 )
-from games.match import FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE
+from games.match import FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE
 
 
 UI = Path(__file__).with_name("ui")
@@ -35,7 +36,7 @@ EVENT_TYPES = {
 }
 EVENT_FIELDS = ("msg_type", "agent_name", "content", "visible_to")
 CASE_STAGES = ("1일차 메인 매치", "1일차 감옥 매치", "2일차 메인 매치", "2일차 감옥 매치", "3일차 메인 매치", "3일차 감옥 매치", "4일차 메인 매치", "4일차 감옥 매치")
-EXILE_GAMES = (FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE)
+EXILE_GAMES = (FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE)
 
 
 def find_matches(root: Path) -> dict[str, Path]:
@@ -135,7 +136,7 @@ def exile_sources(root: Path, header: dict, logs, *, previous_exile: Path | None
         if (previous_exile is None or previous_exile.resolve() not in source_paths(root, header.get("from_exile"))):
             raise ValueError("The exile match must point to this campaign's preceding exile match.")
         collectors = {SECOND_EXILE: collect_second_exile_players, THIRD_EXILE: collect_third_exile_players,
-                      FOURTH_EXILE: collect_fourth_exile_players}
+                      FOURTH_EXILE: collect_fourth_exile_players, FIFTH_EXILE: collect_fifth_exile_players}
         players = collectors[header["game"]](previous_exile, sources)
     if header.get("players") != players:
         raise ValueError("The exile roster must match the campaign's entrants and survivors in source order.")

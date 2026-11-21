@@ -2,6 +2,7 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  symmetry_arrange: tr("세 색 조립", "Arrange all three colors"),
   fence_draw: tr("울타리 그리기", "Draw the loop"),
   secret_think: tr("비밀 코드 추리", "Secret Code deduction"),
   picture_memorize: tr("원본 기억", "Remember the original"), picture_answer: tr("달라진 부분 표시", "Mark the changes"),
