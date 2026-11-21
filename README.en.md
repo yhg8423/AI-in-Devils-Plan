@@ -83,6 +83,8 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/codex-example/day1-main/events.jsonl
 ```
 
+Codex requests time out after 300 seconds by default. Prefix the command with `DEVILS_PLAN_CODEX_TIMEOUT_SECONDS=600` to allow longer image requests. After a timeout, resume with `--resume` and the same output path.
+
 ### OpenAI Responses API
 
 Set `OPENAI_API_KEY` in your environment or in a `.env` file at the repository root. If you do not have a `.env` file, copy the example with the command below and enter your key after `OPENAI_API_KEY=`.

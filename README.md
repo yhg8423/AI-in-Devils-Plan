@@ -83,6 +83,8 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/codex-example/day1-main/events.jsonl
 ```
 
+Codex 요청의 기본 대기 제한은 300초입니다. 긴 이미지 요청은 실행 명령 앞에 `DEVILS_PLAN_CODEX_TIMEOUT_SECONDS=600`을 붙여 늘릴 수 있습니다. 시간 초과로 중단되면 같은 출력 경로에 `--resume`을 지정합니다.
+
 ### OpenAI Responses API
 
 `OPENAI_API_KEY`를 환경 변수나 프로젝트 루트의 `.env`에 설정합니다. `.env`가 없다면 아래 명령으로 예시 파일을 복사한 뒤 `OPENAI_API_KEY=`에 키를 입력합니다.

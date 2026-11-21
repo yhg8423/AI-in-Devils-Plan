@@ -1,17 +1,18 @@
 """Race to assemble three privately editable reflection-symmetric silhouettes."""
 
 from base64 import b64decode
+from collections import deque
 from copy import deepcopy
 import json
 
 from ...match import Decision, Match, encode
-from .puzzles import COLORS, align_placement, assembled_shape, board, judge, make_puzzles, placement_polygon, reflection_axes
+from .puzzles import COLORS, align_placement, assembled_shape, board, judge, make_puzzles, piece_atlas, placement_polygon, reflection_axes
 
 
 WAIT = encode({"type": "wait"})
 MAX_ACTION_SIZE = 8192
 
-RULES = """대칭 퍼즐 · 개인전
+LEGACY_RULES = """대칭 퍼즐 · 개인전
 
 파랑·빨강·초록, 세 색의 조각을 각각 하나의 선대칭 도형으로 만드세요.
 각 색의 조각을 빠짐없이 한 번씩 쓰고, 서로 겹치거나 떨어지지 않게 변끼리 이어 붙여야 합니다.
@@ -47,6 +48,41 @@ submit:true이면 배치와 버저를 한 행동으로 제출합니다. false이
 시드 기반 우선순위를 따릅니다. 마지막 생존 자리가 채워지면 뒤의 버저는 처리하지 않습니다.
 별도 라운드·전체 시간 제한·대화·관계 평가는 없습니다. 호출 상한이 끝나면 스크립트 시연 행동으로 이어갑니다.
 """
+
+MODERN_INSTRUCTIONS = """\n부분 접합도 가능합니다. 길이가 다른 변도 일부가 양의 길이만큼 맞닿으면 연결됩니다.
+꼭짓점 하나만 닿는 점 접촉은 연결로 인정하지 않습니다.
+첨부 이미지 여섯 장은 현재 blue·red·green 작업판, 이어서 같은 순서의 고정 조각 상세도입니다.
+상세도는 조각의 변·꼭짓점을 읽는 자료이며 정답 배치나 색별 판정은 제공하지 않습니다.
+한 생각 구간에서 초안과 추가 검토를 합쳐 최대 세 번 판단할 수 있습니다. 추가 검토에서는
+내 초안의 작업판 그림을 다시 봅니다. 이는 버저 검사나 정답 힌트가 아닙니다.
+최근 최종 전략 메모와 전체 검사 실패 기록을 참고해 이미 시도한 배치를 반복하지 마세요.
+전체 검사 실패는 어느 색이 틀렸는지 알려주지 않습니다.
+전략 메모에는 선택한 행동과 짧은 근거만 요약하세요.
+"""
+RULES = LEGACY_RULES + MODERN_INSTRUCTIONS
+
+
+def _initial_protocol(match):
+    log = match.resume_log
+    if log is not None and log.resume:
+        setup = next((json.loads(row["content"]) for row in log.events if row["msg_type"] == "sym_setup"), None)
+        rules = next((row["content"] for row in log.events if row["msg_type"] == "rules"), None)
+        if setup is not None:
+            return setup["version"], rules or (LEGACY_RULES if setup["version"] == 2 else RULES)
+    return 3, RULES
+
+
+def _upgrade_ready(match):
+    log = match.resume_log
+    if log is None or not log.resume:
+        return False
+    if log.events_seen < len(log.events):
+        return log.events[log.events_seen]["msg_type"] == "sym_tools"
+    return not log.journal.remaining
+
+
+def _image_bytes(images):
+    return tuple(b64decode(image["image"].partition(",")[2], validate=True) for image in images)
 
 
 def parse_action(text, puzzles):
@@ -93,22 +129,37 @@ def play(match: Match):
     match.model_observations = lambda name, events: [event for event in events if event.msg_type == "rules"]
     priority = match.rng.sample(players, len(players))
     puzzles = make_puzzles(match.rng.randrange(2 ** 32))
-    initial_boards = {puzzle["id"]: board(puzzle) for puzzle in puzzles}
+    version, rules = _initial_protocol(match)
+    modern = version >= 3
+    initial_boards = {puzzle["id"]: board(puzzle, detailed=True) if modern else board(puzzle) for puzzle in puzzles}
+    atlases = {puzzle["id"]: piece_atlas(puzzle) for puzzle in puzzles} if modern else {}
     states = {name: {"placements": {color: [] for color in COLORS}, "boards": initial_boards.copy()}
               for name in players}
+    own_notes = {name: deque(maxlen=3) for name in players}
+    own_failures = {name: deque(maxlen=12) for name in players}
     attempts, last_verdict = dict.fromkeys(players, 0), dict.fromkeys(players, None)
     finishes, winners, window = [], [], 0
     slots = len(players) - 1
-    match.event("rules", RULES)
-    match.event("sym_setup", {"version": 2, "players": players, "priority": priority,
-                              "survivors": slots, "mode": "polygons"})
+    match.event("rules", rules)
+    match.event("sym_setup", {"version": version, "players": players, "priority": priority,
+                              "survivors": slots, "mode": "polygons", **({"thinking_passes": 3} if modern else {})})
     match.event("sym_puzzles", {"puzzles": [{"id": puzzle["id"], "label": puzzle["label"],
-        "piece_ids": [piece["id"] for piece in puzzle["pieces"]], "board": initial_boards[puzzle["id"]]}
+        "piece_ids": [piece["id"] for piece in puzzle["pieces"]], "board": initial_boards[puzzle["id"]],
+        **({"details": atlases[puzzle["id"]]} if modern else {})}
         for puzzle in puzzles]})
     while len(winners) < slots:
         window += 1
         active = [name for name in players if name not in winners]
         match.event("sym_window", {"window": window, "active": active})
+        if not modern and _upgrade_ready(match):
+            modern = True
+            atlases = {puzzle["id"]: piece_atlas(puzzle) for puzzle in puzzles}
+            match.event("sym_tools", {"version": 3, "thinking_passes": 3,
+                                      "puzzles": [{"id": puzzle["id"], "details": atlases[puzzle["id"]]}
+                                                  for puzzle in puzzles]})
+            for state in states.values():
+                state["boards"] = {puzzle["id"]: board(puzzle, state["placements"][puzzle["id"]], detailed=True)
+                                   for puzzle in puzzles}
         scripted_times = {name: match.policy.randrange(1_000_000_000, 60_000_000_000) for name in active}
         decisions = {name: Decision(
             f"생각 구간 {window} · {name}. 파랑·빨강·초록 세 대칭 퍼즐을 모두 완성하세요.\n"
@@ -116,8 +167,9 @@ def play(match: Match):
             f"공개 버저 횟수: {encode(attempts)}. 동률 우선순위: {encode(priority)}.\n"
             f"내 마지막 전체 검사 결과: {encode(last_verdict[name])}. "
             f"내 이전 작업 배치: {encode(states[name]['placements'])}\n"
-            "첨부 이미지 세 장은 차례로 blue·red·green의 조각 보관함과 나의 현재 작업판입니다. "
-            "다른 참가자의 작업과 완성 예는 제공되지 않습니다. 각 색의 모든 조각을 겹침 없이 변으로 연결하고, "
+            + ("첨부 이미지 여섯 장은 blue·red·green의 현재 작업판, 이어서 같은 순서의 고정 조각 상세도입니다. "
+               if modern else "첨부 이미지 세 장은 차례로 blue·red·green의 조각 보관함과 나의 현재 작업판입니다. ")
+            + "다른 참가자의 작업과 완성 예는 제공되지 않습니다. 각 색의 모든 조각을 겹침 없이 변으로 연결하고, "
             "빈 공간을 포함한 전체 모양에 방향 제한 없이 하나 이상의 반사 대칭축을 만드세요. "
             "조각 경계 자체가 대칭일 필요는 없으며, 세 색 모두 조건을 만족해야 생존합니다.\n"
             "그림의 x는 오른쪽, y는 아래쪽으로 증가하는 연속 좌표입니다. 음수·소수도 허용합니다. "
@@ -134,21 +186,47 @@ def play(match: Match):
             '"red":[],"green":[]},"submit":false} 형식으로 세 색 전체 작업을 교체하세요. '
             "유지할 조각을 모두 포함하고 좌표 배치나 위의 접합 형식을 쓰세요. 빠진 조각은 치워지며 빈 목록은 그 색을 비웁니다. "
             "submit:true이면 세 색을 검사받도록 즉시 버저도 누릅니다. false이면 작업만 저장합니다. "
-            '{"type":"wait"}는 전체 작업을 그대로 유지합니다. 실패한 답안은 고쳐 다시 제출할 수 있습니다.',
+            '{"type":"wait"}는 전체 작업을 그대로 유지합니다. 실패한 답안은 고쳐 다시 제출할 수 있습니다.'
+            + (MODERN_INSTRUCTIONS
+               + f"\n내 최근 최종 전략 메모 (최대 3개): {encode(list(own_notes[name]))}"
+               + f"\n내 최근 전체 검사 실패 기록 (최대 12개): {encode(list(own_failures[name]))}"
+               if modern else ""),
             encode({"type": "arrange", "placements": {puzzle["id"]: puzzle["solution"] for puzzle in puzzles},
                     "submit": True}), valid=lambda action: _accepts(action, puzzles), invalid_default=WAIT)
             for name in active}
         elapsed = {}
+        decision_start = len(match.events)
+
+        def review_images(name, raw_draft):
+            try:
+                draft = parse_action(raw_draft, puzzles)
+            except (ValueError, TypeError, RecursionError):
+                draft = {"type": "wait"}
+            placements = draft["placements"] if draft["type"] == "arrange" else states[name]["placements"]
+            previews = [board(puzzle, placements[puzzle["id"]], detailed=True) for puzzle in puzzles]
+            return _image_bytes(previews + [atlases[puzzle["id"]] for puzzle in puzzles])
+
         replies = match.decide_together("symmetry_arrange", decisions, response_times=elapsed,
-            images_by_player={name: tuple(b64decode(states[name]["boards"][puzzle["id"]]["image"].partition(",")[2],
-                                                     validate=True) for puzzle in puzzles) for name in active})
+            images_by_player={name: _image_bytes([states[name]["boards"][puzzle["id"]] for puzzle in puzzles]
+                                                 + ([atlases[puzzle["id"]] for puzzle in puzzles] if modern else []))
+                              for name in active},
+            max_reviews=2 if modern else 0, review_images=review_images if modern else None)
+        final_notes = {}
+        for event in match.events[decision_start:]:
+            if event.msg_type == "decision_note" and event.agent_name in own_notes:
+                value = json.loads(event.content)
+                if value.get("phase") == "symmetry_arrange" and not value.get("review"):
+                    final_notes[event.agent_name] = value["note"]
+        for name, note in final_notes.items():
+            own_notes[name].append({"window": window, "note": note})
         submitting = []
         for name in active:
             action = parse_action(replies[name], puzzles)
             if action["type"] == "wait":
                 continue
             states[name] = {"placements": action["placements"],
-                           "boards": {puzzle["id"]: board(puzzle, action["placements"][puzzle["id"]]) for puzzle in puzzles}}
+                           "boards": {puzzle["id"]: board(puzzle, action["placements"][puzzle["id"]], detailed=True)
+                                      if modern else board(puzzle, action["placements"][puzzle["id"]]) for puzzle in puzzles}}
             match.event("sym_board", {"player": name, "window": window, **states[name],
                                       "submitted": action["submit"]}, private=[name], actor=name)
             if action["submit"]:
@@ -162,6 +240,8 @@ def play(match: Match):
             correct = all(judge(puzzle, states[name]["placements"][puzzle["id"]]) for puzzle in puzzles)
             last_verdict[name] = correct
             match.event("sym_verdict", {**common, "correct": correct, "reason": None if correct else "not_symmetric"}, actor=name)
+            if not correct:
+                own_failures[name].append({"window": window, "action": replies[name], "correct": False})
             if correct:
                 winners.append(name)
                 finish = {**common, "rank": len(winners)}

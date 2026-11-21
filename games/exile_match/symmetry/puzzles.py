@@ -3,7 +3,8 @@
 from base64 import b64encode
 from hashlib import sha256
 from io import BytesIO
-from math import atan2, cos, degrees, hypot, isfinite, pi, sin, sqrt
+from math import atan2, cos, degrees, floor, hypot, isfinite, log10, pi, sin, sqrt
+from pathlib import Path
 
 import pygame
 from shapely import symmetric_difference, union_all
@@ -179,13 +180,13 @@ def make_puzzles(seed):
     return load_puzzles(seed)
 
 
-def _label_layout(labels, bounds):
+def _label_layout(labels, bounds, *, radii=(0, 12, 24, 38, 54, 74)):
     """Separate nearby labels while preserving every exact geometry anchor."""
     bounds = pygame.Rect(bounds)
     placed = []
     for value, anchor, preferred, size in labels:
         candidates = []
-        for radius in (0, 12, 24, 38, 54, 74):
+        for radius in radii:
             for direction in range(8):
                 angle = direction * pi / 4
                 center = (preferred[0] + radius * cos(angle), preferred[1] + radius * sin(angle))
@@ -207,8 +208,10 @@ def _label_layout(labels, bounds):
     return placed
 
 
-def board(puzzle, placements=()):
+def board(puzzle, placements=(), *, detailed=False, language="en"):
     """Render polygons at a common tray scale and auto-fit the private workspace."""
+    if detailed:
+        return _detailed_board(puzzle, placements, language=language)
     pygame.font.init()
     factor = 2
     surface = pygame.Surface((WIDTH * factor, HEIGHT * factor))
@@ -317,3 +320,177 @@ def board(puzzle, placements=()):
     png = output.getvalue()
     return {"id": sha256(png).hexdigest()[:16], "width": WIDTH, "height": HEIGHT,
             "image": "data:image/png;base64," + b64encode(png).decode("ascii")}
+
+
+def _png_view(surface, name):
+    output = BytesIO()
+    pygame.image.save(surface, output, name)
+    png = output.getvalue()
+    return {"id": sha256(png).hexdigest()[:16], "width": surface.get_width(), "height": surface.get_height(),
+            "image": "data:image/png;base64," + b64encode(png).decode("ascii")}
+
+
+def _graphics_text(surface, value, font, color, position, *, center=False):
+    label = font.render(value, True, color)
+    position = tuple(round(coordinate) for coordinate in position)
+    surface.blit(label, label.get_rect(center=position) if center else position)
+
+
+def _graphics_polygon(surface, shape, transform, fill, outline="#173a50", width=3, background="#f6f4ea"):
+    points = [tuple(round(coordinate) for coordinate in transform(x, y)) for x, y in shape.exterior.coords]
+    pygame.draw.polygon(surface, fill, points)
+    if width:
+        pygame.draw.lines(surface, outline, True, points, width)
+    for ring in shape.interiors:
+        points = [tuple(round(coordinate) for coordinate in transform(x, y)) for x, y in ring.coords]
+        pygame.draw.polygon(surface, background, points)
+        if width:
+            pygame.draw.lines(surface, outline, True, points, width)
+
+
+def _polygon_annotations(shape, transform, *, prefix="", distance=28):
+    vertices = list(shape.exterior.coords)[:-1]
+    center = shape.centroid
+    labels = []
+    for number, ((ax, ay), (bx, by)) in enumerate(zip(vertices, vertices[1:] + vertices[:1])):
+        anchor = transform(ax, ay)
+        dx, dy = ax - center.x, ay - center.y
+        length = hypot(dx, dy) or 1
+        labels.append((f"{prefix}v{number}", anchor,
+                       (anchor[0] + dx / length * distance, anchor[1] + dy / length * distance)))
+        anchor = transform((ax + bx) / 2, (ay + by) / 2)
+        dx, dy = bx - ax, by - ay
+        length = hypot(dx, dy) or 1
+        sign = 1 if shape.exterior.is_ccw else -1
+        labels.append((f"{prefix}e{number}", anchor,
+                       (anchor[0] + sign * dy / length * distance, anchor[1] - sign * dx / length * distance)))
+    return labels
+
+
+def _draw_annotations(surface, labels, font, bounds):
+    sized = [(value, anchor, preferred, (font.size(value)[0] + 10, font.size(value)[1] + 6))
+             for value, anchor, preferred in labels]
+    routed = _label_layout(sized, bounds, radii=(0, 20, 40, 70, 110, 160, 220, 300, 400, 550, 750))
+    for value, anchor, rectangle in routed:
+        endpoint = (min(max(anchor[0], rectangle.left), rectangle.right),
+                    min(max(anchor[1], rectangle.top), rectangle.bottom))
+        color = "#975867" if value.split(".")[-1].startswith("v") else "#376e8c"
+        pygame.draw.line(surface, color, anchor, endpoint, 2)
+        pygame.draw.circle(surface, color, tuple(round(coordinate) for coordinate in anchor), 3)
+    for value, anchor, rectangle in routed:
+        color = "#633645" if value.split(".")[-1].startswith("v") else "#234d64"
+        pygame.draw.rect(surface, "#fffef5", rectangle, border_radius=3)
+        _graphics_text(surface, value, font, color, rectangle.center, center=True)
+    return routed
+
+
+def _prose_fonts(language, korean_sizes, english_sizes):
+    font = str(Path(__file__).resolve().parents[3] / "web/ui/assets/Galmuri11-Bold.ttf") if language == "ko" else None
+    return tuple(pygame.font.Font(font, size) for size in (korean_sizes if language == "ko" else english_sizes))
+
+
+def piece_atlas(puzzle, *, language="en"):
+    """Public, independently enlarged pieces; no placements or solution data are read."""
+    pygame.font.init()
+    surface = pygame.Surface((1440, 1100))
+    surface.fill("#111d2e")
+    korean = language == "ko"
+    title, body = _prose_fonts(language, (32, 22), (44, 30))
+    label = pygame.font.Font(None, 32)
+    _graphics_text(surface, f"{COLORS[puzzle['id']][0]} / 조각 확대도" if korean else f"{puzzle['id'].upper()} / PIECE ATLAS",
+                   title, "#f5dfb6", (36, 25))
+    _graphics_text(surface, "조각별 확대 · 배율이 서로 다름 · 뒤집기 금지" if korean else "INDIVIDUAL ZOOM / SCALES DIFFER / NO FLIPS",
+                   body, "#d7e5f3", (36, 78))
+    gap, margin = 24, 36
+    card_width = (surface.get_width() - margin * 2 - gap * (len(puzzle["pieces"]) - 1)) / len(puzzle["pieces"])
+    color = pygame.Color(COLORS[puzzle["id"]][1])
+    for index, piece in enumerate(puzzle["pieces"]):
+        card = pygame.Rect(round(margin + index * (card_width + gap)), 133, round(card_width), 870)
+        pygame.draw.rect(surface, "#e9edf0", card, border_radius=12)
+        _graphics_text(surface, piece["id"], title, "#172d44", (card.x + 22, card.y + 18))
+        shape = _piece_polygon(piece)
+        left, top, right, bottom = shape.bounds
+        _graphics_text(surface, f"가로 {right-left:.4g} / 세로 {bottom-top:.4g}" if korean else f"width {right-left:.4g} / height {bottom-top:.4g}",
+                       body, "#405a70", (card.x + 22, card.y + 66))
+        unit = min((card.width - 120) / (right - left), (card.height - 270) / (bottom - top))
+        ox = card.centerx - (left + right) / 2 * unit
+        oy = card.y + 120 + (card.height - 270) / 2 - (top + bottom) / 2 * unit
+        # A positive uniform scale preserves the original chirality, order, and orientation.
+        transform = lambda x, y: (ox + x * unit, oy + y * unit)
+        _graphics_polygon(surface, shape, transform, color)
+        _draw_annotations(surface, _polygon_annotations(shape, transform, distance=38), label,
+                          (card.x + 10, card.y + 103, card.width - 20, card.height - 208))
+        target_units = (card.width - 90) / unit
+        magnitude = 10 ** floor(log10(target_units))
+        ruler_units = max(value * magnitude for value in (1, 2, 5) if value * magnitude <= target_units)
+        length = ruler_units * unit
+        x, y = card.centerx - length / 2, card.bottom - 68
+        pygame.draw.line(surface, "#405a70", (x, y), (x + length, y), 3)
+        for end in (x, x + length):
+            pygame.draw.line(surface, "#405a70", (end, y - 8), (end, y + 8), 3)
+        _graphics_text(surface, f"{ruler_units:g} 단위" if korean else f"{ruler_units:g} units", body, "#405a70", (card.centerx, y + 28), center=True)
+    _graphics_text(surface, "vN: 꼭짓점 / eN: vN에서 다음 꼭짓점으로 가는 변 / 원래 번호 순서 유지" if korean else
+                   "vN: vertex / eN: directed edge from vN to the next vertex / labels keep the original order",
+                   body, "#d7e5f3", (36, 1045))
+    return _png_view(surface, "symmetry-atlas.png")
+
+
+def _detailed_board(puzzle, placements, *, language="en"):
+    """A larger editing view with ownership and geometric overlaps, without symmetry hints."""
+    pygame.font.init()
+    surface = pygame.Surface((WIDTH, HEIGHT))
+    surface.fill("#111d2e")
+    korean = language == "ko"
+    title, body = _prose_fonts(language, (26, 18), (34, 22))
+    label = pygame.font.Font(None, 22)
+    _graphics_text(surface, f"{COLORS[puzzle['id']][0]} / 현재 작업판" if korean else f"{puzzle['id'].upper()} / CURRENT ASSEMBLY",
+                   title, "#f5dfb6", (28, 20))
+    _graphics_text(surface, "조각 ID가 붙은 꼭짓점 v·변 e / 원래 조각 모양은 확대도 참고" if korean else
+                   "Piece-prefixed v/e labels / separate atlas for larger original pieces", body, "#d7e5f3", (28, 62))
+    workspace = pygame.Rect(28, 100, 904, 476)
+    pygame.draw.rect(surface, "#f6f4ea", workspace, border_radius=10)
+    working = [(value, placement_polygon(puzzle, value)) for value in placements]
+    if not working:
+        _graphics_text(surface, "배치한 조각 없음 · 조각 확대도를 참고하세요" if korean else
+                       "No pieces placed / use the separate piece atlas", title, "#677b88", workspace.center, center=True)
+    else:
+        bounds = [shape.bounds for _, shape in working]
+        left, top = min(value[0] for value in bounds), min(value[1] for value in bounds)
+        right, bottom = max(value[2] for value in bounds), max(value[3] for value in bounds)
+        unit = min((workspace.width - 150) / (right - left), (workspace.height - 110) / (bottom - top))
+        ox = workspace.centerx - (left + right) / 2 * unit
+        oy = workspace.centery - (top + bottom) / 2 * unit
+        transform = lambda x, y: (ox + x * unit, oy + y * unit)
+        color = pygame.Color(COLORS[puzzle["id"]][1])
+        outlines = ("#123d58", "#682c59", "#725018")
+        for index, (value, shape) in enumerate(working):
+            _graphics_polygon(surface, shape, transform, color.lerp(pygame.Color("#ffffff"), .12 * (index % 3)))
+        mask = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        for index, (_, first) in enumerate(working):
+            for _, second in working[:index]:
+                overlap = first.intersection(second)
+                regions = [overlap] if overlap.geom_type == "Polygon" else getattr(overlap, "geoms", ())
+                for region in regions:
+                    if region.geom_type == "Polygon" and region.area * unit * unit > .5:
+                        part = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+                        _graphics_polygon(part, region, transform, (255, 255, 255, 255), width=0, background=(0, 0, 0, 0))
+                        mask.blit(part, (0, 0), special_flags=pygame.BLEND_RGBA_MAX)
+        hatch = pygame.Surface(surface.get_size(), pygame.SRCALPHA)
+        for x in range(workspace.left - workspace.height, workspace.right, 12):
+            pygame.draw.line(hatch, "#f36bba", (x, workspace.top), (x + workspace.height, workspace.bottom), 2)
+        hatch.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MULT)
+        surface.blit(hatch, (0, 0))
+        annotations = []
+        for index, (value, shape) in enumerate(working):
+            points = [tuple(round(coordinate) for coordinate in transform(x, y)) for x, y in shape.exterior.coords]
+            pygame.draw.lines(surface, outlines[index % len(outlines)], True, points, 4)
+            annotations.extend(_polygon_annotations(shape, transform, prefix=value["piece"] + ".", distance=24))
+        _draw_annotations(surface, annotations, label, workspace.inflate(-10, -10))
+        for value, shape in working:
+            point = shape.representative_point()
+            _graphics_text(surface, value["piece"], title, "#ffffff", transform(point.x, point.y), center=True)
+        _graphics_text(surface, f"x {left:.5g} .. {right:.5g} / y {top:.5g} .. {bottom:.5g}", body, "#d7e5f3", (28, 590))
+    _graphics_text(surface, f"배치 {len(placements)} / {len(puzzle['pieces'])} · 빗금은 겹친 영역" if korean else
+                   f"PLACED {len(placements)} / {len(puzzle['pieces'])} / hatching marks overlapping area",
+                   body, "#d7e5f3", (28, 615))
+    return _png_view(surface, "symmetry-edit.png")

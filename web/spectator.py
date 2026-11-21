@@ -2,10 +2,12 @@
 
 import argparse
 from collections import Counter
+from functools import lru_cache
 from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+from random import Random
 import subprocess
 import sys
 from threading import Lock
@@ -316,6 +318,70 @@ def read_translations(log: Path) -> tuple[dict, str | None]:
     return translations, sha256(data).hexdigest() if translations else None
 
 
+_symmetry_render_lock = Lock()
+
+
+@lru_cache(maxsize=16)
+def _symmetry_puzzles(seed):
+    from games.exile_match.symmetry.puzzles import make_puzzles
+
+    return {puzzle["id"]: puzzle for puzzle in make_puzzles(seed)}
+
+
+# Keep only KO views, with a ceiling large enough for full-history replay polls.
+@lru_cache(maxsize=4096)
+def _korean_symmetry_image(seed, color, placements, original_id):
+    from games.exile_match.symmetry.puzzles import board, piece_atlas
+
+    with _symmetry_render_lock:
+        try:
+            puzzle = _symmetry_puzzles(seed)[color]
+            if placements is None:
+                render = lambda **kwargs: piece_atlas(puzzle, **kwargs)
+            else:
+                placed = [dict(zip(("piece", "x", "y", "rotation"), value, strict=True)) for value in placements]
+                render = lambda **kwargs: board(puzzle, placed, detailed=True, **kwargs)
+            # Never substitute current geometry for a differently rendered archive.
+            if render()["id"] != original_id:
+                return None
+            return render(language="ko")
+        except (KeyError, TypeError, ValueError):
+            return None
+
+
+def _localize_symmetry_images(content, kind, seed):
+    data = json.loads(content)
+    changed = False
+
+    def localize(image, color, placements=None):
+        nonlocal changed
+        if not isinstance(image, dict) or not isinstance(image.get("id"), str):
+            return image
+        try:
+            key = None if placements is None else tuple(
+                (value["piece"], value["x"], value["y"], value["rotation"]) for value in placements)
+            localized = _korean_symmetry_image(seed, color, key, image["id"])
+        except (KeyError, TypeError, ValueError):
+            return image
+        if localized is None:
+            return image
+        changed = True
+        return {**image, **localized}
+
+    if kind in ("sym_puzzles", "sym_tools"):
+        for puzzle in data["puzzles"]:
+            if "board" in puzzle:
+                puzzle["board"] = localize(puzzle["board"], puzzle["id"], ())
+            if "details" in puzzle:
+                puzzle["details"] = localize(puzzle["details"], puzzle["id"])
+    else:
+        workspaces = [data] if kind == "sym_board" else data["boards"].values()
+        for working in workspaces:
+            for color, image in working["boards"].items():
+                working["boards"][color] = localize(image, color, working["placements"][color])
+    return json.dumps(data, ensure_ascii=False) if changed else content
+
+
 def read_match(log: Path, *, language: str = "ko") -> dict:
     # The writer appends newline-terminated rows. Leave an in-flight row for the next poll.
     rows = [json.loads(line) for line in log.read_bytes().split(b"\n")[:-1] if line.strip()]
@@ -325,9 +391,21 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
     full_match = "game" in header
     translations, version = read_translations(log) if language == "en" else ({}, None)
     translated = {"translation_version": version} if version else {}
+    symmetry_seed, symmetry_modern = None, False
+    if language == "ko" and header.get("game") == FIFTH_EXILE:
+        rng = Random(header["seed"])
+        rng.sample(header["players"], len(header["players"]))
+        symmetry_seed = rng.randrange(2 ** 32)
 
     def event_payload(event: dict, turn: int) -> dict:
+        nonlocal symmetry_modern
         payload = {key: event[key] for key in EVENT_FIELDS}
+        kind = event["msg_type"]
+        if symmetry_seed is not None:
+            if kind in ("sym_setup", "sym_tools"):
+                symmetry_modern = json.loads(event["content"])["version"] >= 3
+            if symmetry_modern and kind in ("sym_puzzles", "sym_tools", "sym_board", "sym_reveal"):
+                payload["content"] = _localize_symmetry_images(event["content"], kind, symmetry_seed)
         if full_match and type(event.get("turn")) is int:
             turn = event["turn"]
         if turn in translations:

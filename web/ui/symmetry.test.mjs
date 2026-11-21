@@ -21,6 +21,9 @@ const pieces = {blue: ["B1", "B2"], red: ["R1", "R2", "R3"], green: ["G1", "G2",
 const event = (msg_type, data, visible_to = "all", agent_name = "System") => ({events: [{msg_type, content: typeof data === "string" ? data : JSON.stringify(data), visible_to, agent_name}]});
 const setupData = (players) => ({version: 2, mode: "polygons", players, priority: [...players].reverse(), survivors: players.length - 1});
 const puzzlesData = {puzzles: colors.map((color) => ({id: color, label: {blue: "파랑", red: "빨강", green: "초록"}[color], piece_ids: pieces[color], board: image(`PUBLIC-${color}`)}))};
+const detailImage = (color) => ({...image(`DETAILS-${color}`), width: 2048, height: 1792});
+const detailedPuzzles = {puzzles: puzzlesData.puzzles.map((puzzle) => ({...puzzle, details: detailImage(puzzle.id)}))};
+const toolsData = {version: 3, thinking_passes: 3, puzzles: colors.map((id) => ({id, details: detailImage(id)}))};
 const puzzles = event("sym_puzzles", puzzlesData);
 const window = (players, number = 1) => event("sym_window", {window: number, active: players});
 const workingData = (player, full = false) => ({player, window: full ? 2 : 1,
@@ -44,6 +47,50 @@ function render(players, steps, {language = "ko", view = "public", selected = ""
 }
 
 for (const language of ["ko", "en"]) {
+  test(`${language}: enlarged public piece details preserve aspect and privacy while own workspace remains available`, () => {
+    const players = ["P01", "P02", "P03"];
+    const steps = [event("sym_setup", {...setupData(players), version: 3}), event("sym_puzzles", detailedPuzzles), window(players), ...players.map((player) => drawing(player)), ...players.map(privateNote)];
+    const publicView = render(players, steps, {language, selected: "P02"});
+    assert.match(publicView, /data-board-id="PUBLIC-blue"/);
+    assert.match(publicView, /width="2048" height="1792"[^>]+data-image-kind="details" data-image-id="DETAILS-blue"/);
+    assert.match(publicView, language === "ko" ? />조각 세부</ : />Piece details</);
+    assert.match(publicView, language === "ko" ? />작업판</ : />Workspace</);
+    assert.match(publicView, language === "ko" ? /원본 크기 · 100%/ : /Original size · 100%/);
+    assert.match(publicView, language === "ko" ? /가로·세로로 스크롤/ : /Scroll horizontally and vertically/);
+    assert.match(publicView, language === "ko" ? /길이가 다른 변이나 변의 일부끼리/ : /Edges may have different lengths and touch along only part of an edge/);
+    assert.match(publicView, language === "ko" ? /꼭짓점만 닿으면 연결로 인정하지 않습니다/ : /Point-only contact does not connect pieces/);
+    assert.match(publicView, language === "ko" ? /자신의 메모와 최근 실패 기록/ : /Your own memo and recent failed attempts/);
+    assert.match(publicView, language === "ko" ? /최대 3번/ : /up to 3 private strategy passes/);
+    assert.match(publicView, language === "ko" ? /그 전에 배치를 확정/ : /finalize the arrangement earlier/);
+    assert.match(publicView, language === "ko" ? /색별 정답 여부나 정답 대칭축은 알려주지 않습니다/ : /without color-specific feedback or solution axes/);
+    assert.doesNotMatch(publicView, /P0\d-PRIVATE-|PRIVATE-STRATEGY|data-axis=/);
+    for (const player of players) assert.equal(publicView.includes(image(`${player}-PRIVATE-blue`).image), false);
+    const ownView = render(players, steps, {language, view: "P01", selected: "P02"});
+    assert.match(ownView, /data-board-id="P01-PRIVATE-blue"/);
+    assert.match(ownView, /data-image-id="DETAILS-blue"/);
+    assert.match(render(players, steps, {language, view: "P01", selected: "P01"}), /PRIVATE-STRATEGY-P01/);
+    assert.doesNotMatch(ownView, /P02-PRIVATE-|PRIVATE-STRATEGY-P02/);
+    assert.equal(ownView.includes(image("P02-PRIVATE-blue").image), false);
+  });
+  test(`${language}: old v2 records enlarge their workspace without a missing details tab or new review claims`, () => {
+    const players = ["P01", "P02", "P03"];
+    const html = render(players, [event("sym_setup", setupData(players)), puzzles, window(players)], {language});
+    assert.match(html, /data-image-kind="workspace" data-image-id="PUBLIC-blue"/);
+    assert.doesNotMatch(html, /DETAILS-|data-image-kind="details"/);
+    assert.doesNotMatch(html, language === "ko" ? /확대 이미지 종류|최대 3번/ : /Enlarged image type|up to 3 private strategy passes/);
+  });
+  test(`${language}: sym_tools adds public detail images to a resumed v2 match without exposing private work`, () => {
+    const players = ["P01", "P02", "P03"];
+    const steps = [event("sym_setup", setupData(players)), puzzles, window(players), drawing("P01"), event("sym_tools", toolsData)];
+    const before = render(players, steps, {language, frame: steps.length - 1});
+    assert.doesNotMatch(before, /DETAILS-|data-image-kind="details"/);
+    const after = render(players, steps, {language});
+    assert.match(after, /data-image-id="DETAILS-blue"/);
+    assert.match(after, language === "ko" ? /조각 세부 이미지와 비공개 전략 검토 적용/ : /Piece detail images and private strategy reviews enabled/);
+    assert.match(after, language === "ko" ? /최대 3번/ : /up to 3 private strategy passes/);
+    assert.doesNotMatch(after, /P01-PRIVATE-|PRIVATE-STRATEGY|data-axis=/);
+    assert.match(render(players, steps, {language, view: "P01"}), /data-board-id="P01-PRIVATE-blue"/);
+  });
   for (const count of [3, 4]) {
     const players = Array.from({length: count}, (_, i) => `P0${i + 1}`);
     test(`${language}, ${count} players: three color tabs, native enlargement and N−1 finish places share the existing corner platforms`, () => {
@@ -173,6 +220,37 @@ test("full replacement action summary covers every color and never turns malform
   assert.equal(api.en.symmetryActionText('not JSON'), "Invalid arrangement action");
 });
 
+test("public piece atlases are copied without private or answer fields, and migration preserves existing boards and history", () => {
+  const players = ["P01", "P02", "P03"], state = {};
+  api.en.applySymmetryEvent(state, "sym_setup", setupData(players));
+  const data = structuredClone(detailedPuzzles);
+  for (const puzzle of data.puzzles) Object.assign(puzzle.details, {placements: "SECRET-WORKSPACE", axes: "SECRET-AXES", solution: "SECRET-SOLUTION"});
+  api.en.applySymmetryEvent(state, "sym_puzzles", data, {step: 2});
+  for (const color of colors) assert.deepEqual(state.symPuzzles.find(({id}) => id === color).details, detailImage(color));
+  data.puzzles[0].details.image = "MUTATED";
+  assert.equal(state.symPuzzles[0].details.image, detailImage("blue").image);
+  api.en.applySymmetryEvent(state, "sym_board", workingData("P01"), {step: 4});
+  api.en.applySymmetryEvent(state, "sym_verdict", {player: "P01", window: 1, attempt: 1, correct: false}, {step: 5});
+  const beforeBoards = structuredClone(state.symBoards), beforeAttempts = structuredClone(state.symAttempts);
+  const migration = structuredClone(toolsData);
+  migration.puzzles[0].details.image = "NEW-ATLAS";
+  migration.puzzles[0].details.solution = "SECRET-SOLUTION";
+  migration.puzzles.push({id: "SECRET-EXTRA-PUZZLE", details: image("SECRET-EXTRA")});
+  api.en.applySymmetryEvent(state, "sym_tools", migration, {step: 6});
+  assert.equal(state.symSetup.version, 3);
+  assert.equal(state.symSetup.thinking_passes, 3);
+  assert.equal(state.symPuzzles[0].details.image, "NEW-ATLAS");
+  assert.equal(state.symPuzzles[0].step, 2);
+  assert.equal(state.symPuzzles.length, 3);
+  assert.deepEqual(state.symPuzzles[0].piece_ids, pieces.blue);
+  assert.deepEqual(state.symPuzzles[0].board, image("PUBLIC-blue"));
+  assert.deepEqual(state.symBoards, beforeBoards);
+  assert.deepEqual(state.symAttempts, beforeAttempts);
+  migration.puzzles[0].details.image = "MUTATED";
+  assert.equal(state.symPuzzles[0].details.image, "NEW-ATLAS");
+  assert.doesNotMatch(JSON.stringify(state), /SECRET-|MUTATED/);
+});
+
 test("English rules describe the recovered polygon sets and continuous placement without a fixed grid", () => {
   const summary = api.en.rulesSummary("대칭 퍼즐 · 게임 규칙", "");
   assert.match(summary, /two, three and three polygon pieces respectively/);
@@ -185,5 +263,14 @@ test("English rules describe the recovered polygon sets and continuous placement
   assert.match(summary, /labels start at zero/);
   assert.match(summary, /need not be edge endpoints/);
   assert.match(summary, /does not search for solutions or correct choices/);
+  assert.match(summary, /Edges may have different lengths and touch along only part of an edge/);
+  assert.match(summary, /point-only contact does not connect pieces/);
+  assert.match(summary, /without color-specific feedback or solution axes/);
+  assert.doesNotMatch(summary, /three private strategy passes|Public piece detail images/);
+  const modern = api.en.rulesSummary("대칭 퍼즐 · 게임 규칙", "고정 조각 상세도와 최대 세 번의 판단");
+  assert.match(modern, /Public piece detail images enlarge the vertex v and edge e labels/);
+  assert.match(modern, /Your own memo and recent failed attempts carry into the next thinking window/);
+  assert.match(modern, /up to three private strategy passes/);
+  assert.match(modern, /finalize the arrangement earlier/);
   assert.doesNotMatch(summary, /10×10|10x10|0°, 90°, 180° and 270°/);
 });

@@ -17,7 +17,12 @@
 .sym-zoom-dialog::backdrop { background: #060b12dc; }
 .sym-zoom-dialog header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
 .sym-zoom-dialog h2 { margin: 0; font: 700 16px var(--pixel-font); }
-.sym-zoom-dialog img { display: block; width: 100%; height: auto; image-rendering: auto; }
+.sym-zoom-scale { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.sym-zoom-scale button[aria-pressed="true"] { border-color: #ffe0a2; background: #5b4d34; }
+.sym-zoom-help { font-size: 12px; line-height: 1.6; color: #c6d0d9; }
+.sym-zoom-image { max-height: 68vh; overflow: auto; background: #0b121a; }
+.sym-zoom-image img { display: block; width: auto; max-width: 100%; max-height: 68vh; height: auto; margin: auto; image-rendering: auto; }
+.sym-zoom-image[data-scale="actual"] img { max-width: none; max-height: none; margin: 0; }
 .sym-stage { min-width: 0; }
 .sym-stage h2 { margin-top: 0; }
 .sym-phase { color: #eac88e; font-weight: 700; }
