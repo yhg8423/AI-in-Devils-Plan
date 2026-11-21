@@ -36,6 +36,22 @@ from .wall_go.game import play as wall_go
 
 
 class MatchTest(unittest.TestCase):
+    def test_simultaneous_players_receive_their_own_images_with_shared_fallback(self):
+        names = ("P01", "P02", "P03")
+        match = Match(names, 1, model=OpenAILanguageModel("test", Mock()), live_players=names, live_turns=3)
+        received = {}
+
+        def query(name, prompt, **kwargs):
+            received[name] = kwargs["images"]
+            return "대기", StrategyNote(text="")
+
+        with patch.object(match, "_query", side_effect=query):
+            answers = match.decide_together("private_boards", {
+                name: Decision("현재 그림을 보세요.", "대기", options=("대기",)) for name in names
+            }, images=(b"public",), images_by_player={"P01": (b"first-private",), "P02": (b"second-private",)})
+        self.assertEqual(answers, dict.fromkeys(names, "대기"))
+        self.assertEqual(received, {"P01": (b"first-private",), "P02": (b"second-private",), "P03": (b"public",)})
+
     def test_simultaneous_model_requests_use_only_their_own_persona(self):
         names = tuple(f"P{seat:02}" for seat in range(16, 0, -1)) + ("Guest",)
         client = Mock()

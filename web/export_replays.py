@@ -34,6 +34,7 @@ RESULT_FIELDS = (
     "all_ranking", "filled", "remaining_value", "shapes", "boards", "coins", "guest", "guest_result", "forced_last",
     "largest", "second_scores", "second_largest", "games", "finish_turns", "ranking_groups",
     "finish_rounds", "round_winners", "questions",
+    "finishes", "attempts",
 )
 
 
