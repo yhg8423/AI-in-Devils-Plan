@@ -25,6 +25,10 @@
 .sym-zoom-image[data-scale="actual"] img { max-width: none; max-height: none; margin: 0; }
 .sym-stage { min-width: 0; }
 .sym-stage h2 { margin-top: 0; }
+.sym-tutorial { margin: 14px 0; padding: 12px; border: 1px solid #59636d; background: #17212b; }
+.sym-tutorial h3 { margin-top: 0; }
+.sym-tutorial p { font-size: 12px; line-height: 1.75; white-space: pre-line; }
+.sym-tutorial-preview { display: block; width: 100%; height: auto; margin: 12px 0; }
 .sym-phase { color: #eac88e; font-weight: 700; }
 .sym-all-three { padding-left: 9px; border-left: 3px solid #ceb57b; color: #f3dfb1; font-size: 12px; line-height: 1.7; }
 .sym-finish-slots { display: grid; grid-template-columns: repeat(var(--sym-slots), minmax(0, 1fr)); gap: 7px; margin: 12px 0; padding: 0; list-style: none; }

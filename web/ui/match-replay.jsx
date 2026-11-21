@@ -29,6 +29,7 @@ import {rulesSummary} from "./rule-summaries.js";
 
 const labels = {
   sym_setup: tr("대칭 퍼즐 준비", "Symmetrical Puzzle setup"), sym_puzzles: tr("세 색 조각 공개", "Three color piece sets revealed"), sym_tools: tr("조각 세부·전략 검토", "Piece details and strategy reviews"),
+  sym_tutorial: tr("조립 연습 예시", "Worked assembly example"),
   sym_window: tr("대칭 퍼즐 조립", "Symmetrical Puzzle assembly"), sym_board: tr("비공개 배치", "Private arrangement"),
   sym_buzz: tr("대칭 퍼즐 버저", "Symmetrical Puzzle buzzer"), sym_verdict: tr("세 색 전체 판정", "All three colors judged"),
   sym_finish: tr("세 색 완성·생존", "Three colors completed and survival secured"), sym_reveal: tr("최종 작업판 공개", "Final assemblies revealed"),
@@ -1242,7 +1243,7 @@ export function MatchReplay({replay, transport, caseName}) {
       (["bingo_preparation", "bingo_discussion", "bingo_round", "bingo_result", "bingo_reveal"].includes(type) ? bingoEventText(type, data) : null) ??
       (["wall_setup", "wall_end", "wall_replay", "wall_advance"].includes(type) ? wallEventText(type, data) : null) ??
       (type === "sym_finish" ? tr(`${data.rank}번째 세 색 완성 판정`, `Three-color finish verdict ${data.rank}`) : null) ??
-      (["sym_setup", "sym_puzzles", "sym_tools", "sym_reveal"].includes(type) ? symmetryEventText(type, data) : null) ??
+      (["sym_setup", "sym_puzzles", "sym_tools", "sym_tutorial", "sym_reveal"].includes(type) ? symmetryEventText(type, data) : null) ??
       (type === "fence_finish" ? tr(`${data.rank}번째 완성 판정`, `Finish verdict ${data.rank}`) : null) ??
       (["fence_setup", "fence_puzzle", "fence_reveal"].includes(type) ? fenceEventText(type, data) : null) ??
       (type === "code_round_result" ? tr(`${data.round}라운드 결과`, `Round ${data.round} results`) : null) ??

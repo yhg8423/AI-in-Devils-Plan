@@ -21,6 +21,7 @@ export function applySymmetryEvent(state, type, data, event = {}) {
     case "sym_setup":
       state.symSetup = {version: data.version, mode: data.mode, players: [...data.players], priority: [...data.priority], survivors: data.survivors, thinking_passes: data.thinking_passes};
       state.symPuzzles = [];
+      state.symTutorial = null;
       state.symBoards = {};
       state.symOperations = [];
       state.symAttempts = [];
@@ -40,6 +41,9 @@ export function applySymmetryEvent(state, type, data, event = {}) {
         const details = data.puzzles.find(({id}) => id === puzzle.id)?.details;
         return details ? {...puzzle, details: copyImage(details)} : puzzle;
       });
+      break;
+    case "sym_tutorial":
+      state.symTutorial = {version: data.version, board: copyImage(data.board), explanations: {ko: data.explanations.ko, en: data.explanations.en}, step: event.step};
       break;
     case "sym_window":
       state.symWindow = {window: data.window, active: [...data.active]};
@@ -95,6 +99,7 @@ export function symmetryEventText(type, data) {
     case "sym_setup": return tr(`파랑·빨강·초록 세 퍼즐 · 먼저 모두 완성한 ${data.survivors}명 생존`, `Blue, red and green puzzles · First ${data.survivors} to finish all three survive`);
     case "sym_puzzles": return tr("세 색의 조각과 빈 작업판 공개", "Pieces and empty workspaces for all three colors revealed");
     case "sym_tools": return tr("조각 세부 이미지와 비공개 전략 검토 적용", "Piece detail images and private strategy reviews enabled");
+    case "sym_tutorial": return tr("별도 연습 조각의 조립 예시 공개", "Worked example using a separate practice set revealed");
     case "sym_window": return `${windowText(data.window)} · ${data.active.join(" · ")}`;
     case "sym_board": return `${data.player} · ${placementText(data.placements)}${data.submitted ? tr(" · 버저 제출", " · Submitted with buzzer") : ""}`;
     case "sym_buzz": return tr(`${data.player} · 버저! · ${data.attempt}번째 제출`, `${data.player} · BUZZ! · Attempt ${data.attempt}`);
@@ -114,7 +119,7 @@ export function symmetryPlayerStatus(state, player) {
     call: incorrect ? tr("오답 · 재도전", "INCORRECT · RETRY") : buzzed ? tr("버저!", "BUZZ!") : undefined};
 }
 
-function SymmetryZoom({board, details, owner, color}) {
+function SymmetryZoom({board, details, owner, color, example = false}) {
   const dialog = useRef(null), title = useId(), panel = useId();
   const [open, setOpen] = useState(false);
   const [tab, setTab] = useState("details"), [actualSize, setActualSize] = useState(false);
@@ -124,12 +129,12 @@ function SymmetryZoom({board, details, owner, color}) {
     if (open && image) { if (!dialog.current.open) dialog.current.showModal(); }
     else if (dialog.current.open) dialog.current.close();
   }, [open, image]);
-  const workspaceLabel = owner ? tr(`${owner}의 ${colorLabel(color)} 작업판`, `${owner}’s ${colorLabel(color).toLowerCase()} assembly`) : tr(`${colorLabel(color)} 공개 조각·빈 작업판`, `${colorLabel(color)} public pieces and empty workspace`);
+  const workspaceLabel = example ? tr("조립 연습 예시", "Worked assembly example") : owner ? tr(`${owner}의 ${colorLabel(color)} 작업판`, `${owner}’s ${colorLabel(color).toLowerCase()} assembly`) : tr(`${colorLabel(color)} 공개 조각·빈 작업판`, `${colorLabel(color)} public pieces and empty workspace`);
   const label = activeTab === "details" ? tr(`${colorLabel(color)} 공개 조각 세부`, `${colorLabel(color)} public piece details`) : workspaceLabel;
   return <>
-    <button className="sym-zoom-button" type="button" aria-haspopup="dialog" disabled={!image} onClick={() => setOpen(true)}>{tr("조각·작업판 확대", "Enlarge pieces and workspace")}</button>
+    <button className="sym-zoom-button" type="button" aria-haspopup="dialog" disabled={!image} onClick={() => setOpen(true)}>{example ? tr("연습 예시 확대", "Enlarge worked example") : tr("조각·작업판 확대", "Enlarge pieces and workspace")}</button>
     <dialog className="sym-zoom-dialog" ref={dialog} aria-labelledby={title} onClose={() => setOpen(false)}>
-      <header><h2 id={title}>{label}</h2><form method="dialog"><button type="submit" aria-label={tr("확대 작업판 닫기", "Close enlarged assembly")}>{tr("닫기", "Close")}</button></form></header>
+      <header><h2 id={title}>{label}</h2><form method="dialog"><button type="submit" aria-label={tr("확대 이미지 닫기", "Close enlarged image")}>{tr("닫기", "Close")}</button></form></header>
       {details && <TabList role="tablist" aria-label={tr("확대 이미지 종류", "Enlarged image type")} value={activeTab} onChange={setTab} size="sm" hasDivider>
         <Tab id={`${panel}-details`} value="details" label={tr("조각 세부", "Piece details")} panelId={panel} />
         <Tab id={`${panel}-workspace`} value="workspace" label={tr("작업판", "Workspace")} panelId={panel} />
@@ -141,7 +146,7 @@ function SymmetryZoom({board, details, owner, color}) {
       <p className="sym-zoom-help">{details ? tr("조각 세부에서 꼭짓점 v와 변 e 번호를 확인하세요. 원본 크기에서는 가로·세로로 스크롤할 수 있습니다.", "Read vertex v and edge e labels in Piece details. Scroll horizontally and vertically at original size.") : tr("원본 크기에서는 가로·세로로 스크롤할 수 있습니다.", "Scroll horizontally and vertically at original size.")}</p>
       <div id={panel} role={details ? "tabpanel" : undefined} aria-labelledby={details ? `${panel}-${activeTab}` : undefined}>
         <div className="sym-zoom-image" data-scale={actualSize ? "actual" : "fit"}>
-          {image && <img src={image.image} width={image.width} height={image.height} alt={label} loading="lazy" data-image-kind={activeTab} data-image-id={image.id} />}
+          {image && <img src={image.image} width={image.width} height={image.height} alt={label} loading="lazy" data-image-kind={example ? "tutorial" : activeTab} data-image-id={image.id} />}
         </div>
       </div>
     </dialog>
@@ -214,6 +219,13 @@ export function SymmetryStage({state, replay}) {
     <p className="sym-instructions">{tr("길이가 다른 변이나 변의 일부끼리 맞닿아도 됩니다. 꼭짓점만 닿으면 연결로 인정하지 않습니다. 버저 판정은 세 색 전체의 정답 여부만 알리며, 색별 정답 여부나 정답 대칭축은 알려주지 않습니다.", "Edges may have different lengths and touch along only part of an edge. Point-only contact does not connect pieces. The buzzer reports only whether all three colors are correct, without color-specific feedback or solution axes.")}</p>
     <p className="sym-instructions">{tr(`먼저 세 색을 모두 완성한 ${slots}명이 생존하고 마지막 한 명이 탈락합니다. 생존자의 완성판도 경기 종료 전에는 공개되지 않습니다. 이 시뮬레이션에서는 오답을 수정해 재제출할 수 있습니다.`, `The first ${slots} players to finish all three colors survive; the last player is eliminated. Finished assemblies stay private until the race ends. In this simulation, incorrect submissions may be revised and resubmitted.`)}</p>
     {state.symSetup?.version >= 3 && <p className="sym-instructions">{tr(`자신의 메모와 최근 실패 기록은 다음 생각 차례에도 유지됩니다. 비공개 전략 검토는 차례마다 최대 ${state.symSetup.thinking_passes ?? 3}번이며, 준비되면 그 전에 배치를 확정할 수 있습니다.`, `Your own memo and recent failed attempts carry into the next thinking window. Each window allows up to ${state.symSetup.thinking_passes ?? 3} private strategy passes; you may finalize the arrangement earlier.`)}</p>}
+    {state.symTutorial?.board && <section className="sym-tutorial" aria-label={tr("별도 조각 조립 연습", "Separate practice-piece assembly")}>
+      <h3>{tr("조립 연습 예시", "Worked assembly example")}</h3>
+      <p>{tr("EX1…은 접합과 대칭을 설명하는 별도의 연습용 조각입니다.", "EX1… are a separate practice set for learning edge joins and reflection symmetry.")}</p>
+      <img className="sym-tutorial-preview" src={state.symTutorial.board.image} width={state.symTutorial.board.width} height={state.symTutorial.board.height} alt={tr("EX1… 연습 조각의 조립 예시", "Worked example with EX1… practice pieces")} data-tutorial-image-id={state.symTutorial.board.id} loading="lazy" />
+      <p>{tr(state.symTutorial.explanations.ko, state.symTutorial.explanations.en)}</p>
+      <SymmetryZoom key={state.symTutorial.board.id} board={state.symTutorial.board} example />
+    </section>}
     <details className="sym-syntax"><summary>{tr("배치와 회전 방법", "Placement and rotation")}</summary>
       <p>{tr("고정된 게임판이나 정답 윤곽 없이 다각형 조각을 자유롭게 배치합니다. 조각은 원하는 각도로 시계 방향 회전할 수 있고, 360°마다 한 바퀴로 계산하며 뒤집을 수 없습니다. 좌표 (x, y)는 회전 후 조각을 감싸는 사각형의 왼쪽 위이며 소수와 음수도 사용할 수 있습니다. 화면은 배치에 맞춰 자동으로 조정됩니다. 직접 배치는 piece·x·y·rotation 네 항목을 지정합니다. 배치 행동은 세 색의 작업판을 모두 교체하며, 대기는 현재 배치를 유지합니다.", "Freely arrange polygon pieces without a fixed game board or target outline. Rotate clockwise by any angle in degrees, wrapping every 360°; pieces cannot be flipped. Coordinates (x, y) locate the upper-left corner of the rotated piece's bounding box and may be decimal or negative. The view fits the current arrangement automatically. Direct placement uses four fields: piece, x, y and rotation. An arrangement action replaces all three workspaces; waiting keeps the current placements.")}</p>
       <p>{tr("정확히 맞대려면 x·y·rotation 대신 edge·vertex·to_piece·to_edge·to_vertex를 지정할 수 있습니다. 기준 조각은 같은 색의 전체 배치 목록에서 앞에 있어야 합니다. 보관함의 변 e와 꼭짓점 v 번호는 0부터 시작하며, e_i는 v_i에서 다음 꼭짓점으로 이어집니다. 두 변이 반대 방향이 되도록 회전한 뒤 지정한 꼭짓점을 겹칩니다. 꼭짓점은 선택한 변의 끝점이 아니어도 됩니다. 이 기능은 조각을 이동·회전할 뿐 정답을 찾거나 선택을 고쳐주지 않습니다.", "For optional exact alignment, replace x, y and rotation with edge, vertex, to_piece, to_edge and to_vertex. The target piece must appear earlier in the same color's full replacement list. Tray edge e and vertex v labels start at zero; e_i runs from v_i to the next vertex. The source edge is rotated opposite the target edge, then the chosen vertices are matched. Those vertices need not be edge endpoints. This only moves and rotates pieces; it does not search for solutions or correct choices.")}</p>

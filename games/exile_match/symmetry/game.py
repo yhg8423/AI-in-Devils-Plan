@@ -7,6 +7,7 @@ import json
 
 from ...match import Decision, Match, encode
 from .puzzles import COLORS, align_placement, assembled_shape, board, judge, make_puzzles, piece_atlas, placement_polygon, reflection_axes
+from .tutorial import TUTORIAL_EXPLANATIONS, tutorial_image
 
 
 WAIT = encode({"type": "wait"})
@@ -69,16 +70,37 @@ def _initial_protocol(match):
         rules = next((row["content"] for row in log.events if row["msg_type"] == "rules"), None)
         if setup is not None:
             return setup["version"], rules or (LEGACY_RULES if setup["version"] == 2 else RULES)
+        if rules is not None:
+            return (2 if rules == LEGACY_RULES else 3), rules
     return 3, RULES
 
 
-def _upgrade_ready(match):
+def _next_saved_event(match):
+    log = match.resume_log
+    if log is not None and log.resume and log.events_seen < len(log.events):
+        return log.events[log.events_seen]
+    return None
+
+
+def _upgrade_ready(match, kind="sym_tools"):
     log = match.resume_log
     if log is None or not log.resume:
         return False
-    if log.events_seen < len(log.events):
-        return log.events[log.events_seen]["msg_type"] == "sym_tools"
-    return not log.journal.remaining
+    saved = _next_saved_event(match)
+    return saved["msg_type"] == kind if saved is not None else not log.journal.remaining
+
+
+def _show_tutorial(match):
+    saved = _next_saved_event(match)
+    value = (json.loads(saved["content"]) if saved is not None and saved["msg_type"] == "sym_tutorial" else
+             {"version": 1, "board": tutorial_image(), "explanations": TUTORIAL_EXPLANATIONS})
+    match.event("sym_tutorial", value)
+    return value
+
+
+def _tutorial_at_start(match):
+    log = match.resume_log
+    return log is None or not log.resume or _upgrade_ready(match, "sym_tutorial")
 
 
 def _image_bytes(images):
@@ -147,6 +169,9 @@ def play(match: Match):
         "piece_ids": [piece["id"] for piece in puzzle["pieces"]], "board": initial_boards[puzzle["id"]],
         **({"details": atlases[puzzle["id"]]} if modern else {})}
         for puzzle in puzzles]})
+    tutorial, tutorial_window = None, None
+    if modern and _tutorial_at_start(match):
+        tutorial, tutorial_window = _show_tutorial(match), 1
     while len(winners) < slots:
         window += 1
         active = [name for name in players if name not in winners]
@@ -160,6 +185,9 @@ def play(match: Match):
             for state in states.values():
                 state["boards"] = {puzzle["id"]: board(puzzle, state["placements"][puzzle["id"]], detailed=True)
                                    for puzzle in puzzles}
+        if modern and tutorial is None and _upgrade_ready(match, "sym_tutorial"):
+            tutorial, tutorial_window = _show_tutorial(match), window
+        example_images = [tutorial["board"]] if window == tutorial_window else []
         scripted_times = {name: match.policy.randrange(1_000_000_000, 60_000_000_000) for name in active}
         decisions = {name: Decision(
             f"생각 구간 {window} · {name}. 파랑·빨강·초록 세 대칭 퍼즐을 모두 완성하세요.\n"
@@ -167,7 +195,7 @@ def play(match: Match):
             f"공개 버저 횟수: {encode(attempts)}. 동률 우선순위: {encode(priority)}.\n"
             f"내 마지막 전체 검사 결과: {encode(last_verdict[name])}. "
             f"내 이전 작업 배치: {encode(states[name]['placements'])}\n"
-            + ("첨부 이미지 여섯 장은 blue·red·green의 현재 작업판, 이어서 같은 순서의 고정 조각 상세도입니다. "
+            + ("앞의 이미지 여섯 장은 blue·red·green의 현재 작업판, 이어서 같은 순서의 고정 조각 상세도입니다. "
                if modern else "첨부 이미지 세 장은 차례로 blue·red·green의 조각 보관함과 나의 현재 작업판입니다. ")
             + "다른 참가자의 작업과 완성 예는 제공되지 않습니다. 각 색의 모든 조각을 겹침 없이 변으로 연결하고, "
             "빈 공간을 포함한 전체 모양에 방향 제한 없이 하나 이상의 반사 대칭축을 만드세요. "
@@ -187,7 +215,10 @@ def play(match: Match):
             "유지할 조각을 모두 포함하고 좌표 배치나 위의 접합 형식을 쓰세요. 빠진 조각은 치워지며 빈 목록은 그 색을 비웁니다. "
             "submit:true이면 세 색을 검사받도록 즉시 버저도 누릅니다. false이면 작업만 저장합니다. "
             '{"type":"wait"}는 전체 작업을 그대로 유지합니다. 실패한 답안은 고쳐 다시 제출할 수 있습니다.'
-            + (MODERN_INSTRUCTIONS
+            + (MODERN_INSTRUCTIONS.replace("첨부 이미지 여섯 장", "앞의 이미지 여섯 장")
+               + ("\n일곱 번째 이미지는 별도 연습 조각의 대칭 완성 예시입니다. 이번 생각 구간의 추가 검토에도 함께 보입니다."
+                  if example_images else "")
+               + ("\n" + tutorial["explanations"]["ko"] if tutorial is not None else "")
                + f"\n내 최근 최종 전략 메모 (최대 3개): {encode(list(own_notes[name]))}"
                + f"\n내 최근 전체 검사 실패 기록 (최대 12개): {encode(list(own_failures[name]))}"
                if modern else ""),
@@ -204,11 +235,11 @@ def play(match: Match):
                 draft = {"type": "wait"}
             placements = draft["placements"] if draft["type"] == "arrange" else states[name]["placements"]
             previews = [board(puzzle, placements[puzzle["id"]], detailed=True) for puzzle in puzzles]
-            return _image_bytes(previews + [atlases[puzzle["id"]] for puzzle in puzzles])
+            return _image_bytes(previews + [atlases[puzzle["id"]] for puzzle in puzzles] + example_images)
 
         replies = match.decide_together("symmetry_arrange", decisions, response_times=elapsed,
             images_by_player={name: _image_bytes([states[name]["boards"][puzzle["id"]] for puzzle in puzzles]
-                                                 + ([atlases[puzzle["id"]] for puzzle in puzzles] if modern else []))
+                                                 + ([atlases[puzzle["id"]] for puzzle in puzzles] if modern else []) + example_images)
                               for name in active},
             max_reviews=2 if modern else 0, review_images=review_images if modern else None)
         final_notes = {}

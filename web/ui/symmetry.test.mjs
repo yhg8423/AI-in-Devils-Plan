@@ -24,6 +24,10 @@ const puzzlesData = {puzzles: colors.map((color) => ({id: color, label: {blue: "
 const detailImage = (color) => ({...image(`DETAILS-${color}`), width: 2048, height: 1792});
 const detailedPuzzles = {puzzles: puzzlesData.puzzles.map((puzzle) => ({...puzzle, details: detailImage(puzzle.id)}))};
 const toolsData = {version: 3, thinking_passes: 3, puzzles: colors.map((id) => ({id, details: detailImage(id)}))};
+const tutorialData = {version: 1, board: {...image("PUBLIC-TUTORIAL"), width: 1800, height: 1150}, explanations: {
+  ko: "EX1과 EX2의 변 일부를 붙이고 EX3을 더해 대칭 도형을 만듭니다.",
+  en: "Join part of the edges of EX1 and EX2, then add EX3 to form a symmetric shape.",
+}};
 const puzzles = event("sym_puzzles", puzzlesData);
 const window = (players, number = 1) => event("sym_window", {window: number, active: players});
 const workingData = (player, full = false) => ({player, window: full ? 2 : 1,
@@ -47,6 +51,29 @@ function render(players, steps, {language = "ko", view = "public", selected = ""
 }
 
 for (const language of ["ko", "en"]) {
+  test(`${language}: the public practice example appears only after its event and exposes no current private assembly`, () => {
+    const players = ["P01", "P02", "P03"];
+    const steps = [event("sym_setup", {...setupData(players), version: 3}), event("sym_puzzles", detailedPuzzles),
+      window(players), drawing("P01"), drawing("P02"), event("sym_tutorial", tutorialData)];
+    const before = render(players, steps, {language, frame: steps.length - 1});
+    assert.doesNotMatch(before, /PUBLIC-TUTORIAL|sym-tutorial-preview|data-image-kind="tutorial"/);
+    const publicView = render(players, steps, {language, selected: "P02"});
+    assert.match(publicView, /data-tutorial-image-id="PUBLIC-TUTORIAL"/);
+    assert.match(publicView, /width="1800" height="1150"[^>]+data-image-kind="tutorial" data-image-id="PUBLIC-TUTORIAL"/);
+    assert.match(publicView, language === "ko" ? /별도의 연습용 조각/ : /a separate practice set/);
+    assert.match(publicView, language === "ko" ? /EX1과 EX2의 변 일부를 붙이고 EX3/ : /Join part of the edges of EX1 and EX2, then add EX3/);
+    assert.doesNotMatch(publicView, language === "ko" ? /Join part of the edges of EX1/ : /EX1과 EX2의 변 일부/);
+    assert.match(publicView, language === "ko" ? /연습 예시 확대/ : /Enlarge worked example/);
+    assert.match(publicView, language === "ko" ? /원본 크기 · 100%/ : /Original size · 100%/);
+    assert.match(render(players, steps, {language}), language === "ko" ? /별도 연습 조각의 조립 예시 공개/ : /Worked example using a separate practice set revealed/);
+    assert.match(publicView, /data-board-id="PUBLIC-blue"/);
+    assert.doesNotMatch(publicView, /P0\d-PRIVATE-|PRIVATE-STRATEGY|data-axis=/);
+    for (const player of ["P01", "P02"]) assert.equal(publicView.includes(image(`${player}-PRIVATE-blue`).image), false);
+    const ownView = render(players, steps, {language, view: "P01", selected: "P02"});
+    assert.match(ownView, /data-tutorial-image-id="PUBLIC-TUTORIAL"/);
+    assert.match(ownView, /data-board-id="P01-PRIVATE-blue"/);
+    assert.doesNotMatch(ownView, /P02-PRIVATE-/);
+  });
   test(`${language}: enlarged public piece details preserve aspect and privacy while own workspace remains available`, () => {
     const players = ["P01", "P02", "P03"];
     const steps = [event("sym_setup", {...setupData(players), version: 3}), event("sym_puzzles", detailedPuzzles), window(players), ...players.map((player) => drawing(player)), ...players.map(privateNote)];
@@ -249,6 +276,27 @@ test("public piece atlases are copied without private or answer fields, and migr
   migration.puzzles[0].details.image = "MUTATED";
   assert.equal(state.symPuzzles[0].details.image, "NEW-ATLAS");
   assert.doesNotMatch(JSON.stringify(state), /SECRET-|MUTATED/);
+});
+
+test("tutorial state copies only the observed public example, persists through windows, and resets for a new setup", () => {
+  const players = ["P01", "P02", "P03"], state = {};
+  api.en.applySymmetryEvent(state, "sym_setup", {...setupData(players), version: 3});
+  assert.equal(state.symTutorial, null);
+  const data = structuredClone(tutorialData);
+  Object.assign(data, {placements: "SECRET-CURRENT-ASSEMBLY", axes: "SECRET-CURRENT-AXES"});
+  data.board.solution = "SECRET-CURRENT-SOLUTION";
+  data.explanations.private = "SECRET-MEMO";
+  api.en.applySymmetryEvent(state, "sym_tutorial", data, {step: 4});
+  assert.deepEqual(state.symTutorial, {...tutorialData, step: 4});
+  data.board.image = "MUTATED";
+  data.explanations.en = "MUTATED";
+  assert.deepEqual(state.symTutorial.board, tutorialData.board);
+  assert.equal(state.symTutorial.explanations.en, tutorialData.explanations.en);
+  api.en.applySymmetryEvent(state, "sym_window", {window: 2, active: players});
+  assert.equal(state.symTutorial.step, 4);
+  assert.doesNotMatch(JSON.stringify(state), /SECRET-|MUTATED/);
+  api.en.applySymmetryEvent(state, "sym_setup", setupData(players));
+  assert.equal(state.symTutorial, null);
 });
 
 test("English rules describe the recovered polygon sets and continuous placement without a fixed grid", () => {

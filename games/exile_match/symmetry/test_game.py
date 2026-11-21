@@ -43,10 +43,17 @@ def atlas(puzzle):
             "image": "data:image/png;base64," + b64encode(image).decode("ascii")}
 
 
+def tutorial(language="en"):
+    image = b"\x89PNG\r\n\x1a\nSEPARATE-PRACTICE-EXAMPLE-" + language.encode()
+    return {"id": sha256(image).hexdigest()[:16], "width": 1600, "height": 1000,
+            "image": "data:image/png;base64," + b64encode(image).decode("ascii")}
+
+
 @contextmanager
 def puzzles():
     with (patch.object(game, "make_puzzles", return_value=[{**puzzle, "internal": "NEVER-PUBLISH"} for puzzle in PUZZLES]),
-          patch.object(game, "board", side_effect=render), patch.object(game, "piece_atlas", side_effect=atlas)):
+          patch.object(game, "board", side_effect=render), patch.object(game, "piece_atlas", side_effect=atlas),
+          patch.object(game, "tutorial_image", side_effect=tutorial)):
         yield
 
 
@@ -177,7 +184,8 @@ class SymmetryTest(unittest.TestCase):
             previous = [row for row in rows(match, "sym_board") if row["player"] == name and row["window"] < window]
             expected = previous[-1]["boards"] if previous else initial
             self.assertEqual(images[:3], tuple(b64decode(expected[color]["image"].partition(",")[2]) for color in COLORS))
-            self.assertEqual(images[3:], game._image_bytes([atlas(puzzle) for puzzle in PUZZLES]))
+            self.assertEqual(images[3:6], game._image_bytes([atlas(puzzle) for puzzle in PUZZLES]))
+            self.assertEqual(len(images), 7 if window == 1 else 6)
             self.assertEqual([event.msg_type for event in history], ["rules"])
             self.assertNotIn("NEVER-PUBLISH", prompt)
             if window > 1:
@@ -223,7 +231,7 @@ class SymmetryTest(unittest.TestCase):
             if event.msg_type in {"sym_buzz", "sym_verdict", "sym_finish"}:
                 self.assertEqual(event.visible_to, "all")
                 self.assertFalse({"placements", "boards", "axes", "colors", "scores"} & set(json.loads(event.content)))
-            if index < reveal and event.visible_to == "all" and event.msg_type != "rules":
+            if index < reveal and event.visible_to == "all" and event.msg_type not in {"rules", "sym_tutorial"}:
                 self.assertNotIn("solution", event.content)
                 self.assertNotIn('"cells"', event.content)
         for puzzle in rows(match, "sym_puzzles")[0]["puzzles"]:
@@ -234,8 +242,12 @@ class SymmetryTest(unittest.TestCase):
         with puzzles():
             match = LiveMatch()
             game.play(match)
+        kinds = [event.msg_type for event in match.events]
+        self.assertEqual(kinds[kinds.index("sym_puzzles") + 1:kinds.index("sym_window")], ["sym_tutorial"])
+        self.assertEqual(rows(match, "sym_tutorial"), [{"version": 1, "board": tutorial(),
+                                                      "explanations": game.TUTORIAL_EXPLANATIONS}])
         for name, window, prompt, history, images in match.requests:
-            self.assertEqual(len(images), 6)
+            self.assertEqual(len(images), 7)
             self.assertNotIn(encode(SOLUTION), prompt)
             self.assertIn(encode({color: [] for color in COLORS}), prompt)
             self.assertIn("시계 방향", prompt)
@@ -243,6 +255,9 @@ class SymmetryTest(unittest.TestCase):
             self.assertIn("부분 접합", prompt)
             self.assertIn("길이가 다른 변", prompt)
             self.assertIn("점 접촉", prompt)
+            self.assertIn(game.TUTORIAL_EXPLANATIONS["ko"], prompt)
+            self.assertIn("일곱 번째 이미지", prompt)
+            self.assertEqual(images[6:], game._image_bytes([tutorial()]))
 
     def test_own_final_notes_and_failed_whole_packs_are_bounded_and_private(self):
         def reply(name, window):
@@ -301,7 +316,8 @@ class SymmetryTest(unittest.TestCase):
             for request, placements in zip(requests, ({color: [] for color in COLORS}, first, second), strict=True):
                 self.assertEqual(request[4][:3], game._image_bytes([
                     render(puzzle, placements[puzzle["id"]], detailed=True) for puzzle in PUZZLES]))
-                self.assertEqual(request[4][3:], game._image_bytes([atlas(puzzle) for puzzle in PUZZLES]))
+                self.assertEqual(request[4][3:6], game._image_bytes([atlas(puzzle) for puzzle in PUZZLES]))
+                self.assertEqual(request[4][6:], game._image_bytes([tutorial()]))
                 self.assertNotIn('"correct":', request[2])
                 self.assertNotIn("색별 정답 여부:", request[2])
         notes = rows(match, "decision_note")
@@ -329,9 +345,12 @@ class SymmetryTest(unittest.TestCase):
             match = LiveMatch(PLAYERS[:3], reply=reply, live_turns=9)
             game.play(match)
         for name, window, prompt, history, images in match.requests:
+            self.assertEqual(len(images), 7 if window == 1 else 6)
+            self.assertIn(game.TUTORIAL_EXPLANATIONS["ko"], prompt)
             if window == 2:
                 self.assertIn(f"FINAL-{name}", prompt)
                 self.assertNotIn("DRAFT-", prompt)
+                self.assertNotIn("일곱 번째 이미지", prompt)
 
     def test_scripted_game_is_deterministic_preserves_pieces_and_requires_three_or_four_unique_players(self):
         with puzzles():
@@ -344,7 +363,7 @@ class SymmetryTest(unittest.TestCase):
             with self.subTest(players=players), self.assertRaises(ValueError):
                 game.play(Match(players, 1))
 
-    def test_actual_interruptions_restore_three_images_and_saved_race_without_duplicate_queries(self):
+    def test_initial_and_private_interruptions_restore_tutorial_and_race_without_duplicate_queries(self):
         original_event = Match.event
         with (TemporaryDirectory() as directory, puzzles(), redirect_stdout(StringIO()), redirect_stderr(StringIO()),
               patch.object(Match, "_query", return_value=(arrange(), StrategyNote(text="private"))),
@@ -356,7 +375,9 @@ class SymmetryTest(unittest.TestCase):
             expected = [json.loads(line) for line in full.read_text().splitlines()]
             saved = json.loads(full.with_name("full.decisions.jsonl").read_text().splitlines()[0])["value"]["value"]
             self.assertTrue(all(reply[2] == 0 for reply in saved.values()))
-            for checkpoint in ("decision_note", "action", "sym_board", "sym_buzz", "sym_verdict", "sym_finish", "sym_reveal"):
+            initial = {"rules", "sym_setup", "sym_puzzles", "sym_tutorial"}
+            for checkpoint in ("rules", "sym_setup", "sym_puzzles", "sym_tutorial", "decision_note", "action",
+                               "sym_board", "sym_buzz", "sym_verdict", "sym_finish", "sym_reveal"):
                 with self.subTest(checkpoint=checkpoint):
                     output = root / f"{checkpoint}.jsonl"
 
@@ -368,9 +389,15 @@ class SymmetryTest(unittest.TestCase):
                     with patch.object(Match, "event", interrupt), self.assertRaisesRegex(RuntimeError, "committed event"):
                         run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=[*arguments, "--output", str(output)])
                     prefix = [json.loads(line) for line in output.read_text().splitlines()]
-                    with (patch.object(Match, "_query", side_effect=AssertionError("committed response queried twice")),
+                    replies = patch.object(Match, "_query", return_value=(arrange(), StrategyNote(text="private"))) if checkpoint in initial else patch.object(
+                        Match, "_query", side_effect=AssertionError("committed response queried twice"))
+                    with (replies as query_mock,
+                          patch.object(game, "tutorial_image", side_effect=tutorial if checkpoint in initial - {"sym_tutorial"} else
+                                       AssertionError("saved tutorial regenerated")) as image_mock,
                           patch("games.match.monotonic_ns", return_value=999_000_000_000)):
                         run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(output)])
+                    self.assertEqual(query_mock.call_count, 4 if checkpoint in initial else 0)
+                    self.assertEqual(image_mock.call_count, 1 if checkpoint in initial - {"sym_tutorial"} else 0)
                     actual = [json.loads(line) for line in output.read_text().splitlines()]
                     self.assertEqual(actual, expected)
                     self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
@@ -396,12 +423,15 @@ class SymmetryTest(unittest.TestCase):
             old_journal = old.with_name("v2.decisions.jsonl").read_bytes()
             prefix = [json.loads(line) for line in old_bytes.splitlines()][:-1]
             self.assertEqual(json.loads(prefix[2]["content"])["version"], 2)
+            saved_explanation = game.TUTORIAL_EXPLANATIONS["ko"]
 
             def query(match, name, prompt, *args, **kwargs):
-                self.assertEqual(len(kwargs["images"]), 6)
+                self.assertEqual(len(kwargs["images"]), 7)
                 self.assertIn("OLD-OWN", prompt)
                 self.assertIn('"window":1', prompt)
                 self.assertIn("부분 접합", prompt)
+                self.assertIn(saved_explanation, prompt)
+                self.assertNotIn("CHANGED-TUTORIAL", prompt)
                 return arrange(), StrategyNote(text="MODERN-OWN")
 
             def fork(name):
@@ -421,7 +451,7 @@ class SymmetryTest(unittest.TestCase):
             tool_index = expected.index(tools[0])
             self.assertEqual(expected[tool_index - 1]["msg_type"], "sym_window")
             self.assertNotIn("details", prefix[3]["content"])
-            for checkpoint in ("sym_tools", "decision_note", "action", "sym_board"):
+            for checkpoint in ("sym_tools", "sym_tutorial", "decision_note", "action", "sym_board"):
                 output = fork(checkpoint)
 
                 def interrupt(match, kind, value, **kwargs):
@@ -433,11 +463,78 @@ class SymmetryTest(unittest.TestCase):
                 with (patch.object(Match, "_query", query), patch.object(Match, "event", interrupt),
                       self.assertRaisesRegex(RuntimeError, "modern checkpoint")):
                     run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(output)])
-                query_patch = patch.object(Match, "_query", query) if checkpoint == "sym_tools" else patch.object(
+                query_patch = patch.object(Match, "_query", query) if checkpoint in {"sym_tools", "sym_tutorial"} else patch.object(
                     Match, "_query", side_effect=AssertionError("modern committed response queried twice"))
-                with query_patch:
+                changed_text = {"ko": "CHANGED-TUTORIAL", "en": "CHANGED-TUTORIAL"}
+                with query_patch, patch.object(game, "TUTORIAL_EXPLANATIONS", changed_text if checkpoint == "sym_tutorial" else game.TUTORIAL_EXPLANATIONS):
                     run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(output)])
                 self.assertEqual([json.loads(line) for line in output.read_text().splitlines()], expected)
+
+    def test_existing_v3_without_tutorial_preserves_prefix_before_one_safe_migration(self):
+        original_event = Match.event
+        with (TemporaryDirectory() as directory, puzzles(), redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+              patch("games.match.monotonic_ns", return_value=70_000_000_000)):
+            root = Path(directory)
+            arguments = ["--players", *PLAYERS, "--seed", "19", "--model", "test", "--model-turns", "20"]
+            for checkpoint in ("sym_board", "sym_window"):
+                output = root / f"old-v3-{checkpoint}.jsonl"
+
+                def interrupt(match, kind, value, **kwargs):
+                    original_event(match, kind, value, **kwargs)
+                    if kind == checkpoint and (kind != "sym_window" or value["window"] == 2):
+                        raise RuntimeError("pre-tutorial checkpoint")
+
+                with (patch.object(game, "_tutorial_at_start", return_value=False),
+                      patch.object(Match, "event", interrupt),
+                      patch.object(Match, "_query", return_value=(arrange({color: [] for color in COLORS}), StrategyNote(text="OLD-V3"))),
+                      self.assertRaisesRegex(RuntimeError, "pre-tutorial checkpoint")):
+                    run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=[*arguments, "--output", str(output)])
+                prefix = [json.loads(line) for line in output.read_text().splitlines()][:-1]
+                self.assertFalse(any(row.get("msg_type") == "sym_tutorial" for row in prefix))
+                calls = []
+
+                def query(match, name, prompt, *args, **kwargs):
+                    calls.append(name)
+                    self.assertEqual(len(kwargs["images"]), 7)
+                    self.assertIn(game.TUTORIAL_EXPLANATIONS["ko"], prompt)
+                    return arrange(), StrategyNote(text="NEW-V3")
+
+                with patch.object(Match, "_query", query):
+                    run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(output)])
+                actual = [json.loads(line) for line in output.read_text().splitlines()]
+                self.assertEqual(actual[:len(prefix)], prefix)
+                examples = [index for index, row in enumerate(actual) if row.get("msg_type") == "sym_tutorial"]
+                self.assertEqual(len(examples), 1)
+                before = actual[examples[0] - 1]
+                self.assertEqual(before["msg_type"], "sym_window")
+                self.assertEqual(json.loads(before["content"])["window"], 2)
+                self.assertEqual(len(calls), 4)
+
+    def test_v2_rules_only_prefix_keeps_legacy_setup_before_tools_and_tutorial(self):
+        original_event = Match.event
+        with (TemporaryDirectory() as directory, puzzles(), redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+              patch("games.match.monotonic_ns", return_value=70_000_000_000)):
+            output = Path(directory) / "v2-rules.jsonl"
+            arguments = ["--players", *PLAYERS, "--seed", "19", "--model", "test", "--model-turns", "4"]
+
+            def interrupt(match, kind, value, **kwargs):
+                original_event(match, kind, value, **kwargs)
+                if kind == "rules":
+                    raise RuntimeError("legacy rules checkpoint")
+
+            with (patch.object(game, "_initial_protocol", return_value=(2, game.LEGACY_RULES)),
+                  patch.object(Match, "event", interrupt), self.assertRaisesRegex(RuntimeError, "legacy rules checkpoint")):
+                run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=[*arguments, "--output", str(output)])
+            prefix = [json.loads(line) for line in output.read_text().splitlines()][:-1]
+            with patch.object(Match, "_query", return_value=(arrange(), StrategyNote())) as query:
+                run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(output)])
+            actual = [json.loads(line) for line in output.read_text().splitlines()]
+            self.assertEqual(actual[:len(prefix)], prefix)
+            self.assertEqual(json.loads(next(row["content"] for row in actual if row.get("msg_type") == "sym_setup"))["version"], 2)
+            kinds = [row.get("msg_type") for row in actual]
+            window = kinds.index("sym_window")
+            self.assertEqual(kinds[window:window + 3], ["sym_window", "sym_tools", "sym_tutorial"])
+            self.assertEqual(query.call_count, 4)
 
     def test_v3_review_note_checkpoints_replay_committed_passes_and_query_only_remaining_passes(self):
         original_event = Match.event

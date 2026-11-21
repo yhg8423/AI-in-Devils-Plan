@@ -335,12 +335,17 @@ def _korean_symmetry_image(seed, color, placements, original_id):
 
     with _symmetry_render_lock:
         try:
-            puzzle = _symmetry_puzzles(seed)[color]
-            if placements is None:
-                render = lambda **kwargs: piece_atlas(puzzle, **kwargs)
+            if color == "tutorial":
+                from games.exile_match.symmetry.tutorial import tutorial_image
+
+                render = tutorial_image
             else:
-                placed = [dict(zip(("piece", "x", "y", "rotation"), value, strict=True)) for value in placements]
-                render = lambda **kwargs: board(puzzle, placed, detailed=True, **kwargs)
+                puzzle = _symmetry_puzzles(seed)[color]
+                if placements is None:
+                    render = lambda **kwargs: piece_atlas(puzzle, **kwargs)
+                else:
+                    placed = [dict(zip(("piece", "x", "y", "rotation"), value, strict=True)) for value in placements]
+                    render = lambda **kwargs: board(puzzle, placed, detailed=True, **kwargs)
             # Never substitute current geometry for a differently rendered archive.
             if render()["id"] != original_id:
                 return None
@@ -352,6 +357,8 @@ def _korean_symmetry_image(seed, color, placements, original_id):
 def _localize_symmetry_images(content, kind, seed):
     data = json.loads(content)
     changed = False
+    if kind == "sym_tutorial":
+        seed = None
 
     def localize(image, color, placements=None):
         nonlocal changed
@@ -368,7 +375,9 @@ def _localize_symmetry_images(content, kind, seed):
         changed = True
         return {**image, **localized}
 
-    if kind in ("sym_puzzles", "sym_tools"):
+    if kind == "sym_tutorial":
+        data["board"] = localize(data["board"], "tutorial")
+    elif kind in ("sym_puzzles", "sym_tools"):
         for puzzle in data["puzzles"]:
             if "board" in puzzle:
                 puzzle["board"] = localize(puzzle["board"], puzzle["id"], ())
@@ -404,7 +413,8 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
         if symmetry_seed is not None:
             if kind in ("sym_setup", "sym_tools"):
                 symmetry_modern = json.loads(event["content"])["version"] >= 3
-            if symmetry_modern and kind in ("sym_puzzles", "sym_tools", "sym_board", "sym_reveal"):
+            if kind == "sym_tutorial" or (
+                    symmetry_modern and kind in ("sym_puzzles", "sym_tools", "sym_board", "sym_reveal")):
                 payload["content"] = _localize_symmetry_images(event["content"], kind, symmetry_seed)
         if full_match and type(event.get("turn")) is int:
             turn = event["turn"]

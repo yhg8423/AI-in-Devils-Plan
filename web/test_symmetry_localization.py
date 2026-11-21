@@ -37,6 +37,10 @@ def fake_atlas(puzzle, *, language="en"):
     return fake_image("atlas", puzzle, language=language)
 
 
+def fake_tutorial(*, language="en"):
+    return fake_image("tutorial", {"id": "EX1-EX2-EX3", "seed": None}, language=language)
+
+
 def event(kind, data, visible_to="all", agent_name="System"):
     return {"type": "event", "msg_type": kind, "agent_name": agent_name, "visible_to": visible_to,
             "content": json.dumps(data, ensure_ascii=False)}
@@ -181,8 +185,61 @@ class SymmetryLocalizationTest(unittest.TestCase):
         self.board.assert_not_called()
         self.atlas.assert_not_called()
 
+    def test_observed_public_tutorial_localizes_without_modern_puzzle_data_and_reuses_cache(self):
+        with patch("games.exile_match.symmetry.tutorial.tutorial_image", side_effect=fake_tutorial) as renderer:
+            data = {"version": 1, "board": fake_tutorial(),
+                    "explanations": {"ko": "EX1·EX2·EX3 별도 연습 조각", "en": "EX1/EX2/EX3 separate practice set"}}
+            self.write([setup(2)])
+            self.assertEqual(len(payloads(spectator.read_match(self.log))), 1)
+            events = [setup(2), event("sym_tutorial", data)]
+            disk = self.write(events)
+            korean = payloads(spectator.read_match(self.log))
+            actual = json.loads(korean[1]["content"])
+            self.assertEqual(actual, {**data, "board": fake_tutorial(language="ko")})
+            self.assertEqual(korean[1]["visible_to"], "all")
+            english = payloads(spectator.read_match(self.log, language="en"))
+            self.assertEqual(english[1]["content"], events[1]["content"])
+            self.assertEqual(renderer.call_count, 2)
+            spectator.read_match(self.log)
+            self.assertEqual(renderer.call_count, 2)
+            self.make_puzzles.assert_not_called()
+            self.board.assert_not_called()
+            self.atlas.assert_not_called()
+            self.assertEqual(self.log.read_bytes(), disk)
+
+    def test_tutorial_id_mismatch_preserves_the_recorded_example(self):
+        with patch("games.exile_match.symmetry.tutorial.tutorial_image", side_effect=fake_tutorial) as renderer:
+            data = {"version": 1, "board": {**fake_tutorial(), "id": "ARCHIVED-OTHER-EXAMPLE"},
+                    "explanations": {"ko": "원래 예시", "en": "Original example"}}
+            source = event("sym_tutorial", data)
+            self.write([setup(), source])
+            self.assertEqual(payloads(spectator.read_match(self.log))[1]["content"], source["content"])
+            self.assertEqual(payloads(spectator.read_match(self.log))[1]["content"], source["content"])
+            self.assertEqual(renderer.call_count, 1)
+
 
 class SymmetryRasterLocalizationTest(unittest.TestCase):
+    def test_public_tutorial_uses_the_real_korean_png_without_inventing_puzzle_state(self):
+        from games.exile_match.symmetry.tutorial import TUTORIAL_EXPLANATIONS, tutorial_image
+
+        spectator._symmetry_puzzles.cache_clear()
+        spectator._korean_symmetry_image.cache_clear()
+        self.addCleanup(spectator._symmetry_puzzles.cache_clear)
+        self.addCleanup(spectator._korean_symmetry_image.cache_clear)
+        data = {"version": 1, "board": tutorial_image(), "explanations": TUTORIAL_EXPLANATIONS}
+        source = event("sym_tutorial", data)
+        with TemporaryDirectory() as directory:
+            log = Path(directory) / "events.jsonl"
+            raw = "".join(json.dumps(row, ensure_ascii=False) + "\n" for row in [HEADER, setup(2), source]).encode()
+            log.write_bytes(raw)
+            korean = payloads(spectator.read_match(log))
+            english = payloads(spectator.read_match(log, language="en"))
+            self.assertEqual(json.loads(korean[1]["content"]), {**data, "board": tutorial_image(language="ko")})
+            self.assertEqual(english[1]["content"], source["content"])
+            self.assertEqual(korean[1]["visible_to"], "all")
+            self.assertEqual(spectator._symmetry_puzzles.cache_info().currsize, 0)
+            self.assertEqual(log.read_bytes(), raw)
+
     def test_existing_v3_pngs_resolve_to_the_real_korean_renderer_without_log_changes(self):
         from games.exile_match.symmetry.puzzles import board, make_puzzles, piece_atlas
 
