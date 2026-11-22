@@ -15,7 +15,7 @@ BLANK_SECONDS = 10
 EMPTY_MEMORY = encode({"memory": ""})
 EMPTY_MARKS = encode({"marks": []})
 
-RULES = """틀린 그림 찾기 · 4인 개인전
+RULES = """달라진 그림 찾기 · 4인 개인전
 
 1. 목표와 점수
 본인의 생존을 위해 경쟁하세요. 각 그림에서 달라진 부분 5곳을 찾습니다.
@@ -101,13 +101,16 @@ def _scripted_marks(match, scene, players, overtime):
 def play(match: Match):
     players = list(match.players)
     if len(players) != 4 or len(set(players)) != 4:
-        raise ValueError("틀린 그림 찾기에는 서로 다른 참가자 4명이 필요합니다.")
+        raise ValueError("달라진 그림 찾기에는 서로 다른 참가자 4명이 필요합니다.")
     match.relationship_reviews_enabled = False
     # Backend.reset() in Match._query also discards Concordia's accumulated memory.
     # Every request receives current scores and only its own current-round recall explicitly.
     match.model_observations = lambda name, events: [event for event in events if event.msg_type == "rules"]
     totals = dict.fromkeys(players, 0)
-    match.event("rules", RULES)
+    rules = RULES
+    if match.resume_log is not None and match.resume_log.resume:
+        rules = next((row["content"] for row in match.resume_log.events if row["msg_type"] == "rules"), RULES)
+    match.event("rules", rules)
     match.event("picture_setup", {"version": 1, "players": players, "normal_rounds": NORMAL_ROUNDS,
                                    "change_count": CHANGE_COUNT, "memory_limit": MEMORY_LIMIT,
                                    "width": WIDTH, "height": HEIGHT})

@@ -36,10 +36,17 @@ DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
 DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
 FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
-SECOND_EXILE = "유배지 매치 2 · 틀린 그림 찾기"
+SECOND_EXILE = "유배지 매치 2 · 달라진 그림 찾기"
 THIRD_EXILE = "유배지 매치 3 · 비밀 코드"
 FOURTH_EXILE = "유배지 매치 4 · 울타리 치기"
 FIFTH_EXILE = "유배지 매치 5 · 대칭 퍼즐"
+
+
+def canonical_game_title(title: str) -> str:
+    """Recognize the former second-exile title without rewriting saved records."""
+    return SECOND_EXILE if title == "유배지 매치 2 · 틀린 그림 찾기" else title
+
+
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
     DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),
@@ -428,7 +435,8 @@ def read_completed_match(path: Path, title: str) -> tuple[dict, dict, Relationsh
     """Read the roster, result and private relationship updates of a completed match."""
     with path.open(encoding="utf-8") as log:
         header = json.loads(log.readline())
-        if not isinstance(header, dict) or header.get("type") != "match" or header.get("game") != title:
+        if (not isinstance(header, dict) or header.get("type") != "match"
+                or canonical_game_title(header.get("game")) != canonical_game_title(title)):
             raise ValueError(f"{path}에는 {title} 기록이 필요합니다.")
         relationships: RelationshipState = {}
         result = None
@@ -545,7 +553,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         log = open_log() if args.resume else None
         saved = log.header if log is not None else None
         if saved is not None:
-            if saved["game"] != title:
+            if canonical_game_title(saved["game"]) != canonical_game_title(title):
                 parser.error(f"{args.output}에는 {title} 기록이 필요합니다.")
             try:
                 restore_resume_args(args, saved, guest=guest)
@@ -705,7 +713,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         match = Match(players, seed, pieces=pieces, models=models, live_turns=model_turns if models else 0,
                       on_event=record_event if log is not None or models else None,
                       allow_review=allow_review, relationships=relationships, resume_log=log, count_calls=count_calls)
-        header = {"type": "match", "game": title, "players": players, "seed": seed,
+        header = {"type": "match", "game": saved["game"] if saved is not None else title,
+                  "players": players, "seed": seed,
                   "pieces": match.pieces.copy(), "model": model_name, "effort": effort if models else None,
                   "provider": provider if models else None,
                   "model_players": list(models), "model_turn_limit": match.live_turns,

@@ -9,13 +9,18 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
 
-from ...match import Match, encode, run_cli
+from ...match import (
+    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, FIRST_EXILE, SECOND_EXILE, THIRD_EXILE,
+    Match, canonical_game_title, encode, read_completed_match, run_cli,
+)
 from ...models import OpenAILanguageModel, StrategyNote
+from ..roster import collect_third_exile_players
 from . import game
 
 
 PLAYERS = ("P01", "P02", "P03", "P04")
-TITLE = "유배지 매치 2 · 틀린 그림 찾기"
+TITLE = SECOND_EXILE
+LEGACY_TITLE = "유배지 매치 2 · 틀린 그림 찾기"
 TARGETS = [{"id": f"D{index}", "x": index * 100, "y": 100, "w": 40, "h": 40}
            for index in range(1, 6)]
 
@@ -68,6 +73,51 @@ class LiveMatch(Match):
 
 
 class ChangedPictureTest(unittest.TestCase):
+    def test_visible_title_changes_only_the_exact_second_exile_alias(self):
+        self.assertEqual(SECOND_EXILE, "유배지 매치 2 · 달라진 그림 찾기")
+        self.assertTrue(game.RULES.startswith("달라진 그림 찾기 ·"))
+        self.assertEqual(canonical_game_title(LEGACY_TITLE), SECOND_EXILE)
+        for title in (SECOND_EXILE, FIRST_EXILE, THIRD_EXILE, "틀린 그림 찾기", "유배지 매치 3 · 틀린 그림 찾기"):
+            with self.subTest(title=title):
+                self.assertEqual(canonical_game_title(title), title)
+
+    def test_completed_legacy_second_exile_remains_a_valid_roster_predecessor_without_rewriting_it(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+
+            def write(stage, title, players, eliminated, *, survivors=None, **links):
+                path = root / f"{stage}.jsonl"
+                header = {"type": "match", "game": title, "players": players, **links}
+                result = {"type": "result", "eliminated": eliminated}
+                if survivors is not None:
+                    result["survivors"] = survivors
+                path.write_text(encode(header) + "\n" + encode(result) + "\n", encoding="utf-8")
+                return path
+
+            all_players = [f"P{index:02}" for index in range(1, 17)]
+            main = write("day1-main", DAY_ONE_MAIN, all_players, ["P13", "P12"])
+            prison = write("day1-prison", DAY_ONE_PRISON,
+                           [name for name in all_players if name not in {"P13", "P12"}], ["P09", "P14"],
+                           from_main=str(main))
+            first_players = ["P13", "P12", "P09", "P14"]
+            first = write("exile1", FIRST_EXILE, first_players, ["P14"], survivors=first_players[:3],
+                          from_matches=[str(main), str(prison)])
+            market = write("day2-main", DAY_TWO_MAIN, [name for name in all_players if name not in first_players],
+                           ["P08"], from_main=str(main), from_prison=str(prison))
+            second = write("exile2", LEGACY_TITLE, ["P13", "P12", "P09", "P08"], ["P12", "P09"],
+                           survivors=["P08", "P13"], from_exile=str(first),
+                           from_matches=[str(main), str(prison), str(market)])
+            roulette = write("day2-prison", DAY_TWO_PRISON,
+                             [name for name in all_players if name not in {*first_players, "P08"}],
+                             ["P07", "P06"], from_main=str(market))
+            snapshots = {path: path.read_bytes() for path in root.iterdir()}
+            self.assertEqual(read_completed_match(second, SECOND_EXILE)[0]["game"], LEGACY_TITLE)
+            self.assertEqual(collect_third_exile_players(second, [main, prison, market, roulette]),
+                             ["P08", "P13", "P07", "P06"])
+            self.assertEqual({path: path.read_bytes() for path in root.iterdir()}, snapshots)
+            with self.assertRaisesRegex(ValueError, THIRD_EXILE):
+                read_completed_match(second, THIRD_EXILE)
+
     def test_action_parsers_accept_only_bounded_memories_and_up_to_five_pixel_marks(self):
         self.assertEqual(game.parse_memory(encode({"memory": "기" * 300})), "기" * 300)
         self.assertEqual(game.parse_memory(game.EMPTY_MEMORY), "")
@@ -246,6 +296,52 @@ class ChangedPictureTest(unittest.TestCase):
                     self.assertEqual(actual, expected)
                     self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
                     self.assertEqual(completion.call_count - calls, expected[-1]["model_calls"] - prefix[-1]["model_calls"])
+
+    def test_old_title_and_exact_old_rules_resume_under_the_new_cli_title(self):
+        original_event = Match.event
+        legacy_rules = game.RULES.replace("달라진 그림 찾기 ·", "틀린 그림 찾기 ·", 1)
+        reply = encode({"action": game.EMPTY_MEMORY, "note": "기억 요약"})
+        with (TemporaryDirectory() as directory, pictures(), redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+              patch("games.models.CodexLanguageModel._complete", return_value=reply) as completion):
+            root = Path(directory)
+            arguments = ["--players", *PLAYERS, "--seed", "19", "--model", "test", "--model-turns", "8"]
+
+            def old_header(path):
+                lines = path.read_bytes().splitlines(keepends=True)
+                header = json.loads(lines[0])
+                self.assertEqual(header["game"], SECOND_EXILE)
+                lines[0] = (encode({**header, "game": LEGACY_TITLE}) + "\n").encode()
+                path.write_bytes(b"".join(lines))
+
+            full = root / "full.jsonl"
+            with patch.object(game, "RULES", legacy_rules):
+                run_cli(game.play, title=SECOND_EXILE, seats=4, argv=[*arguments, "--output", str(full)])
+            old_header(full)
+            expected = [json.loads(line) for line in full.read_text().splitlines()]
+            for checkpoint in ("rules", "picture_memory", "picture_marks"):
+                with self.subTest(checkpoint=checkpoint):
+                    output = root / f"{checkpoint}.jsonl"
+
+                    def interrupt(match, kind, value, **kwargs):
+                        original_event(match, kind, value, **kwargs)
+                        if kind == checkpoint:
+                            raise RuntimeError("legacy checkpoint")
+
+                    with (patch.object(game, "RULES", legacy_rules), patch.object(Match, "event", interrupt),
+                          self.assertRaisesRegex(RuntimeError, "legacy checkpoint")):
+                        run_cli(game.play, title=SECOND_EXILE, seats=4, argv=[*arguments, "--output", str(output)])
+                    old_header(output)
+                    saved = output.read_bytes().splitlines(keepends=True)
+                    prefix = [json.loads(line) for line in saved]
+                    calls = completion.call_count
+                    run_cli(game.play, title=SECOND_EXILE, seats=4, argv=["--resume", "--output", str(output)])
+                    self.assertTrue(output.read_bytes().startswith(b"".join(saved[:-1])))
+                    actual = [json.loads(line) for line in output.read_text().splitlines()]
+                    self.assertEqual(actual, expected)
+                    self.assertEqual(next(row["content"] for row in actual if row.get("msg_type") == "rules"), legacy_rules)
+                    self.assertEqual(actual[0]["game"], LEGACY_TITLE)
+                    self.assertEqual(completion.call_count - calls,
+                                     expected[-1]["model_calls"] - prefix[-1]["model_calls"])
 
 
 if __name__ == "__main__":

@@ -5,6 +5,8 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from games.match import canonical_game_title
+
 from .spectator import CASE_STAGES, EVENT_FIELDS, EXILE_GAMES, exile_sources, source_paths
 from .translate_events import translation_rows
 
@@ -112,7 +114,7 @@ def prepare_exile_match(log, logs, source_root, campaign, *, previous_exile=None
         raise ValueError(f"{log}: expected a completed full match")
     sources = exile_sources(source_root, rows[0], logs, previous_exile=previous_exile)
     events, translated = prepare_match(log, rows[0]["game"].split(" · ", 1)[0], {}, logs, source_root, campaign)
-    events[0]["game"] = rows[0]["game"].replace("달라진 그림 찾기", "틀린 그림 찾기")
+    events[0]["game"] = canonical_game_title(rows[0]["game"])
     stages = {path.resolve(): stage for stage, path in zip(STAGES, logs)}
     events[0]["from_matches"] = [f"matches/{campaign}/{stages[path]}/events.jsonl" for path in sources]
     if previous_exile is not None:

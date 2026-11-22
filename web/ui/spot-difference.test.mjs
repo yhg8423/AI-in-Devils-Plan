@@ -12,7 +12,7 @@ after(() => rmSync(directory, {recursive: true, force: true}));
 const require = createRequire(import.meta.url), api = {};
 for (const language of ["ko", "en"]) {
   const bundle = join(directory, `${language}.cjs`);
-  await build({stdin: {contents: `import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import {MatchReplay} from './match-replay.jsx'; export {applyPictureEvent,pictureSelection,pictureActionText} from './spot-difference.jsx'; export const render = replay => renderToStaticMarkup(<MatchReplay replay={replay} transport={null}/>);`, loader: "jsx", resolveDir: dirname(fileURLToPath(import.meta.url))}, outfile: bundle, bundle: true, platform: "node", format: "cjs", logLevel: "silent", loader: {".css": "empty", ".woff2": "empty", ".md": "text"}, define: {STATIC_REPLAY_BUILD: "false", "process.env.NODE_ENV": '"production"', "globalThis.location": JSON.stringify({search: language === "en" ? "?lang=en" : ""})}});
+  await build({stdin: {contents: `import React from 'react'; import {renderToStaticMarkup} from 'react-dom/server'; import {MatchReplay} from './match-replay.jsx'; import {Home} from './home.jsx'; export {applyPictureEvent,pictureSelection,pictureActionText} from './spot-difference.jsx'; export {canonicalGameTitle,gameTitle} from './locale.js'; export {rulesSummary} from './rule-summaries.js'; export const render = replay => renderToStaticMarkup(<MatchReplay replay={replay} transport={null}/>); export const renderHome = () => { globalThis.window = {location: {pathname:'/',search:'',hash:''}}; return renderToStaticMarkup(<Home onChooseCase={()=>{}}/>); };`, loader: "jsx", resolveDir: dirname(fileURLToPath(import.meta.url))}, outfile: bundle, bundle: true, platform: "node", format: "cjs", logLevel: "silent", loader: {".css": "empty", ".woff2": "empty", ".md": "text"}, define: {STATIC_REPLAY_BUILD: "false", "process.env.NODE_ENV": '"production"', "globalThis.location": JSON.stringify({search: language === "en" ? "?lang=en" : ""})}});
   api[language] = require(bundle);
 }
 const players = ["P01", "P02", "P03", "P04"], noop = () => {};
@@ -27,11 +27,33 @@ const marks1 = event("picture_marks", {round: 1, player: "P01", marks: [{x: 100,
 const marks2 = event("picture_marks", {round: 1, player: "P02", marks: [{x: 250, y: 350}]}, ["P02"], "P02");
 const resultData = {round: 1, players, overtime: false, scores: {P01: 1, P02: 0, P03: 0, P04: 0}, totals: {P01: 1, P02: 0, P03: 0, P04: 0}, answers: {P01: [{x: 100, y: 120, correct: true, target: "change-1"}], P02: [{x: 250, y: 350, correct: false, target: null}], P03: [], P04: []}, targets: Array.from({length: 5}, (_, i) => ({id: `change-${i + 1}`, x: i * 160 + 50, y: 110, w: 40, h: 40})), picture: changed};
 const result = event("picture_result", resultData);
-function render(steps, {language = "ko", view = "operator", selected = "", frame = steps.length} = {}) {
-  return api[language].render({id: "spot-demo", match: {game: "유배지 매치 2 · 틀린 그림 찾기", players, steps}, frame, view, selected, choosePlayer: noop, chooseView: noop, seek: noop, mode: "paused"});
+function render(steps, {language = "ko", view = "operator", selected = "", frame = steps.length, game = "유배지 매치 2 · 틀린 그림 찾기"} = {}) {
+  return api[language].render({id: "spot-demo", match: {game, players, steps}, frame, view, selected, choosePlayer: noop, chooseView: noop, seek: noop, mode: "paused"});
 }
 
 for (const language of ["ko", "en"]) {
+  test(`${language}: current and archived Korean names share the picture scene, panels, and rule summary`, () => {
+    const current = "달라진 그림 찾기";
+    for (const spelling of [current, "틀린 그림 찾기"]) {
+      const title = `유배지 매치 2 · ${spelling}`;
+      assert.equal(api[language].canonicalGameTitle(title), `유배지 매치 2 · ${current}`);
+      assert.equal(api[language].gameTitle(title), language === "en" ? "Exile Match 2 · Spot the Difference" : `유배지 매치 2 · ${current}`);
+      const rules = `${spelling} · 개인전\n\n원본을 기억하고 달라진 곳을 표시하세요.`;
+      const html = render([event("rules", rules), setup, phase("observe")], {language, game: title});
+      assert.match(html, /class="exile-arena spot-arena pixel-frame"/);
+      assert.match(html, /data-picture-id="ORIGINAL-ONLY"/);
+      assert.match(html, /class="caption spot-information"/);
+      assert.match(html, language === "ko" ? /<h2>달라진 그림 찾기<\/h2>/ : /<h2>Spot the Difference<\/h2>/);
+      assert.doesNotMatch(html, /틀린 그림 찾기/);
+      assert.equal(api[language].rulesSummary(`${spelling} · 개인전`, ""), api[language].rulesSummary(`${current} · 개인전`, ""));
+      assert.match(api[language].rulesSummary(`${spelling} · 개인전`, ""), /Four players observe an original picture/);
+    }
+  });
+  test(`${language}: landing game list uses the current Korean name and unchanged English title`, () => {
+    const html = api[language].renderHome();
+    assert.match(html, language === "ko" ? /<strong>달라진 그림 찾기<\/strong>/ : /<strong>Spot the Difference<\/strong>/);
+    assert.doesNotMatch(html, /틀린 그림 찾기/);
+  });
   test(`${language}: raster replays expose only the current image and provide a native enlargement dialog`, () => {
     const rasterOriginal = {id: "RASTER-ORIGINAL", theme: "market", width: 960, height: 640, image: "data:image/png;base64,b3JpZ2luYWw="};
     const rasterChanged = {...rasterOriginal, id: "RASTER-CHANGED", image: "data:image/png;base64,Y2hhbmdlZA=="};

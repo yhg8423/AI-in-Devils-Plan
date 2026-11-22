@@ -383,9 +383,11 @@ class ExileExportTest(unittest.TestCase):
             export_replays([directory], self.source, self.output)
         self.assertFalse(self.output.exists())
 
-    def test_exports_all_three_exiles_with_relocatable_links_and_code_results(self):
+    def test_exports_all_three_exiles_when_second_uses_legacy_title(self):
         directory, logs, first, second, third = third_campaign(self.source)
+        update_header(second, game="유배지 매치 2 · 틀린 그림 찾기")
         originals = {path: path.read_bytes() for path in [*logs, first, second, third]}
+        self.assertEqual(read_match(second)["game"], SECOND_EXILE)
         export_replays([directory], self.source, self.output)
         target = self.output / "matches/example/exile3/events.jsonl"
         rows = [json.loads(line) for line in target.read_text().splitlines()]
@@ -399,6 +401,7 @@ class ExileExportTest(unittest.TestCase):
         self.assertEqual([match["game"] for match in case["exile_matches"]],
                          [FIRST_EXILE, SECOND_EXILE, THIRD_EXILE])
         runs = find_matches(self.output)
+        self.assertEqual(next_match(self.output, runs, "matches/example/exile1")["game"], SECOND_EXILE)
         self.assertEqual(next_match(self.output, runs, "matches/example/exile2")["id"], "matches/example/exile3")
 
     def test_third_exile_requires_its_predecessor_before_any_export_is_written(self):
