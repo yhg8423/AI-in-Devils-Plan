@@ -253,7 +253,9 @@ def case_catalog(root: Path) -> list[dict]:
             case = next((case for case in cases
                          if [match["id"] for match in case["matches"][:len(source_ids)]] == source_ids), None)
             if case is not None:
-                case.setdefault("exile_matches", []).append(summary(run_id, header, status))
+                match = summary(run_id, header, status)
+                match["after"] = source_ids[-1]
+                case.setdefault("exile_matches", []).append(match)
         except (OSError, RuntimeError, ValueError, KeyError, TypeError):
             continue
     for case in cases:

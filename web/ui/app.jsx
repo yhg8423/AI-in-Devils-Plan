@@ -14,7 +14,7 @@ import {MatchReplay} from "./match-replay.jsx";
 import {CasePicker, Home, Mast, SiteFooter, runHref} from "./home.jsx";
 import {InfoPage, infoPages} from "./info-pages.jsx";
 import {LoadingStatus} from "./loading-status.jsx";
-import {caseTitle} from "./cases.js";
+import {caseMatches, caseTitle} from "./cases.js";
 import {en, gameTitle, language, siteTitle, tr} from "./locale.js";
 import "@astryxdesign/core/reset.css";
 import "@astryxdesign/core/astryx.css";
@@ -28,7 +28,7 @@ const chapters = [
 
 function CaseNavigation({replay}) {
   const {caseRecord, chosen, chooseRun} = replay;
-  const matches = [...caseRecord.matches, ...(caseRecord.exile_matches ?? [])];
+  const matches = caseMatches(caseRecord);
   const selectorLabel = tr("매치 선택", "Choose a match");
   return <Selector label={selectorLabel} aria-label={selectorLabel} isLabelHidden size="sm" variant="secondary"
     value={chosen} options={matches.map(({id, game}) => ({value: id, label: gameTitle(game)}))}

@@ -3,6 +3,7 @@ import {Button} from "@astryxdesign/core/Button";
 import {Selector} from "@astryxdesign/core/Selector";
 import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {choiceCountLabel, choiceOptionLabel, choiceResults, optionsByChoice} from "./choice-results.js";
+import {caseMatches} from "./cases.js";
 import {BingoInformation, BingoStage, bingoSetPoint, bingoWhisperPoints, drawBingoSet} from "./auction-bingo.jsx";
 import {applyBingoEvent, bingoActionText, bingoEventText} from "./auction-bingo-state.js";
 import {RouletteInspection, RouletteInspectionLegend, RouletteScene} from "./day-two-scenes.jsx";
@@ -1203,8 +1204,9 @@ function modelLabel({provider, model, effort, model_players: modelPlayers, model
 
 export function MatchReplay({replay, transport, caseName}) {
   const {caseRecord, match, frame, view, selected} = replay;
-  const indexInCase = caseRecord?.matches.findIndex(({id}) => id === replay.id) ?? -1;
-  const nextMatch = indexInCase >= 0 ? caseRecord.matches[indexInCase + 1] : match.next_match;
+  const matches = caseRecord ? caseMatches(caseRecord) : [];
+  const indexInCase = matches.findIndex(({id}) => id === replay.id);
+  const nextMatch = indexInCase >= 0 ? matches[indexInCase + 1] : match.next_match;
   const [subtitle, name] = canonicalGameTitle(match.game).split(" · ");
   const isMarket = name === "미스터리 거래소";
   const isRoulette = name === "러시안 룰렛";
