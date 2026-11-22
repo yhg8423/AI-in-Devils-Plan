@@ -17,7 +17,7 @@ const gameNames = new Map([
   ["4일차 메인 매치", "Day 4 Main Match"], ["경매 빙고", "Auction Bingo"],
   ["4일차 감옥 매치", "Day 4 Prison Match"], ["벽바둑 2", "Wall Go II"],
   ["유배지 매치 1", "Exile Match 1"], ["피스 퍼즐", "Piece Puzzle"],
-  ["유배지 매치 2", "Exile Match 2"], ["틀린 그림 찾기", "Spot the Difference"],
+  ["유배지 매치 2", "Exile Match 2"], ["달라진 그림 찾기", "Spot the Difference"],
   ["유배지 매치 3", "Exile Match 3"], ["비밀 코드", "Secret Code"],
   ["유배지 매치 4", "Exile Match 4"], ["울타리 치기", "Loop Fence Puzzle"],
   ["유배지 매치 5", "Exile Match 5"], ["대칭 퍼즐", "Symmetrical Puzzle"],
@@ -28,7 +28,7 @@ const gameNames = new Map([
 ]);
 
 export function canonicalGameTitle(title) {
-  return title.replaceAll("달라진 그림 찾기", "틀린 그림 찾기");
+  return title.replaceAll("틀린 그림 찾기", "달라진 그림 찾기");
 }
 
 export function gameTitle(title) {

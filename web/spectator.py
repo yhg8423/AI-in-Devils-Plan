@@ -18,7 +18,7 @@ from games.exile_match.roster import (
     collect_exile_players, collect_second_exile_players, collect_third_exile_players, collect_fourth_exile_players,
     collect_fifth_exile_players,
 )
-from games.match import FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE
+from games.match import FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE, canonical_game_title
 
 
 UI = Path(__file__).with_name("ui")
@@ -65,7 +65,7 @@ def read_match_header(log: Path) -> dict | None:
     except (OSError, ValueError):
         return None
     if isinstance(header, dict) and isinstance(header.get("game"), str):
-        header["game"] = header["game"].replace("달라진 그림 찾기", "틀린 그림 찾기")
+        header["game"] = canonical_game_title(header["game"])
         return header
     return None
 
@@ -115,8 +115,8 @@ def source_paths(root: Path, previous: object) -> tuple[Path, ...]:
 
 def exile_sources(root: Path, header: dict, logs, *, previous_exile: Path | None = None) -> list[Path]:
     """Validate an exile roster against its campaign and optional predecessor."""
-    header = {**header, "game": str(header.get("game", "")).replace("달라진 그림 찾기", "틀린 그림 찾기")}
-    if header.get("game") not in EXILE_GAMES or any(key in header for key in ("from_main", "from_prison")):
+    game = canonical_game_title(header.get("game", ""))
+    if game not in EXILE_GAMES or any(key in header for key in ("from_main", "from_prison")):
         raise ValueError("Expected an exile match with from_matches source links.")
     links = header.get("from_matches")
     if not isinstance(links, list) or not links:
@@ -130,7 +130,7 @@ def exile_sources(root: Path, header: dict, logs, *, previous_exile: Path | None
         sources.append(path)
     if any(match_status(path) != "complete" for path in sources):
         raise ValueError("Exile sources must be completed matches.")
-    if header["game"] == FIRST_EXILE:
+    if game == FIRST_EXILE:
         if "from_exile" in header:
             raise ValueError("The first exile match cannot have a previous exile match.")
         players = collect_exile_players(sources)
@@ -139,7 +139,7 @@ def exile_sources(root: Path, header: dict, logs, *, previous_exile: Path | None
             raise ValueError("The exile match must point to this campaign's preceding exile match.")
         collectors = {SECOND_EXILE: collect_second_exile_players, THIRD_EXILE: collect_third_exile_players,
                       FOURTH_EXILE: collect_fourth_exile_players, FIFTH_EXILE: collect_fifth_exile_players}
-        players = collectors[header["game"]](previous_exile, sources)
+        players = collectors[game](previous_exile, sources)
     if header.get("players") != players:
         raise ValueError("The exile roster must match the campaign's entrants and survivors in source order.")
     return sources
@@ -417,10 +417,11 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
         return {"steps": []}
     header = rows[0]
     full_match = "game" in header
+    game = canonical_game_title(header["game"]) if full_match else None
     translations, version = read_translations(log) if language == "en" else ({}, None)
     translated = {"translation_version": version} if version else {}
     symmetry_seed, symmetry_modern, symmetry_pack = None, False, "broadcast"
-    if language == "ko" and header.get("game") == FIFTH_EXILE:
+    if language == "ko" and game == FIFTH_EXILE:
         rng = Random(header["seed"])
         rng.sample(header["players"], len(header["players"]))
         symmetry_seed = rng.randrange(2 ** 32)
@@ -459,7 +460,7 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
                 "visible_to": "all",
             }]})
         return {
-            "format": "match", "game": header["game"], "players": header["players"],
+            "format": "match", "game": game, "players": header["players"],
             "model": header.get("model"), "effort": header.get("effort"), "provider": header.get("provider"),
             "seed": header["seed"],
             "model_players": header.get("model_players"),
@@ -467,7 +468,7 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
             "image_model": header.get("image_model"),
             "image_model_overrides": header.get("image_model_overrides"),
             "image_effort_overrides": header.get("image_effort_overrides"),
-            "board": PARK_ROWS if header["game"].endswith(" · 양자택일") else None,
+            "board": PARK_ROWS if game.endswith(" · 양자택일") else None,
             "complete": complete, "interrupted": interrupted, "model_calls": last.get("model_calls"), "steps": steps,
             **translated,
         }
