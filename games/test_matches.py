@@ -267,6 +267,27 @@ class MatchTest(unittest.TestCase):
                                      {"phase": "symmetry_arrange", "note": "검토 요약 2", "fallback": True})
                     self.assertEqual(final_note.visible_to, ["P01"])
 
+    def test_review_key_stops_repeated_geometry_without_spending_another_call_or_losing_latest_answer(self):
+        names = ("P01", "P02")
+        match = Match(names, 1, model=OpenAILanguageModel("test", Mock()), live_players=names, live_turns=8)
+        calls = dict.fromkeys(names, 0)
+
+        def query(name, prompt, **kwargs):
+            calls[name] += 1
+            candidate = ("1" if calls[name] == 1 else "01") if name == "P01" else str(calls[name])
+            return candidate, StrategyNote(text=f"{name} 검토 {calls[name]}", review_requested=True)
+
+        with patch.object(match, "_query", side_effect=query):
+            answers = match.decide_together("symmetry_arrange", {
+                name: Decision("서로 다른 배치를 검토하세요.", "0", options=("0", "1", "01", "2", "3")) for name in names
+            }, max_reviews=2, review_key=lambda name, candidate: int(candidate))
+        self.assertEqual(calls, {"P01": 2, "P02": 3})
+        self.assertEqual(match.live_turns, 3)
+        self.assertEqual(answers, {"P01": "01", "P02": "3"})
+        notes = [json.loads(event.content) for event in match.events if event.msg_type == "decision_note"]
+        self.assertEqual(sum(note.get("review") is True for note in notes), 3)
+        self.assertEqual(sum(not note.get("review") for note in notes), 2)
+
     def test_openai_cli_sends_structured_text_and_multi_image_actions(self):
         with (TemporaryDirectory() as directory, patch.dict("os.environ", {}, clear=True),
               patch("games.models.OpenAI") as openai, patch("games.models._openai_key") as key,

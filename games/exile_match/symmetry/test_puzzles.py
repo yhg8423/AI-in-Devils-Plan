@@ -241,6 +241,43 @@ class PolygonTest(unittest.TestCase):
         encoded = b64decode(board(banks[2], draft)["image"].partition(",")[2])
         self.assertEqual(sha256(encoded).hexdigest(), "dbce93c90b00a8ceeea3b1a5b824fe06a2aaba17214349065cf2a3a65be8f2b6")
 
+    def test_original_pack_requires_partial_contact_and_supports_a_diagonal_axis(self):
+        seed = 506456969
+        old_blue, old_red, old_green = make_puzzles(seed)
+        blue, red, green = make_puzzles(seed, pack="original")
+        self.assertEqual(blue, old_blue)
+        self.assertNotEqual(red["pieces"], old_red["pieces"])
+        self.assertNotEqual(green["pieces"], old_green["pieces"])
+
+        def turn_together(source, placements, angle):
+            result = []
+            for pose in placements:
+                shape = translate(rotate(placement_polygon(source, pose), angle, origin=(0, 0)), 6, -3)
+                result.append(placement(pose["piece"], *shape.bounds[:2], pose["rotation"] + angle))
+            return result
+
+        for source, expected_axis, joints in (
+            (red, 90, (("R2", 2, 2, "R1", 0, 1), ("R3", 0, 0, "R2", 1, 2))),
+            (green, 45, (("G2", 0, 0, "G1", 3, 0), ("G3", 0, 0, "G2", 2, 3))),
+        ):
+            placed = [source["solution"][0]]
+            for joint in joints:
+                command = dict(zip(("piece", "edge", "vertex", "to_piece", "to_edge", "to_vertex"), joint, strict=True))
+                placed.append(align_placement(source, command, placed))
+            self.assertEqual(reflection_axes(assembled_shape(source, placed)), [expected_axis])
+            self.assertTrue(judge(source, placed))
+            self.assertTrue(judge(source, turn_together(source, placed, 28.5)))
+
+        house = [placement("G1", 0, 0), placement("G2", 2, 0), placement("G3", 2, 3)]
+        self.assertEqual(reflection_axes(assembled_shape(green, house)), [90])
+        self.assertFalse(judge(green, house))
+        self.assertFalse(judge(green, turn_together(green, house, 45)))
+
+        triangle, shaft = [placement_polygon(red, pose) for pose in red["solution"][1:]]
+        self.assertAlmostEqual(triangle.boundary.intersection(shaft.boundary).length, 4)
+        # The rectangle uses only four units of the triangle's six-unit base.
+        self.assertAlmostEqual(triangle.exterior.coords[1][0] - triangle.exterior.coords[2][0], 6)
+
     def test_public_atlases_enlarge_each_piece_without_changing_order_or_chirality(self):
         draw_polygon = graphics._graphics_polygon
         draw_annotations = graphics._draw_annotations
@@ -286,6 +323,93 @@ class PolygonTest(unittest.TestCase):
                 source["solution"] = [{"private": "MUST-NOT-APPEAR"}]
                 source["placements"] = {"private": "OTHER-PLAYER"}
                 self.assertEqual(piece_atlas(source), view)
+
+    def test_default_individual_atlas_png_hashes_remain_unchanged(self):
+        expected = {
+            ("blue", "en"): "7695ec0c8922ce10bce2f22258a95d2a83efed49d197885cd3f96da18cd89843",
+            ("blue", "ko"): "17728cfbbfe1d5bc8300b2853613232cddc0c0fba32afc58fb3c33d5e00e4e4d",
+            ("red", "en"): "5de8b73c7b69dbeba45cd1d5b5a02d9714a78f4c97a79e92050bdd014d4b3607",
+            ("red", "ko"): "00381edb711f10544993f3d5626b4a985c25bd329e410815799f4544818d3027",
+            ("green", "en"): "f3a5177c5e61564f87b164c393d7958faccce9722f383717e24dae736e4c282a",
+            ("green", "ko"): "f684d08083644921139d2b5d470f383027aebd62f904b1668468b868ca2f19c2",
+        }
+        for source in make_puzzles(506456969):
+            for language in ("ko", "en"):
+                with self.subTest(color=source["id"], language=language):
+                    view = piece_atlas(source, language=language)
+                    self.assertEqual(view, piece_atlas(source, language=language, common_scale=False))
+                    self.assertEqual(sha256(b64decode(view["image"].partition(",")[2])).hexdigest(),
+                                     expected[source["id"], language])
+
+    def test_common_scale_overview_has_equal_transform_scales_and_identical_rulers_in_both_languages(self):
+        polygon = graphics._graphics_polygon
+        annotations = graphics._draw_annotations
+        draw_line = pygame.draw.line
+        graphics_text = graphics._graphics_text
+        for source in make_puzzles(31):
+            for language in ("ko", "en"):
+                transforms, rulers, captions = [], [], []
+
+                def capture_polygon(surface, shape, transform, *args, **kwargs):
+                    origin, right, down = transform(0, 0), transform(1, 0), transform(0, 1)
+                    transforms.append((right[0] - origin[0], down[1] - origin[1]))
+                    projected = Polygon([transform(x, y) for x, y in shape.exterior.coords])
+                    self.assertEqual(projected.exterior.is_ccw, shape.exterior.is_ccw)
+                    return polygon(surface, shape, transform, *args, **kwargs)
+
+                def capture_annotations(surface, labels, font, bounds):
+                    routed = annotations(surface, labels, font, bounds)
+                    for index, (_, _, rectangle) in enumerate(routed):
+                        self.assertTrue(pygame.Rect(bounds).contains(rectangle))
+                        self.assertFalse(any(rectangle.inflate(2, 2).colliderect(previous[2]) for previous in routed[:index]))
+                    return routed
+
+                def capture_line(surface, color, start, end, *args, **kwargs):
+                    if color == "#405a70" and start[1] == end[1]:
+                        rulers.append(end[0] - start[0])
+                    return draw_line(surface, color, start, end, *args, **kwargs)
+
+                def capture_text(surface, value, *args, **kwargs):
+                    captions.append(value)
+                    return graphics_text(surface, value, *args, **kwargs)
+
+                with (self.subTest(color=source["id"], language=language),
+                      patch.object(graphics, "_graphics_polygon", side_effect=capture_polygon),
+                      patch.object(graphics, "_draw_annotations", side_effect=capture_annotations),
+                      patch.object(pygame.draw, "line", side_effect=capture_line),
+                      patch.object(graphics, "_graphics_text", side_effect=capture_text),
+                      patch.object(graphics, "judge", side_effect=AssertionError("Overview must not judge"))):
+                    view = piece_atlas(source, language=language, common_scale=True)
+                self.assertEqual(len(transforms), len(source["pieces"]))
+                self.assertEqual(len(rulers), len(source["pieces"]))
+                for xscale, yscale in transforms:
+                    self.assertAlmostEqual(xscale, transforms[0][0], places=9)
+                    self.assertAlmostEqual(yscale, transforms[0][0], places=9)
+                    self.assertGreater(xscale, 0)
+                for length in rulers:
+                    self.assertAlmostEqual(length, rulers[0], places=9)
+                unit_captions = [caption for caption in captions if caption.endswith("단위" if language == "ko" else "units")]
+                self.assertEqual(len(unit_captions), len(source["pieces"]))
+                self.assertEqual(len(set(unit_captions)), 1)
+                self.assertTrue(any(("같은 배율" if language == "ko" else "SAME SCALE") in caption for caption in captions))
+                self.assertFalse(any(("배율이 서로 다름" if language == "ko" else "SCALES DIFFER") in caption for caption in captions))
+                self.assertEqual((view["width"], view["height"]), (1440, 1100))
+                source["solution"] = [{"hidden": "must-not-affect-public-overview"}]
+                source["placements"] = {"other-player": []}
+                self.assertEqual(view, piece_atlas(source, language=language, common_scale=True))
+
+    def test_common_scale_overview_pixels_preserve_relative_piece_sizes(self):
+        source = puzzle(TRIANGLE, count=2)
+        source["pieces"][1]["vertices"] = [(0, 0), (1, 0), (0, .5)]
+        view = piece_atlas(source, common_scale=True)
+        image = pygame.image.load(BytesIO(b64decode(view["image"].partition(",")[2])))
+        pixels = pygame.surfarray.array3d(image)
+        widths = []
+        for left, right in ((36, 708), (732, 1404)):
+            mask = (pixels[left:right, 240:900] == (38, 113, 188)).all(axis=2)
+            columns = mask.any(axis=1).nonzero()[0]
+            widths.append(int(columns[-1] - columns[0] + 1))
+        self.assertAlmostEqual(widths[0] / widths[1], 2, delta=.05)
 
     def test_detailed_drafts_show_owned_indices_and_overlap_hatching_without_judging(self):
         source = puzzle(SQUARE, count=2)

@@ -25,16 +25,16 @@ def fake_puzzles(seed):
 
 def fake_image(kind, puzzle, placements=(), *, language="en"):
     text = json.dumps([kind, puzzle["seed"], puzzle["id"], placements, language], sort_keys=True)
-    return {"id": sha256(text.encode()).hexdigest()[:16], "width": 1440 if kind == "atlas" else 960,
-            "height": 1100 if kind == "atlas" else 640, "image": f"PNG:{text}"}
+    return {"id": sha256(text.encode()).hexdigest()[:16], "width": 1440 if kind in ("atlas", "overview") else 960,
+            "height": 1100 if kind in ("atlas", "overview") else 640, "image": f"PNG:{text}"}
 
 
 def fake_board(puzzle, placements=(), *, detailed=False, language="en"):
     return fake_image("board" if detailed else "legacy", puzzle, placements, language=language)
 
 
-def fake_atlas(puzzle, *, language="en"):
-    return fake_image("atlas", puzzle, language=language)
+def fake_atlas(puzzle, *, language="en", common_scale=False):
+    return fake_image("overview" if common_scale else "atlas", puzzle, language=language)
 
 
 def fake_tutorial(*, language="en"):
@@ -48,14 +48,16 @@ def event(kind, data, visible_to="all", agent_name="System"):
 
 def setup(version=3):
     return event("sym_setup", {"version": version, "players": PLAYERS, "priority": PLAYERS[::-1],
-                               "mode": "polygons", "survivors": 2})
+                               "mode": "polygons", "survivors": 2,
+                               **({"focus_mode": "one_color", "focus_start_window": 1} if version >= 4 else {})})
 
 
 def public_puzzles(version=3):
     return event("sym_puzzles", {"puzzles": [
         {"id": puzzle["id"], "label": puzzle["id"], "piece_ids": [puzzle["id"][0].upper() + "1"],
          "board": fake_board(puzzle, detailed=version >= 3),
-         **({"details": fake_atlas(puzzle)} if version >= 3 else {})}
+         **({"details": fake_atlas(puzzle)} if version >= 3 else {}),
+         **({"overview": fake_atlas(puzzle, common_scale=True)} if version >= 4 else {})}
         for puzzle in fake_puzzles(PUZZLE_SEED)]})
 
 
@@ -185,6 +187,47 @@ class SymmetryLocalizationTest(unittest.TestCase):
         self.board.assert_not_called()
         self.atlas.assert_not_called()
 
+    def test_v4_common_scale_localizes_separately_from_individual_details_and_preserves_focus_metadata(self):
+        for initial_version in (3, 4):
+            with self.subTest(initial_version=initial_version):
+                tools = {"version": 4, "thinking_passes": 3, "focus_mode": "one_color", "focus_start_window": 2,
+                         "puzzles": [{"id": puzzle["id"], "details": fake_atlas(puzzle),
+                                      "overview": fake_atlas(puzzle, common_scale=True)}
+                                     for puzzle in fake_puzzles(PUZZLE_SEED)]}
+                events = [setup(initial_version), public_puzzles(initial_version),
+                          event("sym_board", working("P01"), ["P01"], "P01"), event("sym_tools", tools),
+                          event("sym_window", {"window": 2, "active": PLAYERS, "focus_color": "green"})]
+                disk = self.write(events)
+                korean = payloads(spectator.read_match(self.log))
+                english = payloads(spectator.read_match(self.log, language="en"))
+                migrated = json.loads(korean[3]["content"])
+                self.assertEqual({key: value for key, value in migrated.items() if key != "puzzles"},
+                                 {key: value for key, value in tools.items() if key != "puzzles"})
+                for actual, puzzle in zip(migrated["puzzles"], fake_puzzles(PUZZLE_SEED), strict=True):
+                    self.assertEqual(actual["overview"], fake_atlas(puzzle, language="ko", common_scale=True))
+                    self.assertEqual(actual["details"], fake_atlas(puzzle, language="ko"))
+                    self.assertNotEqual(actual["overview"], actual["details"])
+                if initial_version == 4:
+                    for actual, puzzle in zip(json.loads(korean[1]["content"])["puzzles"], fake_puzzles(PUZZLE_SEED), strict=True):
+                        self.assertEqual(actual["overview"], fake_atlas(puzzle, language="ko", common_scale=True))
+                self.assertEqual(korean[2]["visible_to"], ["P01"])
+                self.assertEqual(korean[4]["content"], events[4]["content"])
+                for source, shown in zip(events, english, strict=True):
+                    self.assertEqual(shown["content"], source["content"])
+                count = self.atlas.call_count
+                self.assertEqual(payloads(spectator.read_match(self.log)), korean)
+                self.assertEqual(self.atlas.call_count, count)
+                self.assertEqual(self.log.read_bytes(), disk)
+
+    def test_common_scale_archive_guard_does_not_replace_a_mismatched_overview(self):
+        source = public_puzzles(4)
+        data = json.loads(source["content"])
+        data["puzzles"][0]["overview"]["id"] = "DIFFERENT-ARCHIVED-OVERVIEW"
+        self.write([setup(4), event("sym_puzzles", data)])
+        shown = json.loads(payloads(spectator.read_match(self.log))[1]["content"])
+        self.assertEqual(shown["puzzles"][0]["overview"], data["puzzles"][0]["overview"])
+        self.assertEqual(shown["puzzles"][0]["details"], fake_atlas(fake_puzzles(PUZZLE_SEED)[0], language="ko"))
+
     def test_observed_public_tutorial_localizes_without_modern_puzzle_data_and_reuses_cache(self):
         with patch("games.exile_match.symmetry.tutorial.tutorial_image", side_effect=fake_tutorial) as renderer:
             data = {"version": 1, "board": fake_tutorial(),
@@ -219,6 +262,29 @@ class SymmetryLocalizationTest(unittest.TestCase):
 
 
 class SymmetryRasterLocalizationTest(unittest.TestCase):
+    def test_real_common_scale_overview_and_individual_atlas_remain_distinct_in_korean_projection(self):
+        from games.exile_match.symmetry.puzzles import make_puzzles, piece_atlas
+
+        spectator._symmetry_puzzles.cache_clear()
+        spectator._korean_symmetry_image.cache_clear()
+        self.addCleanup(spectator._symmetry_puzzles.cache_clear)
+        self.addCleanup(spectator._korean_symmetry_image.cache_clear)
+        puzzles = make_puzzles(PUZZLE_SEED)
+        data = {"puzzles": [{"id": puzzle["id"], "details": piece_atlas(puzzle),
+                             "overview": piece_atlas(puzzle, common_scale=True)} for puzzle in puzzles]}
+        source = event("sym_puzzles", data)
+        with TemporaryDirectory() as directory:
+            log = Path(directory) / "events.jsonl"
+            raw = "".join(json.dumps(row) + "\n" for row in [HEADER, setup(4), source]).encode()
+            log.write_bytes(raw)
+            korean = json.loads(payloads(spectator.read_match(log))[1]["content"])
+            for actual, puzzle in zip(korean["puzzles"], puzzles, strict=True):
+                self.assertEqual(actual["overview"], piece_atlas(puzzle, language="ko", common_scale=True))
+                self.assertEqual(actual["details"], piece_atlas(puzzle, language="ko"))
+                self.assertNotEqual(actual["overview"]["id"], actual["details"]["id"])
+            self.assertEqual(payloads(spectator.read_match(log, language="en"))[1]["content"], source["content"])
+            self.assertEqual(log.read_bytes(), raw)
+
     def test_public_tutorial_uses_the_real_korean_png_without_inventing_puzzle_state(self):
         from games.exile_match.symmetry.tutorial import TUTORIAL_EXPLANATIONS, tutorial_image
 

@@ -170,14 +170,26 @@ def reflection_axes(shape):
     return axes
 
 
+def accepted_axes(puzzle, placements):
+    axes = reflection_axes(assembled_shape(puzzle, placements))
+    if not axes or not puzzle.get("diagonal_axis"):
+        return axes
+    anchor = placement_polygon(puzzle, next(pose for pose in placements if pose["piece"] == "G1"))
+    points = list(anchor.exterior.coords)
+    edges = [(x2 - x1, y2 - y1) for (x1, y1), (x2, y2) in zip(points, points[1:])]
+    dx, dy = max(edges, key=lambda edge: hypot(*edge))
+    direction = degrees(atan2(dy, dx))
+    # Referencing the piece instead of the screen keeps whole-board rotation legal.
+    return [axis for axis in axes if abs((axis - direction) % 90 - 45) < 1e-6]
+
+
 def judge(puzzle, placements):
-    return bool(reflection_axes(assembled_shape(puzzle, placements)))
+    return bool(accepted_axes(puzzle, placements))
 
 
-def make_puzzles(seed):
-    # Recovered broadcast geometry has one separate source of truth.
+def make_puzzles(seed, *, pack="broadcast"):
     from .data import make_puzzles as load_puzzles
-    return load_puzzles(seed)
+    return load_puzzles(seed, pack=pack)
 
 
 def _label_layout(labels, bounds, *, radii=(0, 12, 24, 38, 54, 74)):
@@ -389,30 +401,39 @@ def _prose_fonts(language, korean_sizes, english_sizes):
     return tuple(pygame.font.Font(font, size) for size in (korean_sizes if language == "ko" else english_sizes))
 
 
-def piece_atlas(puzzle, *, language="en"):
-    """Public, independently enlarged pieces; no placements or solution data are read."""
+def piece_atlas(puzzle, *, language="en", common_scale=False):
+    """Public pieces at independent zoom or one common scale, without assembly data."""
     pygame.font.init()
     surface = pygame.Surface((1440, 1100))
     surface.fill("#111d2e")
     korean = language == "ko"
     title, body = _prose_fonts(language, (32, 22), (44, 30))
     label = pygame.font.Font(None, 32)
-    _graphics_text(surface, f"{COLORS[puzzle['id']][0]} / 조각 확대도" if korean else f"{puzzle['id'].upper()} / PIECE ATLAS",
+    atlas_title = (f"{COLORS[puzzle['id']][0]} / 같은 배율 전체 보기" if korean else
+                   f"{puzzle['id'].upper()} / SAME-SCALE OVERVIEW") if common_scale else (
+                   f"{COLORS[puzzle['id']][0]} / 조각 확대도" if korean else f"{puzzle['id'].upper()} / PIECE ATLAS")
+    _graphics_text(surface, atlas_title,
                    title, "#f5dfb6", (36, 25))
-    _graphics_text(surface, "조각별 확대 · 배율이 서로 다름 · 뒤집기 금지" if korean else "INDIVIDUAL ZOOM / SCALES DIFFER / NO FLIPS",
+    atlas_caption = ("모든 조각이 같은 배율 · 같은 단위자 · 뒤집기 금지" if korean else
+                     "ALL PIECES / SAME SCALE / IDENTICAL UNIT RULERS / NO FLIPS") if common_scale else (
+                     "조각별 확대 · 배율이 서로 다름 · 뒤집기 금지" if korean else "INDIVIDUAL ZOOM / SCALES DIFFER / NO FLIPS")
+    _graphics_text(surface, atlas_caption,
                    body, "#d7e5f3", (36, 78))
     gap, margin = 24, 36
     card_width = (surface.get_width() - margin * 2 - gap * (len(puzzle["pieces"]) - 1)) / len(puzzle["pieces"])
     color = pygame.Color(COLORS[puzzle["id"]][1])
+    shapes = [_piece_polygon(piece) for piece in puzzle["pieces"]] if common_scale else None
+    shared_unit = min((round(card_width) - 120) / max(shape.bounds[2] - shape.bounds[0] for shape in shapes),
+                      600 / max(shape.bounds[3] - shape.bounds[1] for shape in shapes)) if common_scale else None
     for index, piece in enumerate(puzzle["pieces"]):
         card = pygame.Rect(round(margin + index * (card_width + gap)), 133, round(card_width), 870)
         pygame.draw.rect(surface, "#e9edf0", card, border_radius=12)
         _graphics_text(surface, piece["id"], title, "#172d44", (card.x + 22, card.y + 18))
-        shape = _piece_polygon(piece)
+        shape = shapes[index] if common_scale else _piece_polygon(piece)
         left, top, right, bottom = shape.bounds
         _graphics_text(surface, f"가로 {right-left:.4g} / 세로 {bottom-top:.4g}" if korean else f"width {right-left:.4g} / height {bottom-top:.4g}",
                        body, "#405a70", (card.x + 22, card.y + 66))
-        unit = min((card.width - 120) / (right - left), (card.height - 270) / (bottom - top))
+        unit = shared_unit if common_scale else min((card.width - 120) / (right - left), (card.height - 270) / (bottom - top))
         ox = card.centerx - (left + right) / 2 * unit
         oy = card.y + 120 + (card.height - 270) / 2 - (top + bottom) / 2 * unit
         # A positive uniform scale preserves the original chirality, order, and orientation.

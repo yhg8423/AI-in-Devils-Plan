@@ -1,6 +1,7 @@
 """Three-color private work, strict full replacements, race privacy, and resume."""
 
 from base64 import b64decode, b64encode
+from collections import OrderedDict
 from contextlib import contextmanager, redirect_stderr, redirect_stdout
 from copy import deepcopy
 from hashlib import sha256
@@ -10,11 +11,12 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
+from shapely.affinity import rotate
 
 from ...match import FIFTH_EXILE, Match, encode, run_cli
 from ...models import OpenAILanguageModel, StrategyNote
 from . import game
-from .puzzles import COLORS, judge, make_puzzles
+from .puzzles import COLORS, judge, make_puzzles, placement_polygon
 
 
 PLAYERS = ("P01", "P02", "P03", "P04")
@@ -37,8 +39,8 @@ def render(puzzle, placements=(), *, detailed=False):
             "image": "data:image/png;base64," + b64encode(image).decode("ascii")}
 
 
-def atlas(puzzle):
-    image = b"\x89PNG\r\n\x1a\nSTATIC-ATLAS-" + puzzle["id"].encode()
+def atlas(puzzle, *, common_scale=False):
+    image = b"\x89PNG\r\n\x1a\nSTATIC-ATLAS-" + (b"COMMON-" if common_scale else b"") + puzzle["id"].encode()
     return {"id": sha256(image).hexdigest()[:16], "width": 1800, "height": 1200,
             "image": "data:image/png;base64," + b64encode(image).decode("ascii")}
 
@@ -49,11 +51,26 @@ def tutorial(language="en"):
             "image": "data:image/png;base64," + b64encode(image).decode("ascii")}
 
 
+def workbench(puzzle, placements=(), *, axis=None):
+    image = b"\x89PNG\r\n\x1a\nSILHOUETTE-" + encode({"color": puzzle["id"], "placements": placements, "axis": axis}).encode()
+    return {"id": sha256(image).hexdigest()[:16], "width": 1440, "height": 900,
+            "image": "data:image/png;base64," + b64encode(image).decode("ascii")}
+
+
 @contextmanager
-def puzzles():
+def puzzles(version=3):
+    original = game._initial_protocol
+
+    def protocol(match):
+        if match.resume_log is not None and match.resume_log.resume:
+            return original(match)
+        return version, {2: game.LEGACY_RULES, 3: game.RULES, 4: game.FOCUS_RULES, 5: game.WORKBENCH_RULES}[version]
+
     with (patch.object(game, "make_puzzles", return_value=[{**puzzle, "internal": "NEVER-PUBLISH"} for puzzle in PUZZLES]),
           patch.object(game, "board", side_effect=render), patch.object(game, "piece_atlas", side_effect=atlas),
-          patch.object(game, "tutorial_image", side_effect=tutorial)):
+          patch.object(game, "measurement_atlas", side_effect=atlas),
+          patch.object(game, "tutorial_image", side_effect=tutorial), patch.object(game, "workbench_image", side_effect=workbench),
+          patch.object(game, "_initial_protocol", side_effect=protocol)):
         yield
 
 
@@ -68,7 +85,7 @@ class LiveMatch(Match):
     def decide_together(self, phase, decisions, **kwargs):
         self.window = rows(self, "sym_window")[-1]["window"]
         answers = super().decide_together(phase, decisions, **kwargs)
-        kwargs["response_times"].update({name: self.times[name] for name in decisions})
+        kwargs["response_times"].update({name: self.times[name] for name in decisions if name in kwargs["response_times"]})
         return answers
 
     def _query(self, name, prompt, *args, **kwargs):
@@ -125,6 +142,105 @@ class SymmetryTest(unittest.TestCase):
         continuous = {**placement, "x": -2.125, "y": 19.75, "rotation": 32.5}
         parsed = game.parse_action(arrange({**partial, "blue": [continuous]}), PUZZLES)
         self.assertEqual(parsed["placements"]["blue"], [continuous])
+
+    def test_arrange_color_parser_validates_one_color_and_matching_focus(self):
+        action = encode({"type": "arrange_color", "color": "red", "placements": SOLUTION["red"], "submit": False})
+        self.assertEqual(game.parse_action(action, PUZZLES), {"type": "arrange_color", "color": "red",
+                                                            "placements": SOLUTION["red"], "submit": False})
+        self.assertTrue(game._accepts(action, PUZZLES, "red"))
+        self.assertFalse(game._accepts(action, PUZZLES, "blue"))
+        self.assertFalse(game._accepts(action, PUZZLES))
+        for changes in ({"color": "yellow"}, {"color": []}, {"placements": None}, {"submit": 1}, {"extra": 1}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                game.parse_action(encode({**json.loads(action), **changes}), PUZZLES)
+
+    def test_v4_focuses_one_color_and_preserves_other_work_with_three_images(self):
+        with puzzles(4):
+            match = LiveMatch(reply=lambda *args: arrange())
+            result = game.play(match)
+        self.assertEqual(result["turns"], 3)
+        setup = rows(match, "sym_setup")[0]
+        self.assertEqual((setup["version"], setup["focus_mode"], setup["focus_start_window"]), (4, "one_color", 1))
+        self.assertEqual([row["focus_color"] for row in rows(match, "sym_window")], list(COLORS))
+        for row in rows(match, "sym_board"):
+            for index, color in enumerate(COLORS):
+                self.assertEqual(row["placements"][color], SOLUTION[color] if index < row["window"] else [])
+        for name, window, prompt, history, images in match.requests:
+            color = tuple(COLORS)[window - 1]
+            puzzle = next(p for p in PUZZLES if p["id"] == color)
+            self.assertEqual(len(images), 4 if window == 1 else 3)
+            self.assertEqual(images[1:3], game._image_bytes([atlas(puzzle, common_scale=True), atlas(puzzle)]))
+            self.assertIn(f"이번 집중 색: {color}", prompt)
+            self.assertIn("내 보존 중인 다른 색 조각 수", prompt)
+            self.assertIn("이번 색이 틀렸다는 뜻이 아닙니다", prompt)
+            self.assertNotIn("앞의 이미지 여섯", prompt)
+        for puzzle in rows(match, "sym_puzzles")[0]["puzzles"]:
+            self.assertEqual(puzzle["overview"], atlas(next(p for p in PUZZLES if p["id"] == puzzle["id"]), common_scale=True))
+
+    def test_v4_arrange_color_updates_only_its_focus_and_rejects_other_colors(self):
+        def reply(name, window):
+            color = tuple(COLORS)[(window - 1) % 3]
+            return encode({"type": "arrange_color", "color": color, "placements": SOLUTION[color], "submit": True})
+
+        with puzzles(4):
+            match = LiveMatch(reply=reply)
+            self.assertEqual(game.play(match)["turns"], 3)
+        with puzzles(4):
+            wrong = encode({"type": "arrange_color", "color": "green", "placements": SOLUTION["green"], "submit": True})
+            match = LiveMatch(reply=lambda *args: wrong, live_turns=4)
+            result = game.play(match)
+        self.assertEqual(len(rows(match, "invalid_action")), 4)
+        self.assertTrue(all(row["window"] == 2 for row in rows(match, "sym_board")))
+        self.assertEqual(result["turns"], 2)  # The unchanged scripted fallback still places the whole pack.
+
+    def test_visit_memory_deduplicates_rigid_motion_and_keeps_counts_without_grading(self):
+        puzzle = PUZZLES[0]
+        first = deepcopy(puzzle["solution"])
+        first = [{**placement, "rotation": placement["rotation"] + 360} for placement in first]
+        history = OrderedDict()
+        with (patch.object(game, "judge", side_effect=AssertionError("memory must not grade")),
+              patch.object(game, "accepted_axes", side_effect=AssertionError("memory must not grade"))):
+            game.remember_visit(history, puzzle, first, 1)
+            shifted = []
+            for placement in first:
+                polygon = rotate(placement_polygon(puzzle, placement), 17.3, origin=(0, 0))
+                shifted.append({**placement, "x": polygon.bounds[0] + 19.123456789, "y": polygon.bounds[1] - 7.5,
+                                "rotation": placement["rotation"] + 17.3})
+            game.remember_visit(history, puzzle, shifted, 2)
+            self.assertEqual(len(history), 1)
+            self.assertEqual(next(iter(history.values()))["count"], 2)
+            self.assertEqual(next(iter(history.values()))["placements"], shifted)
+            for n in range(1, 15):
+                changed = [first[0], {**first[1], "x": first[1]["x"] + n}]
+                game.remember_visit(history, puzzle, changed, 2 + n)
+            game.remember_visit(history, puzzle, first, 17)
+        self.assertEqual(next(reversed(history.values()))["count"], 3)
+        visits = list(history.values())[-12:]
+        prompt = game.focus_prompt("P01", 18, "blue", first, visits=visits)
+        self.assertEqual(len(visits), 12)
+        self.assertIn("방문 기록은 정답·오답 판정이 아닙니다", prompt)
+        self.assertTrue(all(set(row) == {"placements", "count", "last_window"} for row in visits))
+
+    def test_v4_review_previews_only_focus_and_stops_identical_geometry_after_first_review(self):
+        passes = {}
+
+        def reply(name, window):
+            passes[name, window] = passes.get((name, window), 0) + 1
+            if window > 1:
+                return game.WAIT
+            draft = {color: [] for color in COLORS}
+            draft["blue"] = SOLUTION["blue"]
+            return arrange(draft), StrategyNote(text="brief own review", review_requested=True)
+
+        with puzzles(4):
+            match = LiveMatch(reply=reply, live_turns=12)
+            game.play(match)
+        self.assertTrue(all(passes[name, 1] == 2 for name in PLAYERS))
+        self.assertEqual(len([request for request in match.requests if request[1] == 1]), 8)
+        for name in PLAYERS:
+            own = [request for request in match.requests if request[0] == name and request[1] == 1]
+            self.assertEqual(own[1][4][0], game._image_bytes([render(PUZZLES[0], SOLUTION["blue"], detailed=True)])[0])
+            self.assertEqual(len(own[1][4]), 4)
 
     def test_three_or_four_players_race_one_pack_until_first_n_minus_one_finish(self):
         for players in (PLAYERS[:3], PLAYERS):
@@ -365,7 +481,7 @@ class SymmetryTest(unittest.TestCase):
 
     def test_initial_and_private_interruptions_restore_tutorial_and_race_without_duplicate_queries(self):
         original_event = Match.event
-        with (TemporaryDirectory() as directory, puzzles(), redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+        with (TemporaryDirectory() as directory, puzzles(5), redirect_stdout(StringIO()), redirect_stderr(StringIO()),
               patch.object(Match, "_query", return_value=(arrange(), StrategyNote(text="private"))),
               patch("games.match.monotonic_ns", return_value=70_000_000_000)):
             root = Path(directory)
@@ -424,9 +540,12 @@ class SymmetryTest(unittest.TestCase):
             prefix = [json.loads(line) for line in old_bytes.splitlines()][:-1]
             self.assertEqual(json.loads(prefix[2]["content"])["version"], 2)
             saved_explanation = game.TUTORIAL_EXPLANATIONS["ko"]
+            queried = []
 
             def query(match, name, prompt, *args, **kwargs):
-                self.assertEqual(len(kwargs["images"]), 7)
+                queried.append(name)
+                window = rows(match, "sym_window")[-1]["window"]
+                self.assertEqual(len(kwargs["images"]), 5)
                 self.assertIn("OLD-OWN", prompt)
                 self.assertIn('"window":1', prompt)
                 self.assertIn("부분 접합", prompt)
@@ -444,6 +563,7 @@ class SymmetryTest(unittest.TestCase):
             with patch.object(Match, "_query", query):
                 run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(full)])
             expected = [json.loads(line) for line in full.read_text().splitlines()]
+            self.assertEqual(len(queried), 12)
             self.assertEqual(expected[:len(prefix)], prefix)
             tools = [row for row in expected if row.get("msg_type") == "sym_tools"]
             self.assertEqual(len(tools), 1)
@@ -453,6 +573,7 @@ class SymmetryTest(unittest.TestCase):
             self.assertNotIn("details", prefix[3]["content"])
             for checkpoint in ("sym_tools", "sym_tutorial", "decision_note", "action", "sym_board"):
                 output = fork(checkpoint)
+                queried.clear()
 
                 def interrupt(match, kind, value, **kwargs):
                     original_event(match, kind, value, **kwargs)
@@ -463,12 +584,11 @@ class SymmetryTest(unittest.TestCase):
                 with (patch.object(Match, "_query", query), patch.object(Match, "event", interrupt),
                       self.assertRaisesRegex(RuntimeError, "modern checkpoint")):
                     run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(output)])
-                query_patch = patch.object(Match, "_query", query) if checkpoint in {"sym_tools", "sym_tutorial"} else patch.object(
-                    Match, "_query", side_effect=AssertionError("modern committed response queried twice"))
                 changed_text = {"ko": "CHANGED-TUTORIAL", "en": "CHANGED-TUTORIAL"}
-                with query_patch, patch.object(game, "TUTORIAL_EXPLANATIONS", changed_text if checkpoint == "sym_tutorial" else game.TUTORIAL_EXPLANATIONS):
+                with patch.object(Match, "_query", query), patch.object(game, "TUTORIAL_EXPLANATIONS", changed_text if checkpoint == "sym_tutorial" else game.TUTORIAL_EXPLANATIONS):
                     run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(output)])
                 self.assertEqual([json.loads(line) for line in output.read_text().splitlines()], expected)
+                self.assertEqual(len(queried), 12)
 
     def test_existing_v3_without_tutorial_preserves_prefix_before_one_safe_migration(self):
         original_event = Match.event
@@ -495,7 +615,8 @@ class SymmetryTest(unittest.TestCase):
 
                 def query(match, name, prompt, *args, **kwargs):
                     calls.append(name)
-                    self.assertEqual(len(kwargs["images"]), 7)
+                    window = rows(match, "sym_window")[-1]["window"]
+                    self.assertEqual(len(kwargs["images"]), 5)
                     self.assertIn(game.TUTORIAL_EXPLANATIONS["ko"], prompt)
                     return arrange(), StrategyNote(text="NEW-V3")
 
@@ -505,10 +626,10 @@ class SymmetryTest(unittest.TestCase):
                 self.assertEqual(actual[:len(prefix)], prefix)
                 examples = [index for index, row in enumerate(actual) if row.get("msg_type") == "sym_tutorial"]
                 self.assertEqual(len(examples), 1)
-                before = actual[examples[0] - 1]
+                before = next(row for row in reversed(actual[:examples[0]]) if row.get("msg_type") == "sym_window")
                 self.assertEqual(before["msg_type"], "sym_window")
                 self.assertEqual(json.loads(before["content"])["window"], 2)
-                self.assertEqual(len(calls), 4)
+                self.assertEqual(len(calls), 12)
 
     def test_v2_rules_only_prefix_keeps_legacy_setup_before_tools_and_tutorial(self):
         original_event = Match.event
@@ -535,6 +656,36 @@ class SymmetryTest(unittest.TestCase):
             window = kinds.index("sym_window")
             self.assertEqual(kinds[window:window + 3], ["sym_window", "sym_tools", "sym_tutorial"])
             self.assertEqual(query.call_count, 4)
+
+    def test_saved_tools3_replays_exactly_before_tools5_even_at_same_window(self):
+        original_event = Match.event
+        with (TemporaryDirectory() as directory, puzzles(2), redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+              patch("games.match.monotonic_ns", return_value=70_000_000_000)):
+            output = Path(directory) / "tools3.jsonl"
+            arguments = ["--players", *PLAYERS, "--seed", "19", "--model", "test", "--model-turns", "16"]
+            tools3 = {"version": 3, "thinking_passes": 3,
+                      "puzzles": [{"id": puzzle["id"], "details": atlas(puzzle)} for puzzle in PUZZLES]}
+
+            def interrupt(match, kind, value, **kwargs):
+                original_event(match, kind, value, **kwargs)
+                if kind == "sym_window" and value["window"] == 2:
+                    original_event(match, "sym_tools", tools3)
+                    raise RuntimeError("saved tools3 checkpoint")
+
+            with (patch.object(Match, "event", interrupt),
+                  patch.object(Match, "_query", return_value=(arrange({color: [] for color in COLORS}), StrategyNote())),
+                  self.assertRaisesRegex(RuntimeError, "saved tools3 checkpoint")):
+                run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=[*arguments, "--output", str(output)])
+            prefix = [json.loads(line) for line in output.read_text().splitlines()][:-1]
+            with patch.object(Match, "_query", return_value=(arrange(), StrategyNote())) as query:
+                run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=["--resume", "--output", str(output)])
+            actual = [json.loads(line) for line in output.read_text().splitlines()]
+            self.assertEqual(actual[:len(prefix)], prefix)
+            tools = [json.loads(row["content"]) for row in actual if row.get("msg_type") == "sym_tools"]
+            self.assertEqual(tools[0], tools3)
+            self.assertEqual([tool["version"] for tool in tools], [3, 5])
+            self.assertEqual((tools[1]["focus_start_window"], tools[1]["focus_color"]), (2, "blue"))
+            self.assertEqual(query.call_count, 12)
 
     def test_v3_review_note_checkpoints_replay_committed_passes_and_query_only_remaining_passes(self):
         original_event = Match.event

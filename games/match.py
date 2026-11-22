@@ -240,6 +240,7 @@ class Match:
         images_by_player: Mapping[str, Sequence[bytes]] | None = None,
         max_reviews: int = 1,
         review_images: Callable[[str, str], Sequence[bytes]] | None = None,
+        review_key: Callable[[str, str], object] | None = None,
     ) -> dict[str, str]:
         """Resolve simultaneous decisions and optionally record response times in nanoseconds."""
         if type(max_reviews) is not int or max_reviews < 0:
@@ -279,16 +280,23 @@ class Match:
             ["batch", phase, event_index, list(decisions)], ask,
             lambda: self.legacy.batch(phase, reserve(), event_index),
         )
-        current, revised, fallbacks, review_history = proposed, {}, {}, {}
+        current, revised, fallbacks, review_history, reviewed_keys = proposed, {}, {}, {}, {}
         for round_index in range(max_reviews):
             reviews = {}
             for name, (candidate, strategy, _) in current.items():
-                if strategy["review_requested"] and decisions[name].accepts(candidate) and self.take_model_turn():
-                    review = reviews[name] = Review(candidate, strategy["text"])
-                    review_history.setdefault(name, []).append(review)
-                    fallbacks[name] = candidate
-                    self._record_review(name, phase, review,
-                                        pass_number=round_index + 1 if phase == "symmetry_arrange" else None)
+                if not strategy["review_requested"] or not decisions[name].accepts(candidate):
+                    continue
+                key = review_key(name, candidate) if review_key is not None else None
+                if review_key is not None and key in reviewed_keys.get(name, ()):
+                    continue
+                if not self.take_model_turn():
+                    continue
+                reviewed_keys.setdefault(name, []).append(key)
+                review = reviews[name] = Review(candidate, strategy["text"])
+                review_history.setdefault(name, []).append(review)
+                fallbacks[name] = candidate
+                self._record_review(name, phase, review,
+                                    pass_number=round_index + 1 if phase == "symmetry_arrange" else None)
             if not reviews:
                 break
 
