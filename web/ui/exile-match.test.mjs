@@ -6,6 +6,7 @@ import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {after, test} from "node:test";
 import {build} from "esbuild";
+import {caseMatches} from "./cases.js";
 
 const directory = mkdtempSync(join(tmpdir(), "exile-ui-"));
 after(() => rmSync(directory, {recursive: true, force: true}));
@@ -23,9 +24,23 @@ const turn = event("exile_turn", {turn: 1, active: players});
 const board1 = {player: "P01", turn: 1, placements: [{piece: "K1", axis: "row", slot: 1, reverse: false, flip: false}, {piece: "K2", axis: "col", slot: 1, reverse: true, flip: true}, {piece: "K3", axis: "row", slot: 4, reverse: true, flip: false}], joints: [{row: 1, col: 1, ok: false}, {row: 4, col: 1, ok: true}], errors: 1, placed: 3};
 const board2 = {player: "P02", turn: 1, placements: [{piece: "K6", axis: "col", slot: 4, reverse: false, flip: true}], joints: [], errors: 0, placed: 1};
 const own = event("exile_board", board1, ["P01"], "P01"), other = event("exile_board", board2, ["P02"], "P02");
-function render(steps, {language = "ko", view = "operator", selected = "", frame = steps.length} = {}) {
-  return api[language].render({id: "exile-demo", match: {game: "유배지 매치 1 · 피스 퍼즐", players, steps}, frame, view, selected, choosePlayer: noop, chooseView: noop, seek: noop, mode: "paused"});
+function render(steps, {language = "ko", view = "operator", selected = "", frame = steps.length, caseRecord} = {}) {
+  return api[language].render({id: "exile-demo", caseRecord, match: {game: "유배지 매치 1 · 피스 퍼즐", players, steps}, frame, view, selected, choosePlayer: noop, chooseView: noop, seek: noop, mode: "paused"});
 }
+
+test("campaign navigation interleaves exile matches with their source matches", () => {
+  const caseRecord = {
+    id: "day1-main",
+    matches: [{id: "day1-main"}, {id: "day1-prison"},
+      {id: "day2-main", game: "2일차 메인 매치 · 미스터리 거래소"}, {id: "day3-main"}, {id: "day3-prison"}],
+    exile_matches: [{id: "exile-demo", after: "day1-prison"},
+      {id: "exile3", after: "day3-main"}, {id: "exile4", after: "day3-main"}],
+  };
+  assert.deepEqual(caseMatches(caseRecord).map(({id}) => id),
+    ["day1-main", "day1-prison", "exile-demo", "day2-main", "day3-main", "exile3", "exile4", "day3-prison"]);
+  assert.match(render([setup], {caseRecord}), /href="\/\?run=day2-main&amp;case=day1-main"/);
+});
+
 for (const language of ["ko", "en"]) {
   test(`${language}: native scene and eight notch diagrams appear through MatchReplay`, () => {
     const html = render([setup, turn, own], {language});

@@ -1,5 +1,11 @@
 import {tr} from "./locale.js";
 
+export function caseMatches({matches, exile_matches: exileMatches = []}) {
+  const stageOrder = new Map(matches.map(({id}, index) => [id, index]));
+  const position = ({id, after}) => stageOrder.get(id) ?? ((stageOrder.get(after) ?? matches.length) + 0.5);
+  return [...matches, ...exileMatches].sort((first, second) => position(first) - position(second));
+}
+
 function modelName(id) {
   const family = id?.match(/^gpt-\d+(?:\.\d+)?-(luna|sol|terra|astra)$/)?.[1];
   return family ? family[0].toUpperCase() + family.slice(1) : id;

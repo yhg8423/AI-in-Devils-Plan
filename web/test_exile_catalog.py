@@ -183,6 +183,7 @@ class ExileCatalogTest(unittest.TestCase):
         match, = case["exile_matches"]
         self.assertEqual((match["id"], match["game"], match["status"]),
                          ("matches/example/exile1", FIRST_EXILE, "complete"))
+        self.assertEqual(match["after"], "matches/example/day1-prison")
         self.assertEqual(match["model_counts"], [
             {"model": "gpt-6-luna", "effort": "medium", "count": 3},
             {"model": "gpt-6.1-sol", "effort": "low", "count": 1},
@@ -198,7 +199,8 @@ class ExileCatalogTest(unittest.TestCase):
         _, _, exile = campaign(self.root, mixed=True)
         case, = case_catalog(self.root)
         self.assertEqual(len(case["matches"]), 3)
-        self.assertEqual(len(case["exile_matches"]), 1)
+        match, = case["exile_matches"]
+        self.assertEqual(match["after"], "matches/example/day2-main")
         update_header(exile, from_matches=json.loads(exile.read_text().splitlines()[0])["from_matches"][:2])
         case, = case_catalog(self.root)
         self.assertNotIn("exile_matches", case)
