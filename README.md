@@ -83,6 +83,8 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/codex-example/day1-main/events.jsonl
 ```
 
+Codex 요청의 기본 대기 제한은 300초입니다. 긴 이미지 요청은 실행 명령 앞에 `DEVILS_PLAN_CODEX_TIMEOUT_SECONDS=600`을 붙여 늘릴 수 있습니다. 시간 초과로 중단되면 같은 출력 경로에 `--resume`을 지정합니다.
+
 ### OpenAI Responses API
 
 `OPENAI_API_KEY`를 환경 변수나 프로젝트 루트의 `.env`에 설정합니다. `.env`가 없다면 아래 명령으로 예시 파일을 복사한 뒤 `OPENAI_API_KEY=`에 키를 입력합니다.
@@ -245,8 +247,76 @@ Concordia는 참가자 ID에 해당하는 페르소나와 목표를 불러옵니
 | 3일차 감옥 매치 | 돼지 저금통 | 4명 | 참가자 간 대화와 관계 평가 없이 진행하며, 리셋 여부는 자리 순서대로 결정합니다. 모델이 저금통 3개의 기억을 갱신하며, 매번 기억할 번호를 바꿀 수 있습니다. 잘못된 기억은 정답으로 보정하지 않습니다. 의심 선언과 리셋 전 전체 맞히기로 점수를 얻으며, 본 경기는 5점 선점 또는 최대 100턴에 종료합니다. 최하위 동점자는 추가 경기로 가려내며, 추가 승점이 감소하면 탈락하고 증가하면 안전이 확정됩니다. 마지막 남은 동점자는 탈락합니다. |
 | 4일차 메인 매치 | 경매 빙고 | 본선 7명 + 게스트 1명 | 7라운드 동안 도형을 선택하고 비공개로 입찰합니다. 마지막에 획득 도형으로 빙고판을 자동 배치하고, 빙고 줄 수·채운 칸 수·남은 코인 금액으로 순위를 정합니다. |
 | 4일차 감옥 매치 | 벽바둑 2 | 3명 | 대화 없이 말을 이동하고 벽을 세워 영역을 확보합니다. 3인전 1위가 생존하고, 나머지 두 명의 대결로 탈락자를 정합니다. 완전 동률은 동률자끼리 순서를 뒤집어 재경기합니다. |
+| 유배지 매치 1 | 피스 퍼즐 | 4명 | 조각 8개의 홈 방향과 깊이를 맞춰 격자를 완성합니다. 각자 비공개로 조립하고 먼저 완성한 3명이 생존합니다. |
+| 유배지 매치 2 | 틀린 그림 찾기 | 4명 | 원본 그림을 기억한 뒤 바뀐 5곳을 표시합니다. 3라운드 총점으로 2명이 생존하며, 생존 경계의 동점자만 연장전을 진행합니다. |
+| 유배지 매치 3 | 비밀 코드 | 4명 | 그림 카드와 조건에서 알파벳 4개의 코드를 찾습니다. 라운드마다 가장 먼저 정답을 맞힌 1명이 생존하고, 마지막 남은 1명은 탈락합니다. |
+| 유배지 매치 4 | 울타리 치기 | 4명 | 숫자 조건을 만족하는 하나의 닫힌 고리를 만듭니다. 각자 비공개로 수정하며 먼저 완성한 3명이 생존합니다. |
+| 유배지 매치 5 | 대칭 퍼즐 | 3~4명 | 파랑·빨강·초록 조각을 뒤집지 않고 각각 선대칭 도형으로 만듭니다. 세 퍼즐을 먼저 완성한 참가자들이 생존하고 마지막 한 명은 탈락합니다. |
 
 각 매치를 따로 실행하거나, 앞 매치에서 살아남은 참가자의 ID·페르소나·피스·관계 평가를 이어받아 연속 실행할 수 있습니다. 자세한 규칙은 재생 화면의 **구간 이동**에서 확인할 수 있습니다.
+
+### 유배지 매치 실행
+
+첫 참가자 4명이 모이는 시점까지, 1일차 메인부터 완료 기록을 순서대로 지정합니다. 혼합 모델 기록처럼 1일차 종료 후 탈락자가 3명이면 2일차 메인 기록도 추가합니다.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile1/events.jsonl
+```
+
+두 번째 매치는 첫 유배지 생존자 3명과 다음 본선 탈락자 1명이 참가합니다. 여러 명이 동시에 탈락하면 저장된 탈락 명단 순서대로 합류합니다.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.spot_difference \
+  --from-exile play_results/matches/all-luna-16/exile1/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+  --output runs/matches/exile-demo/exile2/events.jsonl
+```
+
+세 번째 매치는 두 번째 유배지 생존자 2명과 다음 본선 탈락자 2명이 참가합니다. 혼합 모델 기록은 3일차 메인 기록까지 지정합니다.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.secret_code \
+  --from-exile play_results/matches/all-luna-16/exile2/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile3/events.jsonl
+```
+
+네 번째 매치는 세 번째 유배지 생존자 3명과 다음 본선 탈락자 1명이 참가합니다. 이미 대기 중인 탈락자가 있으면 그 참가자가 먼저 합류합니다.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.loop_fence \
+  --from-exile play_results/matches/all-luna-16/exile3/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day3-main/events.jsonl \
+  --output runs/matches/exile-demo/exile4/events.jsonl
+```
+
+다섯 번째 매치는 네 번째 유배지 생존자 3명과 다음 본선 탈락자 1명이 참가합니다. 현재 세 기록 모두 3일차 감옥까지 지정합니다.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.symmetry \
+  --from-exile play_results/matches/all-luna-16/exile4/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day3-main/events.jsonl \
+                 play_results/matches/all-luna-16/day3-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile5/events.jsonl
+```
+
+모델로 실행하려면 다른 매치와 같은 `--provider`, `--model`, `--player-model` 옵션을 붙입니다. 중단된 기록은 `--resume --output <events.jsonl>`로 이어서 실행합니다.
 
 ## 웹에서 플레이 기록 보기
 

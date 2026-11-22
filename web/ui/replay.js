@@ -2,6 +2,11 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  symmetry_arrange: tr("세 색 조립", "Arrange all three colors"),
+  fence_draw: tr("울타리 그리기", "Draw the loop"),
+  secret_think: tr("비밀 코드 추리", "Secret Code deduction"),
+  picture_memorize: tr("원본 기억", "Remember the original"), picture_answer: tr("달라진 부분 표시", "Mark the changes"),
+  exile_move: tr("피스 조작", "Move a piece"),
   wall_place: tr("말 배치", "Counter placement"), wall_move: tr("말 이동·벽 설치", "Move and build a wall"),
   bingo_shape: tr("도형 선택", "Shape selection"), bingo_bid: tr("비공개 입찰", "Sealed bid"),
   bingo_strategy: tr("입찰 전 전략 정리", "Planning before bidding"), bingo_preparation: tr("비공개 전략 준비", "Private preparation"),
@@ -259,7 +264,7 @@ export function useReplay(initialRun, caseId) {
         const cases = await fetchCases(signal);
         if (signal.aborted) return;
         const activeCase = cases.find((record) => (!caseId || caseId === record.id) &&
-          record.matches.some((match) => match.id === chosen)) ?? null;
+          [...record.matches, ...(record.exile_matches ?? [])].some((match) => match.id === chosen)) ?? null;
         setCaseRecord((old) => JSON.stringify(old) === JSON.stringify(activeCase) ? old : activeCase);
         if (caseId && !activeCase) {
           setReplay(emptyReplay);

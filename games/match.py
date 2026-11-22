@@ -24,7 +24,7 @@ from .resume import MatchLog, ResumeError
 from .resume_legacy import LegacyDecisions
 
 
-REVIEWABLE_BATCH_PHASES = {"representative", "memory_poker", "submit"}
+REVIEWABLE_BATCH_PHASES = {"representative", "memory_poker", "submit", "symmetry_arrange"}
 EFFORTS = ("low", "medium", "high", "xhigh")
 DEFAULT_GUEST_MODEL = ("codex", "gpt-6.1-sol", "low")
 DAY_ONE_MAIN = "1일차 메인 매치 · 양자택일"
@@ -35,6 +35,11 @@ DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
 DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
 DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
+FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
+SECOND_EXILE = "유배지 매치 2 · 틀린 그림 찾기"
+THIRD_EXILE = "유배지 매치 3 · 비밀 코드"
+FOURTH_EXILE = "유배지 매치 4 · 울타리 치기"
+FIFTH_EXILE = "유배지 매치 5 · 대칭 퍼즐"
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
     DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),
@@ -231,9 +236,15 @@ class Match:
 
     def decide_together(
         self, phase: str, decisions: Mapping[str, Decision], *, response_times: dict[str, int] | None = None,
-        record_actions: bool = True,
+        record_actions: bool = True, images: Sequence[bytes] = (),
+        images_by_player: Mapping[str, Sequence[bytes]] | None = None,
+        max_reviews: int = 1,
+        review_images: Callable[[str, str], Sequence[bytes]] | None = None,
+        review_key: Callable[[str, str], object] | None = None,
     ) -> dict[str, str]:
         """Resolve simultaneous decisions and optionally record response times in nanoseconds."""
+        if type(max_reviews) is not int or max_reviews < 0:
+            raise ValueError("추가 검토 횟수는 0 이상의 정수여야 합니다.")
         for decision in decisions.values():
             if not decision.accepts(decision.default):
                 raise ValueError(f"Invalid scripted action in {phase}: {decision.default}")
@@ -248,8 +259,10 @@ class Match:
 
         start = monotonic_ns()
 
-        def query(name, prompt, *, review=False):
-            candidate, strategy = self._query(name, prompt, record_strategy=True, allow_review=review)
+        def query(name, prompt, *, review=False, preview=None):
+            own_images = (review_images(name, preview) if preview is not None and review_images is not None else
+                          images_by_player.get(name, images) if images_by_player is not None else images)
+            candidate, strategy = self._query(name, prompt, images=own_images, record_strategy=True, allow_review=review)
             return candidate, asdict(strategy), monotonic_ns() - start
 
         def reserve():
@@ -257,7 +270,7 @@ class Match:
 
         def ask():
             live = reserve()
-            allow_review = self.allow_review and self.live_turns > 0 and (
+            allow_review = self.allow_review and max_reviews > 0 and self.live_turns > 0 and (
                 terminal_choice or phase in REVIEWABLE_BATCH_PHASES
             )
             return parallel_actions(live, lambda name: query(name, instructions(name), review=allow_review))
@@ -267,18 +280,44 @@ class Match:
             ["batch", phase, event_index, list(decisions)], ask,
             lambda: self.legacy.batch(phase, reserve(), event_index),
         )
-        reviews = {}
-        for name, (candidate, strategy, _) in proposed.items():
-            if strategy["review_requested"] and decisions[name].accepts(candidate) and self.take_model_turn():
+        current, revised, fallbacks, review_history, reviewed_keys = proposed, {}, {}, {}, {}
+        for round_index in range(max_reviews):
+            reviews = {}
+            for name, (candidate, strategy, _) in current.items():
+                if not strategy["review_requested"] or not decisions[name].accepts(candidate):
+                    continue
+                key = review_key(name, candidate) if review_key is not None else None
+                if review_key is not None and key in reviewed_keys.get(name, ()):
+                    continue
+                if not self.take_model_turn():
+                    continue
+                reviewed_keys.setdefault(name, []).append(key)
                 review = reviews[name] = Review(candidate, strategy["text"])
-                self._record_review(name, phase, review)
+                review_history.setdefault(name, []).append(review)
+                fallbacks[name] = candidate
+                self._record_review(name, phase, review,
+                                    pass_number=round_index + 1 if phase == "symmetry_arrange" else None)
+            if not reviews:
+                break
 
-        def revise():
-            return parallel_actions(
-                tuple(reviews), lambda name: query(name, instructions(name) + "\n" + reviews[name].instructions())
-            )
+            def revise():
+                more = self.allow_review and round_index + 1 < max_reviews and self.live_turns > 0
 
-        revised = self.decision(["revisions", phase, len(self.events), list(reviews)], revise) if reviews else {}
+                def prompt(name):
+                    if max_reviews == 1:
+                        return instructions(name) + "\n" + reviews[name].instructions()
+                    history = "\n".join(item.summary() for item in review_history[name])
+                    next_step = ("필요하면 review:true로 다음 검토를 요청하고, 준비되면 review:false로 확정하세요."
+                                 if more else "이번이 마지막 검토입니다. 최종 답안을 확정하세요.")
+                    return (instructions(name) + f"\n이번은 {round_index + 2}/{max_reviews + 1}번째 판단입니다.\n"
+                            + history + "\n임시 답안과 짧은 메모를 검토하세요. " + next_step)
+                return parallel_actions(tuple(reviews), lambda name: query(
+                    name, prompt(name),
+                    review=more, preview=reviews[name].draft,
+                ))
+
+            current = self.decision(["revisions", phase, len(self.events), list(reviews)], revise)
+            revised.update(current)
         answers = {}
         for name, decision in decisions.items():
             candidate, strategy, elapsed = proposed.get(name, (None, {"text": ""}, None))
@@ -286,11 +325,14 @@ class Match:
             if elapsed is not None and decision.invalid_default is not None:
                 default = decision.invalid_default
             if name in revised:
-                default = reviews[name].draft
+                default = fallbacks[name]
                 candidate, strategy, elapsed = revised[name]
             if response_times is not None and elapsed is not None:
                 response_times[name] = elapsed
             action = self._resolve(name, phase, candidate, default, decision.accepts, note=strategy["text"])
+            if max_reviews > 1 and name in revised and candidate != action and review_history[name][-1].note:
+                self.event("decision_note", {"phase": phase, "note": review_history[name][-1].note, "fallback": True},
+                           private=[name], actor=name)
             if record_actions:
                 self.event("action", {"phase": phase, "action": action}, private=[name], actor=name)
             answers[name] = action
@@ -303,8 +345,11 @@ class Match:
             self.live_turns -= 1
             return True
 
-    def _record_review(self, name, phase, review: Review) -> None:
-        self.event("decision_note", {"phase": phase, "note": review.summary()}, private=[name], actor=name)
+    def _record_review(self, name, phase, review: Review, *, pass_number: int | None = None) -> None:
+        data = {"phase": phase, "note": review.summary()}
+        if pass_number is not None:
+            data.update({"review": True, "pass": pass_number})
+        self.event("decision_note", data, private=[name], actor=name)
 
     def _model_ratings(self, name: str) -> Ratings:
         ratings = self.relationships[name]
@@ -452,13 +497,19 @@ def parse_group_image_model(value: str) -> tuple[str | None, str, str, str, str 
 
 def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             previous_main: str | None = None, after_prison: bool = False,
-            guest: str | None = None, argv=None) -> None:
+            guest: str | None = None, exile_roster: bool = False,
+            previous_exile: str | None = None, argv=None) -> None:
     seat_counts = (seats,) if isinstance(seats, int) else seats
     roster_args = seat_counts[0] if len(seat_counts) == 1 else "+"
     parser = argparse.ArgumentParser(description=title)
     parser.add_argument("--seed", type=int)
     parser.add_argument("--players", nargs=roster_args, metavar="ID", help="순서대로 참가자 ID 지정")
     parser.add_argument("--pieces", nargs=roster_args, type=int, metavar="N", help="참가자 순서대로 시작 피스 지정")
+    if exile_roster:
+        parser.add_argument("--from-matches", nargs="+", type=Path, metavar="EVENTS",
+                            help="유배지 참가자가 모이는 시점까지, 1일차 메인부터 순서대로 완료 기록 지정")
+    if previous_exile:
+        parser.add_argument("--from-exile", type=Path, help=f"완료된 {previous_exile}의 events.jsonl")
     if previous_main:
         parser.add_argument("--from-main", type=Path, help=f"완료된 {previous_main}의 events.jsonl")
     if after_prison:
@@ -512,10 +563,31 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             model_name = DEFAULT_MODELS[provider]
         main_path = getattr(args, "from_main", None)
         prison_path = getattr(args, "from_prison", None)
+        source_matches = getattr(args, "from_matches", None)
+        exile_path = getattr(args, "from_exile", None)
+        inherited_roster = bool(main_path or source_matches)
         if after_prison and bool(main_path) != bool(prison_path):
             parser.error("연속 실행에는 --from-main과 --from-prison을 함께 지정하세요.")
+        if previous_exile and bool(exile_path) != bool(source_matches):
+            parser.error("다음 유배지 매치에는 --from-exile과 --from-matches를 함께 지정하세요.")
         relationships = {}
-        if main_path:
+        if source_matches:
+            if args.players is not None or args.pieces is not None:
+                parser.error("--from-matches로 참가자를 이어받을 때는 --players와 --pieces를 생략하세요.")
+            try:
+                from .exile_match.roster import (
+                    collect_exile_players, collect_second_exile_players,
+                    collect_third_exile_players, collect_fourth_exile_players, collect_fifth_exile_players,
+                )
+
+                collectors = {FIRST_EXILE: collect_second_exile_players, SECOND_EXILE: collect_third_exile_players,
+                              THIRD_EXILE: collect_fourth_exile_players, FOURTH_EXILE: collect_fifth_exile_players}
+                players = (collectors[previous_exile](exile_path, source_matches) if exile_path else
+                           collect_exile_players(source_matches))
+                pieces = [0] * len(players)
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                parser.error(f"유배지 참가자를 읽을 수 없습니다. {error}")
+        elif main_path:
             if previous_main is None or (prison_path and not after_prison):
                 parser.error("이 매치는 저장된 선행 매치 설정을 지원하지 않습니다.")
             if args.players is not None or args.pieces is not None:
@@ -548,7 +620,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         overrides: dict[str, tuple[str, str, str]] = {}
         for name, player_provider, model, player_effort in args.player_model:
             if name not in players:
-                if main_path:
+                if inherited_roster:
                     continue
                 parser.error(f"--player-model에 지정한 {name}은 참가자 명단에 없습니다.")
             if name not in live_players or name in overrides:
@@ -564,7 +636,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
 
         default = (provider, model_name, effort)
         settings = {name: overrides.get(name, default) for name in live_players} if model_name else {}
-        if not main_path and group_image_models.keys() - set(settings.values()):
+        if not inherited_roster and group_image_models.keys() - set(settings.values()):
             parser.error("--image-model-for에 지정한 제공자, 모델, effort를 쓰는 참가자가 없습니다.")
         image_settings = {name: group_image_models[config] for name, config in settings.items()
                           if config in group_image_models}
@@ -656,6 +728,10 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             header["from_main"] = str(main_path)
         if prison_path:
             header["from_prison"] = str(prison_path)
+        if source_matches:
+            header["from_matches"] = [str(path) for path in source_matches]
+        if exile_path:
+            header["from_exile"] = str(exile_path)
         try:
             if log is not None:
                 log.write(header)
@@ -710,12 +786,23 @@ def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
             raise ValueError(f"--{option.replace('_', '-')} 값이 저장된 설정과 일치하지 않습니다.")
         setattr(args, option, value)
 
-    for option in ("from_main", "from_prison"):
+    for option in ("from_main", "from_prison", "from_exile"):
         provided = getattr(args, option, None)
         path = Path(saved[option]) if option in saved else None
         if provided is not None and (path is None or path.resolve() != provided.resolve()):
             raise ValueError(f"--{option.replace('_', '-')} 값이 저장된 설정과 일치하지 않습니다.")
         setattr(args, option, path)
+
+    if hasattr(args, "from_matches"):
+        sources = saved.get("from_matches")
+        if sources is not None and (not isinstance(sources, list) or not sources
+                                   or any(not isinstance(path, str) or not path for path in sources)):
+            raise ValueError("저장된 유배지 선행 기록이 올바르지 않습니다.")
+        paths = [Path(path) for path in sources] if sources else None
+        if args.from_matches is not None and (paths is None or
+                [path.resolve() for path in paths] != [path.resolve() for path in args.from_matches]):
+            raise ValueError("--from-matches 값이 저장된 설정과 일치하지 않습니다.")
+        args.from_matches = paths
 
     roster = [name for name in players if name != guest]
     if guest is not None and (players != [*roster, guest] or pieces.get(guest) != 1):
@@ -727,7 +814,7 @@ def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
         raise ValueError("--pieces 값이 저장된 설정과 일치하지 않습니다.")
     if args.model_player is not None and model_players and list(dict.fromkeys(args.model_player)) != model_players:
         raise ValueError("--model-player 값이 저장된 설정과 일치하지 않습니다.")
-    if args.from_main is None:
+    if args.from_main is None and not getattr(args, "from_matches", None):
         args.players, args.pieces = roster, ordered_pieces
     else:
         args.players = args.pieces = None

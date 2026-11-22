@@ -10,7 +10,7 @@ import {tr} from "./locale.js";
 import {checkpointLabel, eventFields, locationName, scoreText} from "./replay.js";
 import {Sprite} from "./scene.jsx";
 
-const playerTextTypes = new Set(["public", "room", "whisper", "discussion_note", "grass_plan", "decision_note"]);
+const playerTextTypes = new Set(["public", "room", "whisper", "discussion_note", "grass_plan", "decision_note", "picture_memory"]);
 
 export function MatchFeed({events, onSeek, unit = "턴", emptyText = tr("이 시점에 볼 수 있는 플레이 기록이 없어요.", "No play records to show at this point.")}) {
   if (!events.length) return <p className="empty">{emptyText}</p>;
@@ -61,7 +61,7 @@ export function Table({caption, headers, rows}) {
 }
 
 export function isStrategy(event) {
-  return ["discussion_note", "grass_plan", "decision_note"].includes(event.msg_type);
+  return ["discussion_note", "grass_plan", "decision_note", "picture_memory"].includes(event.msg_type);
 }
 
 function ParticipantRelationships({updates, players, player, onSeek}) {

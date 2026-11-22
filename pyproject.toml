@@ -11,4 +11,5 @@ dependencies = [
     "pettingzoo>=1.24.1",
     "chess>=1.9.4",
     "pygame>=2.6.1",
+    "shapely>=2.2,<3",
 ]

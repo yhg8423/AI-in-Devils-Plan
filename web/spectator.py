@@ -2,16 +2,23 @@
 
 import argparse
 from collections import Counter
+from functools import lru_cache
 from hashlib import sha256
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
+from random import Random
 import subprocess
 import sys
 from threading import Lock
 from urllib.parse import parse_qs, urlsplit
 
 from games.either_or.lay_the_grass.board import PARK_ROWS
+from games.exile_match.roster import (
+    collect_exile_players, collect_second_exile_players, collect_third_exile_players, collect_fourth_exile_players,
+    collect_fifth_exile_players,
+)
+from games.match import FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE
 
 
 UI = Path(__file__).with_name("ui")
@@ -31,6 +38,7 @@ EVENT_TYPES = {
 }
 EVENT_FIELDS = ("msg_type", "agent_name", "content", "visible_to")
 CASE_STAGES = ("1일차 메인 매치", "1일차 감옥 매치", "2일차 메인 매치", "2일차 감옥 매치", "3일차 메인 매치", "3일차 감옥 매치", "4일차 메인 매치", "4일차 감옥 매치")
+EXILE_GAMES = (FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE)
 
 
 def find_matches(root: Path) -> dict[str, Path]:
@@ -56,7 +64,10 @@ def read_match_header(log: Path) -> dict | None:
         header = json.loads(line) if line.endswith(b"\n") else None
     except (OSError, ValueError):
         return None
-    return header if isinstance(header, dict) and isinstance(header.get("game"), str) else None
+    if isinstance(header, dict) and isinstance(header.get("game"), str):
+        header["game"] = header["game"].replace("달라진 그림 찾기", "틀린 그림 찾기")
+        return header
+    return None
 
 
 def match_catalog(root: Path) -> list[dict]:
@@ -102,6 +113,38 @@ def source_paths(root: Path, previous: object) -> tuple[Path, ...]:
         return ()
 
 
+def exile_sources(root: Path, header: dict, logs, *, previous_exile: Path | None = None) -> list[Path]:
+    """Validate an exile roster against its campaign and optional predecessor."""
+    header = {**header, "game": str(header.get("game", "")).replace("달라진 그림 찾기", "틀린 그림 찾기")}
+    if header.get("game") not in EXILE_GAMES or any(key in header for key in ("from_main", "from_prison")):
+        raise ValueError("Expected an exile match with from_matches source links.")
+    links = header.get("from_matches")
+    if not isinstance(links, list) or not links:
+        raise ValueError("An exile match needs a from_matches source prefix.")
+    available = {path.resolve() for path in logs}
+    sources = []
+    for link in links:
+        path = next((path for path in source_paths(root, link) if path in available), None)
+        if path is None:
+            raise ValueError("Exile sources must point to this campaign's recorded matches.")
+        sources.append(path)
+    if any(match_status(path) != "complete" for path in sources):
+        raise ValueError("Exile sources must be completed matches.")
+    if header["game"] == FIRST_EXILE:
+        if "from_exile" in header:
+            raise ValueError("The first exile match cannot have a previous exile match.")
+        players = collect_exile_players(sources)
+    else:
+        if (previous_exile is None or previous_exile.resolve() not in source_paths(root, header.get("from_exile"))):
+            raise ValueError("The exile match must point to this campaign's preceding exile match.")
+        collectors = {SECOND_EXILE: collect_second_exile_players, THIRD_EXILE: collect_third_exile_players,
+                      FOURTH_EXILE: collect_fourth_exile_players, FIFTH_EXILE: collect_fifth_exile_players}
+        players = collectors[header["game"]](previous_exile, sources)
+    if header.get("players") != players:
+        raise ValueError("The exile roster must match the campaign's entrants and survivors in source order.")
+    return sources
+
+
 def model_counts(header: dict) -> list[dict]:
     roster = header.get("players")
     default = (header.get("model"), header.get("effort"))
@@ -133,14 +176,21 @@ def model_counts(header: dict) -> list[dict]:
 
 def case_catalog(root: Path) -> list[dict]:
     records = {}
+    exile_records = {}
     for run_id, log in find_matches(root).items():
         header = read_match_header(log)
-        if header is None or header["game"].split(" · ", 1)[0] not in CASE_STAGES:
+        if header is None:
+            continue
+        if header["game"] in EXILE_GAMES:
+            destination = exile_records
+        elif header["game"].split(" · ", 1)[0] in CASE_STAGES:
+            destination = records
+        else:
             continue
         try:
             stat = log.stat()
             started_at = int(getattr(stat, "st_birthtime", stat.st_mtime) * 1000)
-            records[run_id] = (log.resolve(), header, started_at, match_status(log))
+            destination[run_id] = (log.resolve(), header, started_at, match_status(log))
         except (OSError, RuntimeError, ValueError):
             continue
 
@@ -161,8 +211,7 @@ def case_catalog(root: Path) -> list[dict]:
         if parent is not None:
             children.setdefault(parent, []).append(run_id)
 
-    def chain(run_id: str, stage: int, previous: str | None = None) -> list[dict]:
-        _, header, _, status = records[run_id]
+    def summary(run_id, header, status):
         counts = model_counts(header)
         match = {"id": run_id, "game": header["game"], "status": status,
                  "model_counts": counts}
@@ -170,6 +219,11 @@ def case_catalog(root: Path) -> list[dict]:
         if (image_model and image_model != header.get("model") and not header.get("image_model_overrides")
                 and not any(group.get("provider") for group in counts)):
             match["image_model"] = image_model
+        return match
+
+    def chain(run_id: str, stage: int, previous: str | None = None) -> list[dict]:
+        _, header, _, status = records[run_id]
+        match = summary(run_id, header, status)
         path = [match]
         if stage == len(CASE_STAGES) - 1 or status != "complete":
             return path
@@ -190,6 +244,21 @@ def case_catalog(root: Path) -> list[dict]:
             "id": run_id, "started_at": started_at, "matches": chain(run_id, 0), "model": model,
             **{key: header[key] for key in ("provider", "effort", "image_model", "model_overrides") if header.get(key)},
         })
+    exile_paths = {record[0] for record in exile_records.values()}
+    for run_id, (_, header, _, status) in exile_records.items():
+        try:
+            previous = next((path for path in source_paths(root, header.get("from_exile")) if path in exile_paths), None)
+            sources = exile_sources(root, header, by_path, previous_exile=previous)
+            source_ids = [by_path[path] for path in sources]
+            case = next((case for case in cases
+                         if [match["id"] for match in case["matches"][:len(source_ids)]] == source_ids), None)
+            if case is not None:
+                case.setdefault("exile_matches", []).append(summary(run_id, header, status))
+        except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+            continue
+    for case in cases:
+        if "exile_matches" in case:
+            case["exile_matches"].sort(key=lambda match: EXILE_GAMES.index(match["game"]))
     real = [case for case in cases if case["model"]]
     linked = [case for case in real if len(case["matches"]) > 1]
     return linked or real or cases
@@ -197,8 +266,25 @@ def case_catalog(root: Path) -> list[dict]:
 
 def next_match(root: Path, logs: dict[str, Path], run_id: str) -> dict | None:
     current = logs[run_id].resolve()
+    current_header = read_match_header(current)
+    if current_header and current_header["game"] in EXILE_GAMES:
+        stage = EXILE_GAMES.index(current_header["game"])
+        if stage + 1 == len(EXILE_GAMES):
+            return None
+        for candidate, log in logs.items():
+            header = read_match_header(log)
+            if not header or header["game"] != EXILE_GAMES[stage + 1]:
+                continue
+            try:
+                exile_sources(root, header, logs.values(), previous_exile=current)
+            except (OSError, RuntimeError, ValueError, KeyError, TypeError):
+                continue
+            return {"id": candidate, "game": header["game"]}
+        return None
     for candidate, log in logs.items():
         if candidate == run_id or (header := read_match_header(log)) is None:
+            continue
+        if header["game"] in EXILE_GAMES:
             continue
         # A main match after a prison match records both sources. Continue from the prison match.
         previous = header.get("from_prison") or header.get("from_main")
@@ -232,6 +318,98 @@ def read_translations(log: Path) -> tuple[dict, str | None]:
     return translations, sha256(data).hexdigest() if translations else None
 
 
+_symmetry_render_lock = Lock()
+
+
+@lru_cache(maxsize=16)
+def _symmetry_puzzles(seed, pack="broadcast"):
+    from games.exile_match.symmetry.puzzles import make_puzzles
+
+    puzzles = make_puzzles(seed) if pack == "broadcast" else make_puzzles(seed, pack=pack)
+    return {puzzle["id"]: puzzle for puzzle in puzzles}
+
+
+# Keep only KO views, with a ceiling large enough for full-history replay polls.
+@lru_cache(maxsize=4096)
+def _korean_symmetry_image(seed, color, placements, original_id, common_scale=False, workbench=False, axis=None,
+                           pack="broadcast"):
+    from games.exile_match.symmetry.puzzles import board, piece_atlas
+
+    with _symmetry_render_lock:
+        try:
+            if color == "tutorial":
+                from games.exile_match.symmetry.tutorial import tutorial_image
+
+                render = tutorial_image
+            else:
+                puzzle = _symmetry_puzzles(seed, pack)[color]
+                if placements is None:
+                    render = lambda **kwargs: piece_atlas(puzzle, common_scale=True, **kwargs) if common_scale else piece_atlas(puzzle, **kwargs)
+                else:
+                    placed = [dict(zip(("piece", "x", "y", "rotation"), value, strict=True)) for value in placements]
+                    if workbench:
+                        from games.exile_match.symmetry.workbench import workbench_image
+
+                        render = lambda **kwargs: workbench_image(puzzle, placed, axis=axis, **kwargs)
+                    else:
+                        render = lambda **kwargs: board(puzzle, placed, detailed=True, **kwargs)
+            # Never substitute current geometry for a differently rendered archive.
+            english = render()
+            if english["id"] != original_id and color != "tutorial" and placements is None and not common_scale:
+                from games.exile_match.symmetry.workbench import measurement_atlas
+
+                render = lambda **kwargs: measurement_atlas(puzzle, **kwargs)
+                english = render()
+            if english["id"] != original_id:
+                return None
+            return render(language="ko")
+        except (KeyError, TypeError, ValueError):
+            return None
+
+
+def _localize_symmetry_images(content, kind, seed, pack="broadcast"):
+    data = json.loads(content)
+    changed = False
+    if kind == "sym_tutorial":
+        seed = None
+
+    def localize(image, color, placements=None, *, common_scale=False, workbench=False, axis=None):
+        nonlocal changed
+        if not isinstance(image, dict) or not isinstance(image.get("id"), str):
+            return image
+        try:
+            key = None if placements is None else tuple(
+                (value["piece"], value["x"], value["y"], value["rotation"]) for value in placements)
+            localized = (_korean_symmetry_image(seed, color, key, image["id"], common_scale, True, axis, pack=pack) if workbench else
+                         _korean_symmetry_image(seed, color, key, image["id"], common_scale, pack=pack))
+        except (KeyError, TypeError, ValueError):
+            return image
+        if localized is None:
+            return image
+        changed = True
+        return {**image, **localized}
+
+    if kind == "sym_tutorial":
+        data["board"] = localize(data["board"], "tutorial")
+    elif kind in ("sym_puzzles", "sym_tools"):
+        for puzzle in data["puzzles"]:
+            if "board" in puzzle:
+                puzzle["board"] = localize(puzzle["board"], puzzle["id"], ())
+            if "details" in puzzle:
+                puzzle["details"] = localize(puzzle["details"], puzzle["id"])
+            if "overview" in puzzle:
+                puzzle["overview"] = localize(puzzle["overview"], puzzle["id"], common_scale=True)
+    else:
+        workspaces = [data] if kind == "sym_board" else data["boards"].values()
+        for working in workspaces:
+            for color, image in working["boards"].items():
+                working["boards"][color] = localize(image, color, working["placements"][color])
+            for color, image in working.get("workbenches", {}).items():
+                working["workbenches"][color] = localize(image, color, working["placements"][color],
+                                                       workbench=True, axis=working.get("axes", {}).get(color))
+    return json.dumps(data, ensure_ascii=False) if changed else content
+
+
 def read_match(log: Path, *, language: str = "ko") -> dict:
     # The writer appends newline-terminated rows. Leave an in-flight row for the next poll.
     rows = [json.loads(line) for line in log.read_bytes().split(b"\n")[:-1] if line.strip()]
@@ -241,9 +419,25 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
     full_match = "game" in header
     translations, version = read_translations(log) if language == "en" else ({}, None)
     translated = {"translation_version": version} if version else {}
+    symmetry_seed, symmetry_modern, symmetry_pack = None, False, "broadcast"
+    if language == "ko" and header.get("game") == FIFTH_EXILE:
+        rng = Random(header["seed"])
+        rng.sample(header["players"], len(header["players"]))
+        symmetry_seed = rng.randrange(2 ** 32)
 
     def event_payload(event: dict, turn: int) -> dict:
+        nonlocal symmetry_modern, symmetry_pack
         payload = {key: event[key] for key in EVENT_FIELDS}
+        kind = event["msg_type"]
+        if symmetry_seed is not None:
+            if kind in ("sym_setup", "sym_tools"):
+                setup = json.loads(event["content"])
+                symmetry_modern = setup["version"] >= 3
+                if kind == "sym_setup":
+                    symmetry_pack = setup.get("puzzle_pack", "broadcast")
+            if kind == "sym_tutorial" or (
+                    symmetry_modern and kind in ("sym_puzzles", "sym_tools", "sym_board", "sym_reveal")):
+                payload["content"] = _localize_symmetry_images(event["content"], kind, symmetry_seed, symmetry_pack)
         if full_match and type(event.get("turn")) is int:
             turn = event["turn"]
         if turn in translations:
@@ -270,6 +464,9 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
             "seed": header["seed"],
             "model_players": header.get("model_players"),
             "model_overrides": header.get("model_overrides"),
+            "image_model": header.get("image_model"),
+            "image_model_overrides": header.get("image_model_overrides"),
+            "image_effort_overrides": header.get("image_effort_overrides"),
             "board": PARK_ROWS if header["game"].endswith(" · 양자택일") else None,
             "complete": complete, "interrupted": interrupted, "model_calls": last.get("model_calls"), "steps": steps,
             **translated,

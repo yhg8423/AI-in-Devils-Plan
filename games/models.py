@@ -8,6 +8,7 @@ from contextlib import ExitStack, contextmanager
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 import json
+from math import isfinite
 import os
 from pathlib import Path
 import shlex
@@ -29,6 +30,7 @@ DEFAULT_MODELS = {
     "anthropic": "claude-haiku-5-5",
 }
 DEFAULT_EFFORT = "low"
+CODEX_TIMEOUT_ENV = "DEVILS_PLAN_CODEX_TIMEOUT_SECONDS"
 ACTION_SCHEMA = {
     "type": "object",
     "properties": {"action": {"type": "string"}},
@@ -185,6 +187,12 @@ class CodexLanguageModel(ActionLanguageModel):
     def __init__(self, model: str, workspace: Path, *, effort: str = DEFAULT_EFFORT,
                  image_model: str | None = None, image_effort: str | None = None):
         super().__init__(effort=effort, image_effort=image_effort)
+        try:
+            self._timeout_seconds = float(os.getenv(CODEX_TIMEOUT_ENV, "300"))
+        except ValueError:
+            raise ValueError(f"{CODEX_TIMEOUT_ENV}는 0보다 큰 유한한 초 단위 숫자여야 합니다.") from None
+        if not isfinite(self._timeout_seconds) or self._timeout_seconds <= 0:
+            raise ValueError(f"{CODEX_TIMEOUT_ENV}는 0보다 큰 유한한 초 단위 숫자여야 합니다.")
         self._workspace = workspace
         self._image_model = image_model
         schema = workspace / "action.schema.json"
@@ -220,9 +228,17 @@ class CodexLanguageModel(ActionLanguageModel):
                     path.write_bytes(image)
                     image_args.extend(("--image", str(path)))
                 command = [*command[:2], *image_args, *command[2:]]
-            completed = subprocess.run(
-                command, input=model_input, text=True, capture_output=True, timeout=300, check=False,
-            )
+            try:
+                completed = subprocess.run(
+                    command, input=model_input, text=True, capture_output=True,
+                    timeout=self._timeout_seconds, check=False,
+                )
+            except subprocess.TimeoutExpired:
+                raise RuntimeError(
+                    f"Codex 응답 대기 시간이 {self._timeout_seconds:g}초를 넘었습니다. "
+                    f"{CODEX_TIMEOUT_ENV} 환경 변수로 제한을 늘린 뒤 "
+                    "같은 --output 경로에 --resume을 추가해 이어서 실행하세요."
+                ) from None
         answer = None
         error = None
         for line in completed.stdout.splitlines():

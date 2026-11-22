@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from .spectator import CASE_STAGES, EVENT_FIELDS, source_paths
+from .spectator import CASE_STAGES, EVENT_FIELDS, EXILE_GAMES, exile_sources, source_paths
 from .translate_events import translation_rows
 
 
@@ -32,7 +32,9 @@ RESULT_FIELDS = (
     "raw_scores", "manitos", "pieces_spent", "turns", "resets",
     "turn_limit", "end_reason", "main_turns", "tiebreaks",
     "all_ranking", "filled", "remaining_value", "shapes", "boards", "coins", "guest", "guest_result", "forced_last",
-    "largest", "second_scores", "second_largest", "games",
+    "largest", "second_scores", "second_largest", "games", "finish_turns", "ranking_groups",
+    "finish_rounds", "round_winners", "questions",
+    "finishes", "attempts",
 )
 
 
@@ -104,6 +106,21 @@ def encode_rows(rows):
     return "".join(json.dumps(row, ensure_ascii=False, separators=(",", ":")) + "\n" for row in rows)
 
 
+def prepare_exile_match(log, logs, source_root, campaign, *, previous_exile=None):
+    _, rows = decode_rows(log)
+    if not rows:
+        raise ValueError(f"{log}: expected a completed full match")
+    sources = exile_sources(source_root, rows[0], logs, previous_exile=previous_exile)
+    events, translated = prepare_match(log, rows[0]["game"].split(" · ", 1)[0], {}, logs, source_root, campaign)
+    events[0]["game"] = rows[0]["game"].replace("달라진 그림 찾기", "틀린 그림 찾기")
+    stages = {path.resolve(): stage for stage, path in zip(STAGES, logs)}
+    events[0]["from_matches"] = [f"matches/{campaign}/{stages[path]}/events.jsonl" for path in sources]
+    if previous_exile is not None:
+        previous_stage = EXILE_GAMES.index(events[0]["game"])
+        events[0]["from_exile"] = f"matches/{campaign}/exile{previous_stage}/events.jsonl"
+    return events, translated
+
+
 def export_replays(campaigns, source_root, output_root):
     source_root = source_root.resolve()
     destination_root = output_root / "matches"
@@ -115,20 +132,37 @@ def export_replays(campaigns, source_root, output_root):
         if destination in prepared or destination.exists() or destination.is_symlink():
             raise FileExistsError(f"{destination}: export would overwrite an existing campaign")
         logs = [campaign / stage / "events.jsonl" for stage in STAGES]
+        exile_logs = [campaign / f"exile{index}" / "events.jsonl" for index in range(1, len(EXILE_GAMES) + 1)]
+        if any(log.parent.is_symlink() for log in exile_logs):
+            raise ValueError(f"{campaign}: symbolic links are not supported")
+        has_exile = exile_logs[0].exists() or exile_logs[0].is_symlink()
+        for index, log in enumerate(exile_logs[1:], start=1):
+            if (log.exists() or log.is_symlink()) and not exile_logs[index - 1].exists():
+                if index == 1:
+                    raise ValueError(f"{campaign}: the second exile match requires the first exile match")
+                raise ValueError(f"{campaign}: exile{index + 1} requires exile{index}")
         if any(log.parent.is_symlink() for log in logs):
             raise ValueError(f"{campaign}: symbolic links are not supported")
-        while len(logs) > 4 and not logs[-1].is_symlink() and not logs[-1].exists():
+        while len(logs) > (2 if has_exile else 4) and not logs[-1].is_symlink() and not logs[-1].exists():
             logs.pop()
-        prepared[destination] = [
-            prepare_match(log, game, links, logs, source_root, campaign.name)
-            for log, game, links in zip(logs, CASE_STAGES[:len(logs)], PREDECESSORS[:len(logs)], strict=True)
-        ]
+        matches = {
+            stage: prepare_match(log, game, links, logs, source_root, campaign.name)
+            for stage, log, game, links in zip(STAGES[:len(logs)], logs, CASE_STAGES[:len(logs)],
+                                              PREDECESSORS[:len(logs)], strict=True)
+        }
+        if has_exile:
+            for index, log in enumerate(exile_logs):
+                if log.exists() or log.is_symlink():
+                    matches[f"exile{index + 1}"] = prepare_exile_match(
+                        log, logs, source_root, campaign.name,
+                        previous_exile=exile_logs[index - 1] if index else None)
+        prepared[destination] = matches
 
     destination_root.mkdir(parents=True, exist_ok=True)
     for destination, matches in prepared.items():
         with TemporaryDirectory(dir=destination_root, prefix=".export-") as temp:
             stage_root = Path(temp)
-            for stage, (events, translated) in zip(STAGES[:len(matches)], matches, strict=True):
+            for stage, (events, translated) in matches.items():
                 path = stage_root / stage
                 path.mkdir()
                 (path / "events.jsonl").write_text(encode_rows(events), encoding="utf-8")

@@ -83,6 +83,8 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/codex-example/day1-main/events.jsonl
 ```
 
+Codex requests time out after 300 seconds by default. Prefix the command with `DEVILS_PLAN_CODEX_TIMEOUT_SECONDS=600` to allow longer image requests. After a timeout, resume with `--resume` and the same output path.
+
 ### OpenAI Responses API
 
 Set `OPENAI_API_KEY` in your environment or in a `.env` file at the repository root. If you do not have a `.env` file, copy the example with the command below and enter your key after `OPENAI_API_KEY=`.
@@ -245,8 +247,76 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 3 prison match | Piggy Bank | 4 | Play without discussion or relationship assessments, deciding reset requests in seat order. Each model updates its memories of three banks and may change which banks it retains at every update. Mistaken memories are not corrected from the true contents. Score by calling doubt or recalling all banks before a reset. The main match ends at five points or after at most 100 turns. Last-place ties play extra rounds: losing points eliminates a player, gaining points secures safety, and the last remaining tied player is eliminated. |
 | Day 4 main match | Auction Bingo | 7 regular + 1 guest | Choose shapes and bid privately over seven rounds. Won shapes are automatically arranged at the end; rank by bingo lines, filled spaces, then the total value of unused coins. |
 | Day 4 prison match | Wall Go II | 3 | Move counters and build walls to claim territory without discussion. The three-player winner survives; the other two play a duel to determine elimination. Complete ties replay with only tied players and reversed turn order. |
+| Exile match 1 | Piece Puzzle | 4 | Assemble eight slotted pieces into a lattice by matching notch directions and depths. Players build privately; the first three to finish survive. |
+| Exile match 2 | Spot the Difference | 4 | Memorize the original picture, then mark five changed areas. The top two survive after three rounds; only ties at the survival boundary play overtime. |
+| Exile match 3 | Secret Code | 4 | Find a four-letter code from illustrated cards and clues. The first correct answer each round secures survival; the last remaining player is eliminated. |
+| Exile match 4 | Loop Fence Puzzle | 4 | Draw one closed loop satisfying every numbered clue. Players edit privately; the first three to finish survive. |
+| Exile match 5 | Symmetrical Puzzle | 3–4 | Assemble the blue, red and green pieces into reflection-symmetric shapes without flipping them. Complete all three puzzles to survive; the last player is eliminated. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
+
+### Run exile matches
+
+List completed matches in order, starting with Day 1 main, up to the point where four eliminated players have accumulated. If only three have been eliminated after Day 1, as in the mixed-model run, include Day 2 main too.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile1/events.jsonl
+```
+
+The second match joins the first exile match's three survivors with the next eliminated main/prison player. Simultaneous eliminations arrive in their recorded order.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.spot_difference \
+  --from-exile play_results/matches/all-luna-16/exile1/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+  --output runs/matches/exile-demo/exile2/events.jsonl
+```
+
+The third match joins the second exile match's two survivors with the next two eliminated main/prison players. For the mixed-model run, include the Day 3 main result too.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.secret_code \
+  --from-exile play_results/matches/all-luna-16/exile2/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile3/events.jsonl
+```
+
+The fourth match joins the third exile match's three survivors with the next eliminated main/prison player. Any already queued arrival joins first.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.loop_fence \
+  --from-exile play_results/matches/all-luna-16/exile3/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day3-main/events.jsonl \
+  --output runs/matches/exile-demo/exile4/events.jsonl
+```
+
+The fifth match joins the fourth exile match's three survivors with the next eliminated main/prison player. All three current campaigns need sources through Day 3 prison.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.symmetry \
+  --from-exile play_results/matches/all-luna-16/exile4/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day3-main/events.jsonl \
+                 play_results/matches/all-luna-16/day3-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile5/events.jsonl
+```
+
+Use the same `--provider`, `--model`, and `--player-model` options as other matches for model play. Resume an interrupted run with `--resume --output <events.jsonl>`.
 
 ## Read play logs on the website
 
