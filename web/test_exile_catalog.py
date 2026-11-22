@@ -6,8 +6,8 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from games.match import (
-    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, DAY_THREE_MAIN,
-    FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE,
+    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, DAY_THREE_MAIN, DAY_THREE_PRISON,
+    FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE,
 )
 
 from .export_replays import STAGES, encode_rows, export_replays
@@ -114,11 +114,12 @@ def third_campaign(root, *, player_count=8):
     return directory, logs, first, second, third
 
 
-def fourth_campaign(root):
-    directory, logs, first, second, third = third_campaign(root, player_count=9)
+def fourth_campaign(root, *, player_count=9):
+    directory, logs, first, second, third = third_campaign(root, player_count=player_count)
     main = directory / "day3-main/events.jsonl"
     main.parent.mkdir()
-    header = {"type": "match", "game": DAY_THREE_MAIN, "players": ["P01", "P09"], "seed": 1,
+    players = ["P01", "P09", *[f"P{number:02}" for number in range(10, player_count + 1)]]
+    header = {"type": "match", "game": DAY_THREE_MAIN, "players": players, "seed": 1,
               "from_main": str(logs[-2]), "from_prison": str(logs[-1])}
     main.write_text(encode_rows([header, {"type": "result", "eliminated": ["P09"]}]))
     main.with_name("events.en.jsonl").write_text("")
@@ -138,6 +139,33 @@ def fourth_campaign(root):
     fourth.write_text(encode_rows([header, event, result]))
     fourth.with_name("events.en.jsonl").write_text("")
     return directory, logs, first, second, third, fourth
+
+
+def fifth_campaign(root):
+    directory, logs, first, second, third, fourth = fourth_campaign(root, player_count=10)
+    prison = directory / "day3-prison/events.jsonl"
+    prison.parent.mkdir()
+    header = {"type": "match", "game": DAY_THREE_PRISON, "players": ["P01", "P10"], "seed": 1,
+              "from_main": str(logs[-1])}
+    prison.write_text(encode_rows([header, {"type": "result", "eliminated": ["P10"]}]))
+    prison.with_name("events.en.jsonl").write_text("")
+    logs.append(prison)
+    fifth = directory / "exile5/events.jsonl"
+    fifth.parent.mkdir()
+    players = ["P05", "P04", "P07", "P10"]
+    header = {"type": "match", "game": FIFTH_EXILE, "players": players, "seed": 1,
+              "from_matches": [str(path) for path in logs], "from_exile": str(fourth)}
+    event = {"type": "event", "turn": 1, "msg_type": "sym_finish", "agent_name": "System",
+             "content": json.dumps({"player": "P05", "rank": 1, "window": 2, "attempt": 1, "elapsed_ns": 12}),
+             "visible_to": "all"}
+    result = {"type": "result", "ranking": players, "ranking_groups": [[player] for player in players],
+              "survivors": players[:3], "eliminated": players[3:], "turns": 3,
+              "scores": {"P05": 3, "P04": 3, "P07": 3, "P10": 2},
+              "finish_turns": dict.fromkeys(players[:3], 3), "attempts": dict.fromkeys(players, 1),
+              "finishes": [json.loads(event["content"])]}
+    fifth.write_text(encode_rows([header, event, result]))
+    fifth.with_name("events.en.jsonl").write_text("")
+    return directory, logs, first, second, third, fourth, fifth
 
 
 class ExileCatalogTest(unittest.TestCase):
@@ -258,6 +286,21 @@ class ExileCatalogTest(unittest.TestCase):
         update_header(fourth, from_exile=str(third))
         update_header(second, players=["P05", "P04", "P03", "P09"])
         self.assertEqual(len(case_catalog(self.root)[0]["exile_matches"]), 1)
+
+
+    def test_fifth_exile_preserves_four_players_and_requires_the_recorded_fourth_match(self):
+        _, _, _, _, third, fourth, fifth = fifth_campaign(self.root)
+        case, = case_catalog(self.root)
+        self.assertEqual([match["game"] for match in case["exile_matches"]],
+                         [FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE])
+        runs = find_matches(self.root)
+        self.assertEqual(next_match(self.root, runs, "matches/example/exile4")["id"], "matches/example/exile5")
+        self.assertIsNone(next_match(self.root, runs, "matches/example/exile5"))
+        update_header(fifth, from_exile=str(third))
+        self.assertEqual(len(case_catalog(self.root)[0]["exile_matches"]), 4)
+        self.assertIsNone(next_match(self.root, runs, "matches/example/exile4"))
+        update_header(fifth, from_exile=str(fourth), players=["P05", "P04", "P10"])
+        self.assertEqual(len(case_catalog(self.root)[0]["exile_matches"]), 4)
 
 
 class ExileExportTest(unittest.TestCase):
@@ -385,6 +428,28 @@ class ExileExportTest(unittest.TestCase):
         directory, _, _, _, third, _ = fourth_campaign(self.source)
         third.unlink()
         with self.assertRaisesRegex(ValueError, "exile4 requires exile3"):
+            export_replays([directory], self.source, self.output)
+        self.assertFalse(self.output.exists())
+
+    def test_exports_fifth_exile_with_portable_sources_and_three_color_progress(self):
+        directory, logs, first, second, third, fourth, fifth = fifth_campaign(self.source)
+        originals = {path: path.read_bytes() for path in [*logs, first, second, third, fourth, fifth]}
+        export_replays([directory], self.source, self.output)
+        target = self.output / "matches/example/exile5/events.jsonl"
+        rows = [json.loads(line) for line in target.read_text().splitlines()]
+        self.assertEqual(rows[0]["from_exile"], "matches/example/exile4/events.jsonl")
+        self.assertEqual(rows[0]["from_matches"], [f"matches/example/{stage}/events.jsonl" for stage in STAGES[:6]])
+        self.assertEqual(rows[-1]["scores"], {"P05": 3, "P04": 3, "P07": 3, "P10": 2})
+        self.assertEqual(rows[-1]["finishes"][0]["player"], "P05")
+        self.assertEqual({path: path.read_bytes() for path in originals}, originals)
+        self.assertEqual(len(case_catalog(self.output)[0]["exile_matches"]), 5)
+        runs = find_matches(self.output)
+        self.assertEqual(next_match(self.output, runs, "matches/example/exile4")["id"], "matches/example/exile5")
+
+    def test_fifth_exile_cannot_export_without_fourth(self):
+        directory, _, _, _, _, fourth, _ = fifth_campaign(self.source)
+        fourth.unlink()
+        with self.assertRaisesRegex(ValueError, "exile5 requires exile4"):
             export_replays([directory], self.source, self.output)
         self.assertFalse(self.output.exists())
 

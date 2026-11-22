@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from random import Random
 import re
-from subprocess import CompletedProcess
+from subprocess import CompletedProcess, TimeoutExpired
 from tempfile import TemporaryDirectory
 from threading import Barrier, Event, local
 from time import monotonic_ns
@@ -36,6 +36,52 @@ from .wall_go.game import play as wall_go
 
 
 class MatchTest(unittest.TestCase):
+    def test_codex_timeout_defaults_to_300_and_accepts_configured_positive_seconds(self):
+        response = {"type": "item.completed", "item": {"type": "agent_message", "text": '{"action":"대기"}'}}
+        for value, expected in ((None, 300), ("600", 600), ("600.25", 600.25)):
+            environment = {} if value is None else {"DEVILS_PLAN_CODEX_TIMEOUT_SECONDS": value}
+            with (self.subTest(value=value), TemporaryDirectory() as directory,
+                  patch.dict("os.environ", environment, clear=True),
+                  patch("games.models.subprocess.run", return_value=CompletedProcess([], 0, json.dumps(response), "")) as run):
+                model = CodexLanguageModel("test-model", Path(directory))
+                self.assertEqual(model.sample_text("행동을 선택하세요."), "대기")
+                self.assertEqual(run.call_args.kwargs["timeout"], expected)
+                run.assert_called_once()
+
+    def test_codex_timeout_rejects_invalid_environment_before_starting_a_process(self):
+        for value in ("0", "-1", "NaN", "Inf", "-Inf", "not-a-number", ""):
+            with (self.subTest(value=value), TemporaryDirectory() as directory,
+                  patch.dict("os.environ", {"DEVILS_PLAN_CODEX_TIMEOUT_SECONDS": value}),
+                  patch("games.models.subprocess.run") as run):
+                with self.assertRaisesRegex(ValueError, "DEVILS_PLAN_CODEX_TIMEOUT_SECONDS"):
+                    CodexLanguageModel("test-model", Path(directory))
+                run.assert_not_called()
+                self.assertEqual(list(Path(directory).iterdir()), [])
+
+    def test_codex_timeout_has_clear_resume_error_cleans_images_and_never_retries(self):
+        paths = []
+
+        def timeout(command, **kwargs):
+            paths.extend(Path(command[index + 1]) for index, argument in enumerate(command) if argument == "--image")
+            self.assertEqual([path.read_bytes() for path in paths], [b"blue", b"red", b"green"])
+            raise TimeoutExpired(command, kwargs["timeout"], output="PRIVATE-PARTIAL-OUTPUT", stderr="PRIVATE-ERROR")
+
+        with (TemporaryDirectory() as directory,
+              patch.dict("os.environ", {"DEVILS_PLAN_CODEX_TIMEOUT_SECONDS": "600"}),
+              patch("games.models.subprocess.run", side_effect=timeout) as run):
+            model = CodexLanguageModel("test-model", Path(directory))
+            with model.attached_images((b"blue", b"red", b"green")), self.assertRaises(RuntimeError) as raised:
+                model.sample_text("세 그림을 확인하세요.")
+            message = str(raised.exception)
+            for expected in ("600", "DEVILS_PLAN_CODEX_TIMEOUT_SECONDS", "--output", "--resume"):
+                self.assertIn(expected, message)
+            for hidden in (directory, "--image", "--model", "PRIVATE-PARTIAL-OUTPUT", "PRIVATE-ERROR"):
+                self.assertNotIn(hidden, message)
+            self.assertTrue(raised.exception.__suppress_context__)
+            self.assertTrue(all(not path.exists() and not path.parent.exists() for path in paths))
+            self.assertEqual(model.calls, 1)
+            run.assert_called_once()
+
     def test_simultaneous_players_receive_their_own_images_with_shared_fallback(self):
         names = ("P01", "P02", "P03")
         match = Match(names, 1, model=OpenAILanguageModel("test", Mock()), live_players=names, live_turns=3)
@@ -153,6 +199,94 @@ class MatchTest(unittest.TestCase):
         review = match.events[0]
         self.assertIn("임시 답안 개인", review.content)
         self.assertNotIn(review, match.observations("P02"))
+
+    def test_simultaneous_three_pass_review_uses_own_updated_images_and_can_finish_early(self):
+        names = ("P01", "P02")
+        match = Match(names, 1, model=OpenAILanguageModel("test", Mock()), live_players=names, live_turns=8)
+        received = {name: [] for name in names}
+        previews = []
+
+        def query(name, prompt, **kwargs):
+            calls = received[name]
+            calls.append((prompt, kwargs))
+            index = len(calls)
+            return str(index), StrategyNote(text=f"{name}-summary-{index}", review_requested=name == "P01")
+
+        def preview(name, draft):
+            previews.append((name, draft))
+            return (f"{name}-draft-{draft}".encode(),)
+
+        with patch.object(match, "_query", side_effect=query):
+            answers = match.decide_together("symmetry_arrange", {
+                name: Decision("배치를 검토하세요.", "0", options=("0", "1", "2", "3")) for name in names
+            }, images_by_player={name: (name.encode(),) for name in names},
+                max_reviews=2, review_images=preview)
+
+        self.assertEqual(answers, {"P01": "3", "P02": "1"})
+        self.assertEqual([kwargs["allow_review"] for _, kwargs in received["P01"]], [True, True, False])
+        self.assertEqual(len(received["P02"]), 1)
+        self.assertEqual(previews, [("P01", "1"), ("P01", "2")])
+        self.assertEqual([kwargs["images"] for _, kwargs in received["P01"]],
+                         [(b"P01",), (b"P01-draft-1",), (b"P01-draft-2",)])
+        self.assertIn("2/3번째 판단", received["P01"][1][0])
+        self.assertIn("review:true로 다음 검토", received["P01"][1][0])
+        final_prompt = received["P01"][-1][0]
+        self.assertIn("3/3번째 판단", final_prompt)
+        self.assertIn("이번이 마지막 검토", final_prompt)
+        for expected in ("P01-summary-1", "P01-summary-2", "임시 답안 1", "임시 답안 2"):
+            self.assertIn(expected, final_prompt)
+        self.assertNotIn("P02-summary", final_prompt)
+        reviews = [event for event in match.events if event.msg_type == "decision_note"
+                   and json.loads(event.content).get("review")]
+        self.assertEqual([json.loads(event.content)["pass"] for event in reviews], [1, 2])
+        self.assertTrue(all(event.visible_to == ["P01"] for event in reviews))
+        self.assertEqual(match.live_turns, 4)
+
+    def test_simultaneous_review_respects_disabled_budget_and_invalid_final_fallback(self):
+        for max_reviews, turns, expected_calls, expected in ((0, 3, 1, "1"), (2, 1, 1, "1"), (2, 3, 3, "2")):
+            with self.subTest(max_reviews=max_reviews, turns=turns):
+                match = Match(("P01",), 1, model=OpenAILanguageModel("test", Mock()),
+                              live_players=("P01",), live_turns=turns)
+                flags = []
+
+                def query(name, prompt, **kwargs):
+                    flags.append(kwargs["allow_review"])
+                    action = str(len(flags)) if len(flags) < 3 else "invalid"
+                    return action, StrategyNote(text=f"검토 요약 {len(flags)}", review_requested=True)
+
+                with patch.object(match, "_query", side_effect=query):
+                    answer = match.decide_together("symmetry_arrange", {
+                        "P01": Decision("검토하세요.", "0", options=("0", "1", "2"))
+                    }, max_reviews=max_reviews)
+                self.assertEqual(len(flags), expected_calls)
+                self.assertEqual(answer, {"P01": expected})
+                self.assertFalse(flags[-1])
+                if expected_calls == 3:
+                    final_note = [event for event in match.events if event.msg_type == "decision_note"][-1]
+                    self.assertEqual(json.loads(final_note.content),
+                                     {"phase": "symmetry_arrange", "note": "검토 요약 2", "fallback": True})
+                    self.assertEqual(final_note.visible_to, ["P01"])
+
+    def test_review_key_stops_repeated_geometry_without_spending_another_call_or_losing_latest_answer(self):
+        names = ("P01", "P02")
+        match = Match(names, 1, model=OpenAILanguageModel("test", Mock()), live_players=names, live_turns=8)
+        calls = dict.fromkeys(names, 0)
+
+        def query(name, prompt, **kwargs):
+            calls[name] += 1
+            candidate = ("1" if calls[name] == 1 else "01") if name == "P01" else str(calls[name])
+            return candidate, StrategyNote(text=f"{name} 검토 {calls[name]}", review_requested=True)
+
+        with patch.object(match, "_query", side_effect=query):
+            answers = match.decide_together("symmetry_arrange", {
+                name: Decision("서로 다른 배치를 검토하세요.", "0", options=("0", "1", "01", "2", "3")) for name in names
+            }, max_reviews=2, review_key=lambda name, candidate: int(candidate))
+        self.assertEqual(calls, {"P01": 2, "P02": 3})
+        self.assertEqual(match.live_turns, 3)
+        self.assertEqual(answers, {"P01": "01", "P02": "3"})
+        notes = [json.loads(event.content) for event in match.events if event.msg_type == "decision_note"]
+        self.assertEqual(sum(note.get("review") is True for note in notes), 3)
+        self.assertEqual(sum(not note.get("review") for note in notes), 2)
 
     def test_openai_cli_sends_structured_text_and_multi_image_actions(self):
         with (TemporaryDirectory() as directory, patch.dict("os.environ", {}, clear=True),

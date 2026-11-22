@@ -24,7 +24,7 @@ from .resume import MatchLog, ResumeError
 from .resume_legacy import LegacyDecisions
 
 
-REVIEWABLE_BATCH_PHASES = {"representative", "memory_poker", "submit"}
+REVIEWABLE_BATCH_PHASES = {"representative", "memory_poker", "submit", "symmetry_arrange"}
 EFFORTS = ("low", "medium", "high", "xhigh")
 DEFAULT_GUEST_MODEL = ("codex", "gpt-6.1-sol", "low")
 DAY_ONE_MAIN = "1일차 메인 매치 · 양자택일"
@@ -39,6 +39,7 @@ FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
 SECOND_EXILE = "유배지 매치 2 · 틀린 그림 찾기"
 THIRD_EXILE = "유배지 매치 3 · 비밀 코드"
 FOURTH_EXILE = "유배지 매치 4 · 울타리 치기"
+FIFTH_EXILE = "유배지 매치 5 · 대칭 퍼즐"
 PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
     DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),
@@ -237,8 +238,13 @@ class Match:
         self, phase: str, decisions: Mapping[str, Decision], *, response_times: dict[str, int] | None = None,
         record_actions: bool = True, images: Sequence[bytes] = (),
         images_by_player: Mapping[str, Sequence[bytes]] | None = None,
+        max_reviews: int = 1,
+        review_images: Callable[[str, str], Sequence[bytes]] | None = None,
+        review_key: Callable[[str, str], object] | None = None,
     ) -> dict[str, str]:
         """Resolve simultaneous decisions and optionally record response times in nanoseconds."""
+        if type(max_reviews) is not int or max_reviews < 0:
+            raise ValueError("추가 검토 횟수는 0 이상의 정수여야 합니다.")
         for decision in decisions.values():
             if not decision.accepts(decision.default):
                 raise ValueError(f"Invalid scripted action in {phase}: {decision.default}")
@@ -253,8 +259,9 @@ class Match:
 
         start = monotonic_ns()
 
-        def query(name, prompt, *, review=False):
-            own_images = images_by_player.get(name, images) if images_by_player is not None else images
+        def query(name, prompt, *, review=False, preview=None):
+            own_images = (review_images(name, preview) if preview is not None and review_images is not None else
+                          images_by_player.get(name, images) if images_by_player is not None else images)
             candidate, strategy = self._query(name, prompt, images=own_images, record_strategy=True, allow_review=review)
             return candidate, asdict(strategy), monotonic_ns() - start
 
@@ -263,7 +270,7 @@ class Match:
 
         def ask():
             live = reserve()
-            allow_review = self.allow_review and self.live_turns > 0 and (
+            allow_review = self.allow_review and max_reviews > 0 and self.live_turns > 0 and (
                 terminal_choice or phase in REVIEWABLE_BATCH_PHASES
             )
             return parallel_actions(live, lambda name: query(name, instructions(name), review=allow_review))
@@ -273,18 +280,44 @@ class Match:
             ["batch", phase, event_index, list(decisions)], ask,
             lambda: self.legacy.batch(phase, reserve(), event_index),
         )
-        reviews = {}
-        for name, (candidate, strategy, _) in proposed.items():
-            if strategy["review_requested"] and decisions[name].accepts(candidate) and self.take_model_turn():
+        current, revised, fallbacks, review_history, reviewed_keys = proposed, {}, {}, {}, {}
+        for round_index in range(max_reviews):
+            reviews = {}
+            for name, (candidate, strategy, _) in current.items():
+                if not strategy["review_requested"] or not decisions[name].accepts(candidate):
+                    continue
+                key = review_key(name, candidate) if review_key is not None else None
+                if review_key is not None and key in reviewed_keys.get(name, ()):
+                    continue
+                if not self.take_model_turn():
+                    continue
+                reviewed_keys.setdefault(name, []).append(key)
                 review = reviews[name] = Review(candidate, strategy["text"])
-                self._record_review(name, phase, review)
+                review_history.setdefault(name, []).append(review)
+                fallbacks[name] = candidate
+                self._record_review(name, phase, review,
+                                    pass_number=round_index + 1 if phase == "symmetry_arrange" else None)
+            if not reviews:
+                break
 
-        def revise():
-            return parallel_actions(
-                tuple(reviews), lambda name: query(name, instructions(name) + "\n" + reviews[name].instructions())
-            )
+            def revise():
+                more = self.allow_review and round_index + 1 < max_reviews and self.live_turns > 0
 
-        revised = self.decision(["revisions", phase, len(self.events), list(reviews)], revise) if reviews else {}
+                def prompt(name):
+                    if max_reviews == 1:
+                        return instructions(name) + "\n" + reviews[name].instructions()
+                    history = "\n".join(item.summary() for item in review_history[name])
+                    next_step = ("필요하면 review:true로 다음 검토를 요청하고, 준비되면 review:false로 확정하세요."
+                                 if more else "이번이 마지막 검토입니다. 최종 답안을 확정하세요.")
+                    return (instructions(name) + f"\n이번은 {round_index + 2}/{max_reviews + 1}번째 판단입니다.\n"
+                            + history + "\n임시 답안과 짧은 메모를 검토하세요. " + next_step)
+                return parallel_actions(tuple(reviews), lambda name: query(
+                    name, prompt(name),
+                    review=more, preview=reviews[name].draft,
+                ))
+
+            current = self.decision(["revisions", phase, len(self.events), list(reviews)], revise)
+            revised.update(current)
         answers = {}
         for name, decision in decisions.items():
             candidate, strategy, elapsed = proposed.get(name, (None, {"text": ""}, None))
@@ -292,11 +325,14 @@ class Match:
             if elapsed is not None and decision.invalid_default is not None:
                 default = decision.invalid_default
             if name in revised:
-                default = reviews[name].draft
+                default = fallbacks[name]
                 candidate, strategy, elapsed = revised[name]
             if response_times is not None and elapsed is not None:
                 response_times[name] = elapsed
             action = self._resolve(name, phase, candidate, default, decision.accepts, note=strategy["text"])
+            if max_reviews > 1 and name in revised and candidate != action and review_history[name][-1].note:
+                self.event("decision_note", {"phase": phase, "note": review_history[name][-1].note, "fallback": True},
+                           private=[name], actor=name)
             if record_actions:
                 self.event("action", {"phase": phase, "action": action}, private=[name], actor=name)
             answers[name] = action
@@ -309,8 +345,11 @@ class Match:
             self.live_turns -= 1
             return True
 
-    def _record_review(self, name, phase, review: Review) -> None:
-        self.event("decision_note", {"phase": phase, "note": review.summary()}, private=[name], actor=name)
+    def _record_review(self, name, phase, review: Review, *, pass_number: int | None = None) -> None:
+        data = {"phase": phase, "note": review.summary()}
+        if pass_number is not None:
+            data.update({"review": True, "pass": pass_number})
+        self.event("decision_note", data, private=[name], actor=name)
 
     def _model_ratings(self, name: str) -> Ratings:
         ratings = self.relationships[name]
@@ -538,11 +577,11 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             try:
                 from .exile_match.roster import (
                     collect_exile_players, collect_second_exile_players,
-                    collect_third_exile_players, collect_fourth_exile_players,
+                    collect_third_exile_players, collect_fourth_exile_players, collect_fifth_exile_players,
                 )
 
                 collectors = {FIRST_EXILE: collect_second_exile_players, SECOND_EXILE: collect_third_exile_players,
-                              THIRD_EXILE: collect_fourth_exile_players}
+                              THIRD_EXILE: collect_fourth_exile_players, FOURTH_EXILE: collect_fifth_exile_players}
                 players = (collectors[previous_exile](exile_path, source_matches) if exile_path else
                            collect_exile_players(source_matches))
                 pieces = [0] * len(players)

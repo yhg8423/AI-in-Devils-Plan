@@ -83,6 +83,8 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/codex-example/day1-main/events.jsonl
 ```
 
+Codex requests time out after 300 seconds by default. Prefix the command with `DEVILS_PLAN_CODEX_TIMEOUT_SECONDS=600` to allow longer image requests. After a timeout, resume with `--resume` and the same output path.
+
 ### OpenAI Responses API
 
 Set `OPENAI_API_KEY` in your environment or in a `.env` file at the repository root. If you do not have a `.env` file, copy the example with the command below and enter your key after `OPENAI_API_KEY=`.
@@ -249,6 +251,7 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Exile match 2 | Spot the Difference | 4 | Memorize the original picture, then mark five changed areas. The top two survive after three rounds; only ties at the survival boundary play overtime. |
 | Exile match 3 | Secret Code | 4 | Find a four-letter code from illustrated cards and clues. The first correct answer each round secures survival; the last remaining player is eliminated. |
 | Exile match 4 | Loop Fence Puzzle | 4 | Draw one closed loop satisfying every numbered clue. Players edit privately; the first three to finish survive. |
+| Exile match 5 | Symmetrical Puzzle | 3–4 | Assemble the blue, red and green pieces into reflection-symmetric shapes without flipping them. Complete all three puzzles to survive; the last player is eliminated. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
 
@@ -297,6 +300,20 @@ uv run --locked --python 3.12 python -m games.exile_match.loop_fence \
                  play_results/matches/all-luna-16/day2-prison/events.jsonl \
                  play_results/matches/all-luna-16/day3-main/events.jsonl \
   --output runs/matches/exile-demo/exile4/events.jsonl
+```
+
+The fifth match joins the fourth exile match's three survivors with the next eliminated main/prison player. All three current campaigns need sources through Day 3 prison.
+
+```bash
+uv run --locked --python 3.12 python -m games.exile_match.symmetry \
+  --from-exile play_results/matches/all-luna-16/exile4/events.jsonl \
+  --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
+                 play_results/matches/all-luna-16/day1-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day2-main/events.jsonl \
+                 play_results/matches/all-luna-16/day2-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day3-main/events.jsonl \
+                 play_results/matches/all-luna-16/day3-prison/events.jsonl \
+  --output runs/matches/exile-demo/exile5/events.jsonl
 ```
 
 Use the same `--provider`, `--model`, and `--player-model` options as other matches for model play. Resume an interrupted run with `--resume --output <events.jsonl>`.
