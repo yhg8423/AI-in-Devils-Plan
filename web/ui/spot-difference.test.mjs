@@ -31,6 +31,10 @@ function render(steps, {language = "ko", view = "operator", selected = "", frame
   return api[language].render({id: "spot-demo", match: {game, players, steps}, frame, view, selected, choosePlayer: noop, chooseView: noop, seek: noop, mode: "paused"});
 }
 
+test("the English opening rules award only one point for repeated marks on the same area", () => {
+  assert.match(render([], {language: "en"}), /Each correctly marked area earns one point, even if marked more than once/);
+});
+
 for (const language of ["ko", "en"]) {
   test(`${language}: current and archived Korean names share the picture scene, panels, and rule summary`, () => {
     const current = "달라진 그림 찾기";

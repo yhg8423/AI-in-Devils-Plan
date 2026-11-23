@@ -106,7 +106,7 @@ const legacyRelationshipCheckpoints = new Map([
   ["경기 종료", "매치 종료"],
 ]);
 const actions = {
-  symmetry_arrange: tr("세 색 조립", "Arrange all three colors"),
+  symmetry_arrange: tr("세 색 조립", "Arrange pieces"),
   fence_draw: tr("울타리 그리기", "Draw the loop"),
   secret_think: tr("코드 준비·버저", "Prepare code and buzz"),
   picture_memorize: tr("원본 기억", "Remember the original"), picture_answer: tr("달라진 부분 표시", "Mark the changes"),
@@ -316,6 +316,9 @@ function record(event, step) {
       }
       if (en && data.action === "패스") return "Pass";
       if (en && data.action === "현금") return "Cash";
+      if (en && data.phase === "choice_4" && ["공공", "개인"].includes(data.action)) {
+        return choiceOptionLabel(`${data.action}의 이익`);
+      }
       if (en && data.phase === "submit") {
         const [weight, color] = data.action.split(" ");
         return `Weight ${weight} · ${chipColorLabel(color)}`;

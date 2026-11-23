@@ -7,6 +7,7 @@ import {fileURLToPath} from "node:url";
 import {after, test} from "node:test";
 import {build} from "esbuild";
 import {caseMatches} from "./cases.js";
+import {rulesSummary} from "./rule-summaries.js";
 
 const directory = mkdtempSync(join(tmpdir(), "exile-ui-"));
 after(() => rmSync(directory, {recursive: true, force: true}));
@@ -27,6 +28,12 @@ const own = event("exile_board", board1, ["P01"], "P01"), other = event("exile_b
 function render(steps, {language = "ko", view = "operator", selected = "", frame = steps.length, caseRecord} = {}) {
   return api[language].render({id: "exile-demo", caseRecord, match: {game: "유배지 매치 1 · 피스 퍼즐", players, steps}, frame, view, selected, choosePlayer: noop, chooseView: noop, seek: noop, mode: "paused"});
 }
+
+test("the English rule summary includes passing and explains reverse and flip as placement options", () => {
+  const summary = rulesSummary("피스 퍼즐 · 4인 개인전", "");
+  assert.match(summary, /press the buzzer to submit, or pass/);
+  assert.match(summary, /When placing a piece, you may reverse the notch order and flip the notch directions independently/);
+});
 
 test("campaign navigation interleaves exile matches with their source matches", () => {
   const caseRecord = {

@@ -104,7 +104,7 @@ function statusText(state, player) {
 function BingoStandings({state, selected = ""}) {
   const reveal = state.bingoReveal;
   const guest = state.bingoSetup?.guest ?? "G01";
-  return <Table caption={tr("본선 최종 순위 · 게스트 별도 표시", "Final standings · Guest listed separately")} headers={tr(["참가자", "순위", "빙고", "채운 칸", "잔여 금액", "결과"], ["Player", "Rank", "Lines", "Filled", "Coins left", "Result"])}
+  return <Table caption={tr("본선 최종 순위 · 게스트 별도 표시", "Final standings · Guest listed separately")} headers={tr(["참가자", "순위", "빙고", "채운 칸", "잔여 금액", "결과"], ["Player", "Rank", "Lines", "Filled", "Remaining coin value", "Result"])}
     rows={[...reveal.ranking, guest].filter((player) => !selected || selected === player).map((player) => {
       const final = reveal.players[player];
       return [player, player === guest ? tr("게스트", "Guest") : reveal.ranking.indexOf(player) + 1,
@@ -165,7 +165,7 @@ export function BingoStage({state, replay}) {
       <p className="bingo-secrecy revealed">{tr("획득 도형과 빙고판이 모두 공개되었습니다.", "All acquired shapes and bingo cards have been revealed.")}</p>
       <div className="bingo-player-picker">{players.map((player) => <button type="button" key={player} onClick={() => choosePlayer(player)} aria-pressed={chosen === player} data-guest={player === guest}>{player}{player === guest && <small>{tr("게스트", "Guest")}</small>}</button>)}</div>
       {final && <section className="bingo-final-card"><div><h3>{chosen} <small>{statusText(state, chosen)}</small></h3><BingoCard board={board} filled={final.board} label={tr(`${chosen} · ${final.lines}줄, ${final.filled}칸 완성`, `${chosen} · ${final.lines} lines, ${final.filled} filled cells`)} /></div>
-        <dl><div><dt>{tr("빙고", "Bingos")}</dt><dd>{final.lines}{tr("줄", " lines")}</dd></div><div><dt>{tr("완성", "Filled")}</dt><dd>{final.filled} / 9</dd></div><div><dt>{tr("잔여 코인", "Coins left")}</dt><dd>{priceLabel(final.remaining_value)}</dd></div>
+        <dl><div><dt>{tr("빙고", "Bingos")}</dt><dd>{final.lines}{tr("줄", " lines")}</dd></div><div><dt>{tr("완성", "Filled")}</dt><dd>{final.filled} / 9</dd></div><div><dt>{tr("잔여 코인", "Remaining coin value")}</dt><dd>{priceLabel(final.remaining_value)}</dd></div>
           <div><dt>{tr("획득 도형", "Shapes won")}</dt><dd>{bingoShapes.map((shape) => `${shapeGlyph(shape)} ${final.shapes[shape]}`).join(" · ")}</dd></div></dl></section>}
     </>}
     {chosen && (own || final) && <section className="bingo-wallet"><h3>{chosen} · {final ? tr("최종 코인", "Final coins") : tr("비공개 코인 현황", "Private coin balance")}</h3>
