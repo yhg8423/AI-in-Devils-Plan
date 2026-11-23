@@ -349,6 +349,10 @@ test("one-color action labels preserve the other colors and retain whole-set sub
   assert.equal(api.ko.symmetryActionText(action), "빨강 작업판 교체 · 조각 2개 · 나머지 두 색 유지 · 버저 제출");
   assert.equal(api.en.symmetryActionText({...action, color: "unknown"}), "Invalid arrangement action");
   assert.equal(api.en.symmetryActionText({...action, placements: {red: []}}), "Invalid arrangement action");
+  const actionEvent = event("action", {phase: "symmetry_arrange", action: JSON.stringify(action)}, ["P01"], "P01");
+  const html = render(["P01", "P02", "P03"], [actionEvent], {language: "en", view: "operator"});
+  assert.match(html, /Arrange pieces/);
+  assert.match(html, /Replace Red assembly · 2 pieces · Keep the other two colors · Submit with buzzer/);
 });
 
 test("v5 copies only known finite axes and workbench image fields, with owner privacy and reveal intact", () => {

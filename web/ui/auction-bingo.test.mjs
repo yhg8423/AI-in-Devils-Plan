@@ -301,6 +301,7 @@ test("final reveal shows cards and prices while sealed bids stay private", () =>
   assert.ok(html.indexOf('class="bingo-standings"') < html.indexOf('class="bingo-player-picker"'));
   const englishStandings = render([...pending, reveal, result], "public", "G01", "en").match(/<section class="bingo-standings"[\s\S]*?<\/section>/)[0];
   assert.match(englishStandings, /Final standings/);
+  assert.match(englishStandings, /Remaining coin value/);
   assert.match(englishStandings, /P05<\/th>(?:(?!<\/tr>)[\s\S])*Living Quarters/);
   assert.match(englishStandings, /G01<\/th><td>Guest<\/td>/);
   assert.match(html, /data-filled="true"/);

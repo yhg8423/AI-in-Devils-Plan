@@ -180,7 +180,7 @@ export function SpotStage({state, replay}) {
     <h2>{tr("달라진 그림 찾기", "Spot the Difference")}</h2>
     {!phase ? <div className="spot-rules"><h3>{tr("게임 규칙", "Game rules")}</h3>
       <p>{tr("원본을 3분간 관찰하고, 그림이 사라진 뒤 10초 후 달라진 그림을 봅니다. 2분 안에 바뀐 5곳을 찾아 표시합니다.", "Observe the original for three minutes. It disappears, and the changed picture follows ten seconds later. Mark up to five changed areas within two minutes.")}</p>
-      <p>{tr("정답당 1점, 3라운드 총점 하위 2명이 탈락합니다. 생존 경계의 동점자는 원본 관찰 시간이 2분인 연장전을 진행합니다.", "Each correct mark scores one point. The bottom two after three rounds are eliminated. Boundary-tied players play overtime with a two-minute original observation phase.")}</p>
+      <p>{tr("정답당 1점, 3라운드 총점 하위 2명이 탈락합니다. 생존 경계의 동점자는 원본 관찰 시간이 2분인 연장전을 진행합니다.", "Each correctly marked area earns one point, even if marked more than once. The bottom two after three rounds are eliminated. Players tied at the cutoff play overtime and have two minutes to observe the original.")}</p>
     </div> : <>
       <p className="spot-phase">{result ? tr("최종 결과", "Final results") : `${roundText(phase.round, phase.overtime)} · ${stageText(phase.stage)}`}</p>
       {!result && <ol className="spot-timing" aria-label={tr("라운드 진행 단계", "Round stages")}>
