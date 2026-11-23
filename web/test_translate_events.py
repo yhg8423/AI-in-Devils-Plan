@@ -5,11 +5,35 @@ import sys
 from tempfile import TemporaryDirectory
 import unittest
 
+from games.mystery_stock_market.game import STOCK_RULES, stock_hint
+
 from .spectator import read_match
-from .translate_events import translate_logs
+from .translate_events import convert_text, translate_logs
 
 
 class TranslateEventsTests(unittest.TestCase):
+    def test_market_clue_translation_preserves_public_and_private_reveals(self):
+        huja_rule = STOCK_RULES[-1]
+        steel_rule = STOCK_RULES[2]
+
+        def unexpected_translation(text):
+            self.fail(f"Known market clue was sent to the translator: {text}")
+
+        early = convert_text(stock_hint(huja_rule, 15), unexpected_translation)
+        self.assertIn("total holdings", early)
+        self.assertIn("▧", early)
+        self.assertNotIn("10 shares", early)
+        self.assertNotIn("30 shares", early)
+        final = convert_text(stock_hint(huja_rule, 20), unexpected_translation)
+        self.assertIn("at least 10 shares and at most 30 shares", final)
+        self.assertNotRegex(final, "[□▧]")
+        preview = convert_text(f"후자전자 · {stock_hint(huja_rule, 15)}", unexpected_translation)
+        self.assertEqual(preview, f"Huja Electronics · {early}")
+
+        steel = convert_text(stock_hint(steel_rule, 20), unexpected_translation)
+        self.assertIn("increase: −₩200 per share added", steel)
+        self.assertIn("Decrease: +₩200 per share removed", steel)
+
     def test_translates_only_event_content_and_reuses_cached_text(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
