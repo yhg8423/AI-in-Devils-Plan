@@ -10,6 +10,8 @@ import sqlite3
 import subprocess
 from tempfile import NamedTemporaryFile, TemporaryDirectory
 
+from games.mystery_stock_market.game import REVEAL_ROUNDS, STOCK_RULES, STOCKS, stock_hint
+
 from .spectator import find_matches
 
 
@@ -40,6 +42,25 @@ GAME_TERMS = {
 TERM_PATTERN = re.compile("|".join(map(re.escape, GAME_TERMS)))
 PLAYER_ID = re.compile(r"(?i)\b([pg])([0-9]{2})(?![0-9])")
 
+# Translate the rule as a whole, then mask the English text at the corresponding reveal stages.
+MARKET_RULES_EN = (
+    "[5:If] [20:at least four] [5:stocks] [15:rise], [10:+20% in the next round]. "
+    "[15:If] [20:at least four] [5:stocks] [15:fall], [10:−10% in the] next [10:round].",
+    "[10:If] [20:Bangeo Steel's] price [10:rose, +10%], [5:otherwise] [15:−10%].",
+    "[20:Bangeo Steel]: [5:Total holdings] [15:increase:] −₩200 [10:per share] [15:added]. "
+    "[15:Decrease:] +₩200 [10:per share] [15:removed].",
+    "[5:Alt Entertainment's] [10:stock price] [15:chart matches] [20:the Mystery Stock Exchange logo].",
+    "If [15:Huja Electronics] [20:is under Secret], [5:+13%], [5:otherwise] [10:−₩1,000].",
+    "If [5:Koyo Tech's] [15:buy volume] exceeds [20:Huja Electronics'] buy volume, [10:+₩1,400], [5:otherwise] [10:−₩700].",
+    "If [10:Huja Electronics'] [15:total holdings] are [5:at least] [20:10 shares] and [5:at most] [20:30 shares], "
+    "+₩1,500, [5:otherwise] [15:−₩1,000].",
+)
+MARKET_CLUES = {
+    stock_hint(original, round_number): stock_hint(translated, round_number)
+    for original, translated in zip(STOCK_RULES, MARKET_RULES_EN, strict=True)
+    for round_number in REVEAL_ROUNDS
+}
+
 
 def source_events(snapshot: bytes):
     """Yield source indexes independently of the replay visibility filter."""
@@ -59,6 +80,11 @@ def source_events(snapshot: bytes):
 
 
 def convert_text(text, translate):
+    if text in MARKET_CLUES:
+        return MARKET_CLUES[text]
+    stock, _, clue = text.partition(" · ")
+    if stock in STOCKS and clue in MARKET_CLUES:
+        return f"{GAME_TERMS[stock]} · {MARKET_CLUES[clue]}"
     if not HANGUL.search(text):
         return text
     if text in GLOSSARY:
