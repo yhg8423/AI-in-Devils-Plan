@@ -6,6 +6,7 @@ import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {after, test} from "node:test";
 import {build} from "esbuild";
+import {rulesSummary} from "./rule-summaries.js";
 
 const directory = mkdtempSync(join(tmpdir(), "hidden-word-ui-"));
 after(() => rmSync(directory, {recursive: true, force: true}));
@@ -54,7 +55,7 @@ function renderMatch(events, view, language, selected = "") {
     content: JSON.stringify(data), agent_name: actor, visible_to: visible}]}));
   const noOp = () => {};
   return api[language].renderMatch({id: "hidden-word-demo", frame: steps.length, mode: "paused",
-    match: {game: "5일차 메인 매치 · 히든 워드", players, steps, seed: 1}, view, selected,
+    match: {game: "5일차 메인 매치 · 히든 워드", players: events.find(({type}) => type === "word_setup")?.data.order ?? players, steps, seed: 1}, view, selected,
     choosePlayer: noOp, chooseView: noOp, seek: noOp});
 }
 
@@ -144,6 +145,28 @@ for (const language of ["ko", "en"]) {
     assert.match(html, language === "ko" ? /시작 전 대화|딜러룸 입장/ : /Opening discussion|Enters dealer room/);
     assert.doesNotMatch(html, /word_(discussion|dealer)/);
   });
+  test(`${language}: Word2Vec shows raw signed scores and vocabulary misses without a noun judgment`, () => {
+    const vectorSetup = record("word_setup", {...setup.data, version: 2, score_mode: "word2vec"});
+    const negative = record("word_similarity", {...similarity.data, similarity: -40, valid: true});
+    const unknown = record("word_similarity", {...similarity.data, index: 2, similarity: null, valid: false, reason: "out_of_vocabulary"});
+    const events = [vectorSetup, ...base.slice(1, 5), negative, unknown];
+    const html = renderMatch(events, "public", language);
+    assert.match(html, /Word2Vec/);
+    assert.match(html, /−100[~–]100%/);
+    assert.match(html, /-40%/);
+    assert.match(html, /data-signed="true" data-negative="true"><span style="width:20%;left:30%"/);
+    assert.match(html, language === "ko" ? /벡터 사전에 없음/ : /Not in vector vocabulary/);
+    assert.doesNotMatch(html, /명사 아님|Not a noun|NaN|보름달|추석/);
+    const label = api[language].hiddenEventText("word_similarity", unknown.data);
+    assert.match(label, language === "ko" ? /벡터 사전에 없음/ : /Not in vector vocabulary/);
+  });
+  test(`${language}: inherited five-player roster renders without adding a sixth player`, () => {
+    const five = record("word_setup", {...setup.data, order: players.slice(0, 5), players: 5});
+    const html = renderMatch([five, ...base.slice(1)], "public", language);
+    const arena = html.slice(html.indexOf('class="arena"'), html.indexOf('class="match-state"'));
+    assert.equal((arena.match(/data-player="P0[1-6]"/g) ?? []).length, 5);
+    assert.doesNotMatch(arena, /data-player="P06"/);
+  });
 }
 
 test("operator can inspect private candidates and sealed guesses", () => {
@@ -154,4 +177,16 @@ test("operator can inspect private candidates and sealed guesses", () => {
   assert.equal(api.en.similarityLabel(95), "95%");
   assert.equal(api.en.similarityLabel(95.001), ">95%");
   assert.equal(api.en.hiddenEventText("word_similarity", similarity.data), "Candidate 1 · Similarity 88.25%");
+});
+
+test("English rules distinguish raw Word2Vec rules from archived AI judgments", () => {
+  const heading = "히든 워드 · 참가자 5~6명 · 2라운드";
+  const legacy = rulesSummary(heading, "독립된 AI 판정 문맥입니다. 방송의 Word2Vec 수치와 일치하지 않습니다.");
+  assert.match(legacy, /isolated AI similarity judgments/);
+  assert.match(legacy, /scripted play uses fixed associations/);
+  const current = rulesSummary(heading, "Word2Vec 코사인 유사도 × 100");
+  assert.match(current, /direct Korean Word2Vec cosine similarity × 100/);
+  assert.match(current, /−100% to 100%/);
+  assert.match(current, /same vector vocabulary and raw scores/);
+  assert.doesNotMatch(current, /isolated AI|fixed associations/);
 });

@@ -1,5 +1,5 @@
 from contextlib import redirect_stderr, redirect_stdout
-from dataclasses import asdict, replace
+from dataclasses import replace
 from io import StringIO
 import json
 from pathlib import Path
@@ -8,9 +8,9 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ..match import DAY_FIVE_MAIN, Match, encode, run_cli
-from ..resume import MatchLog
-from . import game
-from .words import ENVELOPES
+from . import __main__ as cli, game
+from .vectors import WordVectors
+from .words import ASSOCIATIONS, ENVELOPES, WORDS
 
 
 PLAYERS = tuple(f"P{number:02}" for number in range(1, 7))
@@ -29,6 +29,13 @@ class WrongGuesses(Match):
 
 
 class HiddenWordTest(unittest.TestCase):
+    def setUp(self):
+        vocabulary = sorted(set(WORDS).union(*(set(hints) for hints in ASSOCIATIONS.values())))
+        self.vectors = WordVectors(vocabulary, [[1, 1] for _ in vocabulary])
+        loader = patch.object(game, "load_vectors", return_value=self.vectors)
+        loader.start()
+        self.addCleanup(loader.stop)
+
     def test_extra_answer_cost_is_limited_to_one_per_secret(self):
         two = encode({"answers": ["바다", "강"], "spend": True})
         self.assertEqual(game.parse_guesses(two, 1, False), (["바다", "강"], True))
@@ -47,15 +54,6 @@ class HiddenWordTest(unittest.TestCase):
             with self.subTest(payload=payload), self.assertRaises(ValueError):
                 game.parse_guesses(encode(payload), 3, False)
         self.assertEqual(game.parse_guesses('{"answers":[],"spend":false}', 0, True), ([], False))
-
-    def test_similarity_rejects_invalid_numbers_and_types(self):
-        self.assertEqual(game.similarity_result('{"similarity":95.001,"noun":true}'),
-                         {"similarity": 95.001, "noun": True})
-        for value in (True, -1, 101, float("nan"), float("inf"), 10 ** 400, "96"):
-            with self.subTest(value=str(value)[:30]), self.assertRaises(ValueError):
-                game.similarity_result(encode({"similarity": value, "noun": True}))
-        with self.assertRaises(ValueError):
-            game.similarity_result('{"similarity":80,"noun":1}')
 
     def test_two_round_scores_and_complete_tie_order(self):
         match = WrongGuesses(PLAYERS, 7)
@@ -167,7 +165,7 @@ class HiddenWordTest(unittest.TestCase):
     def test_threshold_is_strict_and_fallback_uses_first_highest_current_hint(self):
         for score, expected_count, forced in ((95, 10, True), (95.01, 1, False)):
             match = WrongGuesses(PLAYERS, 3)
-            with patch.object(game, "_judge", return_value={"similarity": score, "noun": True, "mode": "scripted"}):
+            with patch.object(game, "_judge", return_value={"similarity": score, "valid": True, "mode": "word2vec"}):
                 game.play(match)
             clues = events(match, "word_clue")
             hints = events(match, "word_hint")
@@ -177,15 +175,22 @@ class HiddenWordTest(unittest.TestCase):
                 self.assertEqual(clue["word"], current[0]["word"])
                 self.assertEqual(clue["forced"], forced)
 
-    def test_invalid_noun_consumes_opportunity_without_substitution_or_word_leak(self):
-        match = WrongGuesses(PLAYERS, 4)
-        with patch.object(game, "_judge", return_value={"similarity": 99, "noun": False, "mode": "ai"}):
-            game.play(match)
+    def test_oov_hint_consumes_opportunity_without_substitution_or_word_leak(self):
+        class UnknownHints(WrongGuesses):
+            def decide_together(self, phase, decisions, **kwargs):
+                if phase == "word_hint":
+                    decisions = {name: replace(decision, default="없는낱말") for name, decision in decisions.items()}
+                return super().decide_together(phase, decisions, **kwargs)
+
+        match = UnknownHints(PLAYERS, 4)
+        game.play(match)
         clues = events(match, "word_clue")
         self.assertTrue(all(clue["word"] is None for clue in clues))
         self.assertEqual(len(events(match, "word_hint")), len(clues) * 10)
         self.assertTrue(all(record["similarity"] is None and record["valid"] is False
                             for record in events(match, "word_similarity")))
+        self.assertEqual({record["reason"] for record in events(match, "word_similarity")}, {"out_of_vocabulary"})
+        self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"없는낱말"})
 
     def test_deadlines_are_cumulative_and_late_guesses_do_not_spend_pieces(self):
         class SlowMatch(WrongGuesses):
@@ -202,51 +207,85 @@ class HiddenWordTest(unittest.TestCase):
                 return answers
 
         match = SlowMatch(PLAYERS, 5, pieces=[2] * 6)
-        with patch.object(game, "_judge", return_value={"similarity": 50, "noun": True, "mode": "scripted"}):
+        with patch.object(game, "_judge", return_value={"similarity": 50, "valid": True, "mode": "word2vec"}):
             result = game.play(match)
         self.assertEqual(len(events(match, "word_hint")), 36)
         self.assertTrue(all(record["answers"] == [] and record["spent"] == 0 for record in events(match, "word_guess")))
         for name, balance in result["pieces"].items():
             self.assertEqual(balance, 2 + result["pieces_awarded"].get(name, 0))
 
-    def test_judge_is_isolated_cached_and_retries_malformed_response(self):
-        model = Mock()
-        model.sample_text.side_effect = ["bad", '{"similarity":87,"noun":true}']
-        match = Match(PLAYERS, 1, models={"P01": model}, live_turns=10)
-        match.event("private_test", "협상 비밀 문장", private=["P01"])
+    def test_word2vec_scores_preserve_negatives_and_cache_symmetric_pair(self):
+        vectors = WordVectors(["바다", "파도"], [[1, 0], [-1, 0]])
+        vectors.similarity = Mock(wraps=vectors.similarity)
         cache = {}
-        first = game._judge(match, "P01", "바다", "파도", cache)
-        self.assertEqual(first["similarity"], 87)
-        self.assertEqual(game._judge(match, "P02", "바다", "파도", cache), first)
-        self.assertEqual(model.sample_text.call_count, 2)
-        self.assertEqual(match.live_turns, 8)
-        self.assertNotIn("협상 비밀 문장", model.sample_text.call_args.kwargs["prompt"])
-        self.assertEqual(len(events(match, "invalid_action")), 1)
-        model.sample_text.side_effect = ['{"similarity":NaN,"noun":true}', "bad"]
-        with self.assertRaisesRegex(RuntimeError, "유사도 판정"):
-            game._judge(match, "P01", "바다", "하늘", cache)
-        self.assertNotIn(("바다", "하늘"), cache)
+        first = game._judge(vectors, "바다", "파도", cache)
+        self.assertEqual(first, {"similarity": -100, "valid": True, "mode": "word2vec"})
+        self.assertEqual(game._judge(vectors, "파도", "바다", cache), first)
+        vectors.similarity.assert_called_once()
 
-    def test_similarity_journal_replays_without_model_call_then_cache_reuses_pair(self):
-        with TemporaryDirectory() as directory:
-            path = Path(directory) / "events.jsonl"
+    def test_similarity_ignores_participant_model_and_remaining_budget(self):
+        scores = []
+        for remaining in (0, 10):
+            match = WrongGuesses(PLAYERS, 3, live_turns=remaining)
             model = Mock()
-            model.sample_text.return_value = '{"similarity":89,"noun":true}'
-            header = {"type": "match", "game": "히든 워드 재개 테스트"}
-            for resuming in (False, True):
-                with MatchLog(path, resume=resuming) as log:
-                    log.write(header)
-                    match = Match(PLAYERS, 1, models={"P01": model}, live_turns=10,
-                        resume_log=log, count_calls=lambda: model.sample_text.call_count,
-                        on_event=lambda event: log.write({"type": "event", **asdict(event), "model_calls": 1}))
-                    match.event("before_similarity", {})
-                    cache = {}
-                    verdict = game._judge(match, "P01", "바다", "파도", cache)
-                    match.event("after_similarity", verdict)
-                    self.assertEqual(match.live_turns, 9)
-                    self.assertEqual(game._judge(match, "P02", "바다", "파도", cache), verdict)
-                    log.write({"type": "interrupted", "model_calls": 1})
-            model.sample_text.assert_called_once()
+            match.models = {name: model for name in PLAYERS}
+            game.play(match)
+            model.sample_text.assert_not_called()
+            self.assertEqual(match.live_turns, remaining)
+            scores.append(events(match, "word_similarity"))
+            self.assertTrue(all(record["mode"] == "word2vec" for record in scores[-1]))
+        self.assertEqual(*scores)
+
+    def test_interrupted_match_replays_with_same_vectors(self):
+        def interrupt(match):
+            record = match.on_event
+            def stop(event):
+                record(event)
+                if event.msg_type == "word_verdict":
+                    raise RuntimeError("test interruption")
+            match.on_event = stop
+            return game.play(match)
+
+        with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            path = Path(directory) / "events.jsonl"
+            with self.assertRaisesRegex(RuntimeError, "interruption"):
+                run_cli(interrupt, title=DAY_FIVE_MAIN, seats=6, argv=["--output", str(path)])
+            before = path.read_text().splitlines()
+            run_cli(game.play, title=DAY_FIVE_MAIN, seats=6, argv=["--resume", "--output", str(path)])
+            after = path.read_text().splitlines()
+            self.assertEqual(after[:len(before) - 1], before[:-1])
+            self.assertEqual(json.loads(after[-1])["type"], "result")
+
+    def test_cli_preflight_errors_do_not_create_logs_and_help_needs_no_model(self):
+        with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            path = Path(directory) / "new" / "events.jsonl"
+            for problem in (FileNotFoundError("missing word vectors"), ValueError("corrupt word vectors")):
+                with patch.object(cli, "load_vectors", side_effect=problem), self.assertRaises(SystemExit):
+                    cli.main(["--output", str(path)])
+                self.assertFalse(path.parent.exists())
+            incomplete = WordVectors(["바다"], [[1, 0]])
+            with patch.object(cli, "load_vectors", return_value=incomplete), self.assertRaises(SystemExit):
+                cli.main(["--output", str(path)])
+            self.assertFalse(path.parent.exists())
+            with patch.object(cli, "load_vectors", side_effect=AssertionError("must not load")), self.assertRaises(SystemExit) as error:
+                cli.main(["--help"])
+            self.assertEqual(error.exception.code, 0)
+
+    def test_cli_rejects_legacy_changed_scorer_or_deck_without_changing_record(self):
+        with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            path = Path(directory) / "events.jsonl"
+            for setup in ({"version": 1}, {"version": 2, "scorer": {"sha256": "different"}},
+                          {"version": 2, "scorer": self.vectors.metadata},
+                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": "different"}):
+                if setup.get("scorer") == self.vectors.metadata:
+                    with self.assertRaisesRegex(ValueError, "단어 봉투 구성이 변경되었습니다"):
+                        game.validate_saved_setup(setup, self.vectors)
+                path.write_text(encode({"type": "match", "game": DAY_FIVE_MAIN}) + "\n"
+                                + encode({"type": "event", "msg_type": "word_setup", "content": encode(setup)}) + "\n")
+                before = path.read_bytes()
+                with patch.object(cli, "load_vectors", return_value=self.vectors), self.assertRaises(SystemExit):
+                    cli.main(["--resume", "--output", str(path)])
+                self.assertEqual(path.read_bytes(), before)
 
 
 if __name__ == "__main__":

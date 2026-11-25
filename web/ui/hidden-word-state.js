@@ -8,6 +8,10 @@ export function similarityLabel(value) {
   const rounded = number.format(value);
   return value > 95 && rounded === "95" ? ">95%" : `${rounded}%`;
 }
+export function hintScoreLabel({similarity, valid, reason}) {
+  if (reason === "out_of_vocabulary") return tr("벡터 사전에 없음", "Not in vector vocabulary");
+  return valid === false ? tr("명사 아님", "Not a noun") : similarityLabel(similarity);
+}
 export const hiddenRoundLabel = (round) => tr(`${round}라운드`, `Round ${round}`);
 
 export function applyHiddenEvent(state, type, data, event = {}) {
@@ -56,7 +60,7 @@ export function applyHiddenEvent(state, type, data, event = {}) {
       state.wordHints ??= [];
       const previous = state.wordHints.find((hint) => hintKey(hint) === hintKey(data));
       const update = {round: data.round, setter: data.setter, phase: data.phase,
-        index: data.index, similarity: data.similarity, valid: data.valid, step: event.step};
+        index: data.index, similarity: data.similarity, valid: data.valid, reason: data.reason, step: event.step};
       if (type === "word_hint") update.word = data.word;
       if (previous) Object.assign(previous, update);
       else state.wordHints.push(update);
@@ -102,7 +106,7 @@ export function hiddenActionText(phase, action) {
 
 export function hiddenEventText(type, data) {
   switch (type) {
-    case "word_setup": return tr(`참가자 ${data.order.length}명 · ${data.rounds}라운드`, `${data.order.length} players · ${data.rounds} rounds`);
+    case "word_setup": return tr(`참가자 ${data.order.length}명 · ${data.rounds}라운드`, `${data.order.length} players · ${data.rounds} rounds`) + (data.score_mode === "word2vec" ? " · Word2Vec" : "");
     case "word_envelope": return tr(`봉투 ${data.envelope} · ${data.words.join(" · ")}`, `Envelope ${data.envelope} · ${data.words.join(" · ")}`);
     case "word_secret": return `${hiddenRoundLabel(data.round)} · ${tr("비공개 히든 워드", "Private hidden word")} · ${data.word}`;
     case "word_round": return `${hiddenRoundLabel(data.round)} · ${tr(`승점 ×${data.multiplier}`, `VP ×${data.multiplier}`)}`;
@@ -115,8 +119,8 @@ export function hiddenEventText(type, data) {
     case "word_discussion_end": return tr("대화 종료", "Discussion complete");
     case "word_turn": return `${hiddenRoundLabel(data.round)} · ${tr("출제자", "Setter")} ${data.setter}`;
     case "word_phase": return `${hiddenRoundLabel(data.round)} · ${data.setter} · ${tr(`${data.phase}차 힌트`, `Hint phase ${data.phase}`)}`;
-    case "word_hint": return tr(`비공개 후보 ${data.index} · ${data.word} · ${similarityLabel(data.similarity)}`, `Private candidate ${data.index} · ${data.word} · ${similarityLabel(data.similarity)}`);
-    case "word_similarity": return tr(`후보 ${data.index} · 유사도 ${similarityLabel(data.similarity)}`, `Candidate ${data.index} · Similarity ${similarityLabel(data.similarity)}`);
+    case "word_hint": return tr(`비공개 후보 ${data.index} · ${data.word} · ${hintScoreLabel(data)}`, `Private candidate ${data.index} · ${data.word} · ${hintScoreLabel(data)}`);
+    case "word_similarity": return tr(`후보 ${data.index} · 유사도 ${hintScoreLabel(data)}`, `Candidate ${data.index} · Similarity ${hintScoreLabel(data)}`);
     case "word_clue":
     case "word_closest": return data.word ? tr(`공개 힌트 · ${data.word} · ${similarityLabel(data.similarity)}`, `Public clue · ${data.word} · ${similarityLabel(data.similarity)}`) :
       tr("시간 내 유효한 힌트 없음", "No valid clue submitted in time");

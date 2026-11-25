@@ -4,7 +4,7 @@ import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {Table} from "./records.jsx";
 import {tr} from "./locale.js";
 import {scoreText} from "./replay.js";
-import {hiddenEventText, hiddenPrivateOwner, hiddenRoundLabel, hiddenSecretFor, similarityLabel} from "./hidden-word-state.js";
+import {hiddenEventText, hiddenPrivateOwner, hiddenRoundLabel, hiddenSecretFor, hintScoreLabel, similarityLabel} from "./hidden-word-state.js";
 import "./hidden-word.css";
 
 export {applyHiddenEvent, hiddenEventText, hiddenActionText} from "./hidden-word-state.js";
@@ -46,6 +46,7 @@ function SimilarityTrail({state, replay}) {
   const turn = state.wordTurn;
   const phase = state.wordPhase?.phase;
   const own = replay.view === "operator" || hiddenPrivateOwner(state, replay) === turn?.setter;
+  const signed = state.wordSetup?.score_mode === "word2vec";
   const hints = state.wordHints?.filter((hint) => sameTurn(hint, turn) && hint.phase === phase) ?? [];
   const clue = state.wordClues?.findLast((item) => sameTurn(item, turn) && item.phase === phase);
   return <section className="hidden-similarities" aria-label={tr("힌트 후보 유사도", "Hint candidate similarities")}>
@@ -54,10 +55,11 @@ function SimilarityTrail({state, replay}) {
       {hints.map((hint) => {
         const revealed = sameTurn(clue, turn) && clue.phase === hint.phase && clue.word === hint.word;
         const word = own && hint.word || revealed && clue.word;
+        const score = Number.isFinite(hint.similarity) ? Math.max(signed ? -100 : 0, Math.min(100, hint.similarity)) : 0;
         return <li key={hint.index} data-threshold={hint.similarity > 95}>
           <span className="hidden-candidate-name">{hint.index}. <strong lang={word ? "ko" : undefined}>{word || tr("비공개 후보", "Private candidate")}</strong></span>
-          <span className="hidden-meter"><span style={{width: `${Number.isFinite(hint.similarity) ? Math.max(0, Math.min(100, hint.similarity)) : 0}%`}} /></span>
-          <strong>{hint.valid === false ? tr("명사 아님", "Not a noun") : similarityLabel(hint.similarity)}</strong>
+          <span className="hidden-meter" data-signed={signed} data-negative={score < 0}><span style={{width: `${signed ? Math.abs(score) / 2 : score}%`, left: signed ? `${50 + Math.min(0, score) / 2}%` : undefined}} /></span>
+          <strong>{hintScoreLabel(hint)}</strong>
         </li>;
       })}
     </ol>}
@@ -98,6 +100,7 @@ export function HiddenWordStage({state, replay}) {
   return <div className="hidden-word-stage">
     <div className="hidden-heading"><h2>{result ? tr("최종 결과", "Final results") : turn ? tr(`${turn.round} / ${setup?.rounds ?? 2}라운드`, `Round ${turn.round} of ${setup?.rounds ?? 2}`) : tr("히든 워드", "Hidden Word")}</h2>
       {turn && !result && <span>{tr(`승점 ×${turn.round === 2 ? 2 : 1}`, `VP ×${turn.round === 2 ? 2 : 1}`)}</span>}</div>
+    {setup?.score_mode === "word2vec" && <p className="hidden-score-method"><strong>Word2Vec</strong> · {tr("코사인 유사도 × 100 · −100~100%", "Cosine similarity × 100 · −100–100%")}</p>}
     {result ? <Scoreboard state={state} replay={replay} /> : <>
       {state.wordDiscussion && <p className="hidden-discussion">{hiddenEventText(state.wordDiscussion.turn ? "word_discussion_round" : "word_discussion", state.wordDiscussion)}</p>}
       {state.wordDealer?.stage === "enter" && <p className="hidden-discussion">{hiddenEventText("word_dealer", state.wordDealer)}</p>}

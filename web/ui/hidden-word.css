@@ -1,6 +1,7 @@
 .hidden-word-stage { color: #e1e6e9; font-size: 13px; }
 .hidden-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .hidden-heading > span { border: 1px solid #8f7955; padding: 3px 6px; color: #ebcf98; background: #40392c; white-space: nowrap; }
+.hidden-score-method { font-size: 10px; color: #b2c1cd; margin-block: 3px 12px; }
 .hidden-discussion { border-left: 3px solid #bfa875; background: #2a3340; padding: 9px; color: #d9d8c5; }
 .hidden-setter { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-block: 10px; color: #b6c5d0; }
 .hidden-setter > strong { color: #edcf98; font-size: 20px; }
@@ -19,8 +20,11 @@
 .hidden-candidate-name { overflow-wrap: anywhere; }
 .hidden-candidate-name strong { font-weight: normal; }
 .hidden-similarities li > strong { font-variant-numeric: tabular-nums; text-align: right; color: #d0e4e3; }
-.hidden-meter { height: 9px; background: #101822; border: 1px solid #50616d; }
+.hidden-meter { position: relative; height: 9px; background: #101822; border: 1px solid #50616d; }
 .hidden-meter > span { display: block; height: 100%; background: #8db1c1; }
+.hidden-meter[data-signed="true"]::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #a8b9c8; }
+.hidden-meter[data-signed="true"] > span { position: absolute; top: 0; }
+.hidden-meter[data-negative="true"] > span { background: #c296a2; }
 .hidden-similarities li[data-threshold="true"] .hidden-meter > span { background: #e8c88e; }
 .hidden-similarities li[data-threshold="true"] > strong { color: #edcf98; }
 .hidden-clue { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; padding: 11px; background: #39382d; border: 2px solid #b59a63; margin-block: 12px; }

@@ -252,7 +252,7 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 3 prison match | Piggy Bank | 4 | Play without discussion or relationship assessments, deciding reset requests in seat order. Each model updates its memories of three banks and may change which banks it retains at every update. Mistaken memories are not corrected from the true contents. Score by calling doubt or recalling all banks before a reset. The main match ends at five points or after at most 100 turns. Last-place ties play extra rounds: losing points eliminates a player, gaining points secures safety, and the last remaining tied player is eliminated. |
 | Day 4 main match | Auction Bingo | 7 regular + 1 guest | Choose shapes and bid privately over seven rounds. Won shapes are automatically arranged at the end; rank by bingo lines, filled spaces, then the total value of unused coins. |
 | Day 4 prison match | Wall Go II | 3 | Move counters and build walls to claim territory without discussion. The three-player winner survives; the other two play a duel to determine elimination. Complete ties replay with only tied players and reversed turn order. |
-| Day 5 main match | Hidden Word | 5–6 | Set words over two rounds and deduce opponents’ words from AI similarity scores and revealed clues. The top two enter the living quarters, last place is eliminated, and the rest go to prison. |
+| Day 5 main match | Hidden Word | 5–6 | Set words over two rounds and deduce opponents’ words from Word2Vec similarity scores and revealed clues. The top two enter the living quarters, last place is eliminated, and the rest go to prison. |
 | Exile match 1 | Piece Puzzle | 4 | Assemble eight slotted pieces into a lattice by matching notch directions and depths. Players build privately; the first three to finish survive. |
 | Exile match 2 | Spot the Difference | 4 | Memorize the original picture, then mark five changed areas. The top two survive after three rounds; only ties at the survival boundary play overtime. |
 | Exile match 3 | Secret Code | 4 | Find a four-letter code from illustrated cards and clues. The first correct answer each round secures survival; the last remaining player is eliminated. |
@@ -261,7 +261,13 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
 
-Hidden Word continues with five survivors from existing records; standalone play defaults to six. It uses original word envelopes. Live similarity judgments use an AI context separate from player conversations and do not reproduce the broadcast’s scores. Scripted demonstrations use a fixed association table.
+Hidden Word continues with five survivors from existing records; standalone play defaults to six. It uses original word envelopes and calculates cosine similarity × 100 directly from [Kyubyong’s Korean Word2Vec model](https://github.com/Kyubyong/wordvectors). Scores range from −100 to 100 and do not reproduce the broadcast’s values. All players use the same vectors regardless of their models or remaining call budget; similarity scoring makes no LLM calls.
+
+Before the first run, download the vectors once with the command below. They are saved to `runs/models/hidden-word/ko-word2vec.npz`, which Git ignores. Hints outside the model’s vocabulary are rejected.
+
+```bash
+uv run --locked --python 3.12 python -m games.hidden_word.vectors --download
+```
 
 ### Run exile matches
 
@@ -337,7 +343,7 @@ Use **KO / EN** at the top to switch the website’s language. The Python game e
 
 ### Export play logs for the website
 
-The website reads only replays exported to `play_results/`. A published run can contain the main and prison matches from Days 1–4 in order. Each match directory contains the original log and its English translation.
+The website reads only replays exported to `play_results/`. A published run can contain the main and prison matches from Days 1–4, followed by the Day 5 main match. Each match directory contains the original log and its English translation.
 
 ```text
 play_results/matches/<run>/<stage>/events.jsonl
