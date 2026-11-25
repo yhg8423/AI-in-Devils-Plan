@@ -16,7 +16,7 @@ ENVELOPES = (
 )
 DECK_SHA256 = sha256(json.dumps(ENVELOPES, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
 # These are candidate hint actions, never similarity scores. Demonstrations use
-# the same pretrained Word2Vec vectors as model-driven play.
+# the same pretrained fastText vectors as model-driven play.
 ASSOCIATIONS = {
     "봄": ("꽃", "새싹", "봄철"), "여름": ("해변", "더위", "여름철"),
     "가을": ("낙엽", "추수", "가을철"), "겨울": ("눈", "추위", "겨울철"),

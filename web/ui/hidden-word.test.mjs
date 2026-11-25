@@ -87,6 +87,23 @@ for (const language of ["ko", "en"]) {
     assert.match(html, /위성/);
     assert.doesNotMatch(html, /보름달/);
   });
+  test(`${language}: vocabulary fallback can reveal an unsubmitted word without changing archived forced labels`, () => {
+    const nearest = record("word_clue", {...clue.data, word: "만월", similarity: 83.4, forced: true, source: "word2vec_nearest"});
+    const events = [...base.slice(0, 7), nearest];
+    const state = stateFor(events, "public", language);
+    assert.equal(state.wordClue.source, "word2vec_nearest");
+    assert.equal(state.wordHints.length, 1);
+    assert.equal(state.wordHints[0].word, undefined);
+    const html = renderMatch(events, "public", language);
+    assert.match(html, /만월/);
+    assert.match(html, language === "ko" ? /Word2Vec 사전에서 정답과 가장 가까운 단어입니다/ : /The closest word to the answer in the Word2Vec vocabulary/);
+    assert.doesNotMatch(html, /보름달|추석|submitted in this phase|이 단계에서 제출한 후보 중/);
+    const archived = render([...base.slice(0, 7), record("word_clue", {...clue.data, forced: true})], {view: "public", language});
+    assert.match(archived, language === "ko" ? /이 단계에서 제출한 후보 중 유사도가 가장 높은 단어입니다/ : /The most similar word among the candidates submitted in this phase/);
+    assert.doesNotMatch(archived, /closest word to the answer|Word2Vec 사전에서/);
+    const normal = render([...base.slice(0, 7), record("word_clue", {...clue.data, source: "submitted_hint"})], {view: "public", language});
+    assert.doesNotMatch(normal, /closest word to the answer|Word2Vec 사전에서|submitted in this phase|이 단계에서 제출한 후보 중/);
+  });
   test(`${language}: pending or timed-out hints render before a public clue`, () => {
     const pending = render(base.slice(0, 7), {view: "public", language});
     assert.match(pending, /88\.25%/);
@@ -160,6 +177,67 @@ for (const language of ["ko", "en"]) {
     const label = api[language].hiddenEventText("word_similarity", unknown.data);
     assert.match(label, language === "ko" ? /벡터 사전에 없음/ : /Not in vector vocabulary/);
   });
+  test(`${language}: fastText metadata labels the current scorer and noun fallback without changing archived models`, () => {
+    const fastText = record("word_setup", {...setup.data, version: 2, score_mode: "fasttext", discussion: false,
+      scorer: {id: "fasttext-cc-ko-300", dimensions: 300, vocabulary: 2000000, score: "cosine*100"}});
+    const negative = record("word_similarity", {...similarity.data, similarity: -40, valid: true, mode: "fasttext"});
+    const unknown = record("word_similarity", {...similarity.data, index: 2, similarity: null, valid: false, reason: "out_of_vocabulary", mode: "fasttext"});
+    const nearest = record("word_clue", {...clue.data, word: "만월", similarity: 83.4, forced: true, source: "fasttext_nearest"});
+    const events = [fastText, ...base.slice(1, 5), negative, unknown, nearest];
+    const html = renderMatch(events, "public", language);
+    assert.match(html, /fastText · cc\.ko\.300/);
+    assert.match(html, /-40%/);
+    assert.match(html, /data-signed="true" data-negative="true"><span style="width:20%;left:30%"/);
+    assert.match(html, /만월/);
+    assert.match(html, language === "ko" ? /fastText 사전에서 정답과 가장 가까운 일반명사입니다/ : /The closest common noun to the answer in the fastText vocabulary/);
+    assert.match(html, language === "ko" ? /벡터 사전에 없음/ : /Not in vector vocabulary/);
+    assert.doesNotMatch(html, /Word2Vec|보름달|추석|명사 아님|Not a noun/);
+    assert.match(api[language].hiddenEventText("word_setup", fastText.data), /fastText/);
+    const legacy = record("word_setup", {...setup.data, version: 2, score_mode: "word2vec", scorer: {id: "kyubyong-ko-word2vec-2016", dimensions: 200}});
+    const archived = renderMatch([legacy, ...base.slice(1)], "public", language);
+    assert.match(archived, /Word2Vec/);
+    assert.doesNotMatch(archived, /fastText/);
+  });
+  test(`${language}: relative reveal qualification preserves raw scores and hides the private benchmark`, () => {
+    const relative = record("word_setup", {...setup.data, version: 2, score_mode: "fasttext", discussion: false,
+      reveal_rule: "nearest_noun_ratio_v1", hint_filter: "same_as_nearest"});
+    const candidate = (index, data) => record("word_similarity", {...similarity.data, index, valid: true, ...data});
+    const events = [relative, ...base.slice(1, 5),
+      candidate(1, {similarity: 55.04, qualifies: true, max_similarity: 57.93746, cutoff: 55.040587, nearest_name: "비공개기준명사"}),
+      candidate(2, {similarity: 96, qualifies: false}), candidate(3, {similarity: 96}),
+      candidate(4, {similarity: -12.34, qualifies: false}),
+      candidate(5, {similarity: null, valid: false, reason: "not_common_noun", qualifies: false})];
+    const state = stateFor(events, "public", language);
+    assert.equal(state.wordHints[0].qualifies, true);
+    assert.equal(state.wordHints[1].qualifies, false);
+    assert.equal(state.wordHints[2].qualifies, undefined);
+    assert.equal(state.wordHints[0].max_similarity, undefined);
+    assert.equal(state.wordHints[0].cutoff, undefined);
+    assert.equal(state.wordHints[0].nearest_name, undefined);
+    const html = render(events, {view: "public", language});
+    assert.match(html, language === "ko" ? /최근접 일반명사 유사도의 95% 초과 시 공개/ : /Reveal above 95% of the nearest common noun’s similarity/);
+    assert.match(html, language === "ko" ? /원본 유사도/ : /Raw similarity/);
+    const rows = [...html.matchAll(/<li data-threshold="(true|false)">([\s\S]*?)<\/li>/g)];
+    assert.equal(rows.length, 5);
+    assert.equal(rows.filter(([, qualifies]) => qualifies === "true").length, 1);
+    assert.equal(rows[0][1], "true");
+    assert.match(rows[0][2], /55\.04%/);
+    assert.match(rows[0][2], language === "ko" ? /기준 충족/ : /Criterion met/);
+    for (const row of rows.slice(1, 3)) {
+      assert.equal(row[1], "false");
+      assert.match(row[2], /96%/);
+      assert.doesNotMatch(row[2], /기준 충족|Criterion met/);
+    }
+    assert.match(rows[3][2], /-12\.34%/);
+    assert.match(rows[4][2], language === "ko" ? /일반명사 아님/ : /Not a common noun/);
+    for (const view of ["public", "operator", "P01", "P03"]) {
+      assert.doesNotMatch(renderMatch(events, view, language), /비공개기준명사|57\.93746|55\.040587|&gt;95%/);
+    }
+    const announced = record("word_clue", {...clue.data, word: "비공개기준명사", similarity: 57.94, source: "fasttext_nearest", forced: true});
+    assert.match(renderMatch([...events, announced], "public", language), /비공개기준명사/);
+    const label = api[language].hiddenEventText("word_similarity", events.at(-1).data);
+    assert.match(label, language === "ko" ? /일반명사 아님/ : /Not a common noun/);
+  });
   test(`${language}: inherited five-player roster renders without adding a sixth player`, () => {
     const five = record("word_setup", {...setup.data, order: players.slice(0, 5), players: 5});
     const html = renderMatch([five, ...base.slice(1)], "public", language);
@@ -220,4 +298,23 @@ test("English rules distinguish raw Word2Vec rules from archived AI judgments", 
   assert.match(silent, /cannot discuss, negotiate, whisper or move rooms/);
   assert.match(silent, /Relationship reviews follow verdicts/);
   assert.doesNotMatch(silent, /ten opening discussion turns|up to four before each setter/);
+  assert.match(silent, /highest-scoring hint of that phase/);
+  const nearest = rulesSummary(heading, "Word2Vec 코사인 유사도 × 100\n참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.\n기준을 넘지 못하면 제출한 힌트와 관계없이 Word2Vec 사전에서 정답 자체를 제외하고 가장 가까운 단어를 공개합니다.");
+  assert.match(nearest, /across the full Word2Vec vocabulary, excluding the answer itself, regardless of the submitted candidates/);
+  assert.match(nearest, /direct Korean Word2Vec|private strategy preparation/);
+  assert.doesNotMatch(nearest, /highest-scoring hint of that phase|opening discussion turns/);
+  const fastText = rulesSummary(heading, "fastText 코사인 유사도 × 100\n참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.\n기준을 넘지 못하면 제출한 힌트와 관계없이 fastText 사전에서 정답 자체를 제외하고 가장 가까운 일반명사를 공개합니다.");
+  assert.match(fastText, /direct Korean fastText cosine similarity × 100/);
+  assert.match(fastText, /closest common noun.*full fastText vocabulary/);
+  assert.match(fastText, /cc\.ko\.300 text vectors: 300 dimensions trained on Common Crawl and Wikipedia/);
+  assert.match(fastText, /fixed vocabulary and does not generate vectors for unknown words/);
+  assert.doesNotMatch(fastText, /Word2Vec|isolated AI|fixed associations|opening discussion turns/);
+  const relative = rulesSummary(heading, "fastText 코사인 유사도 × 100\n참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.\n최근접 일반명사 유사도의 95%를 초과하면 힌트를 공개합니다.\n기준을 넘지 못하면 제출한 힌트와 관계없이 fastText 사전에서 정답 자체를 제외하고 가장 가까운 일반명사를 공개합니다.");
+  assert.match(relative, /raw cosine similarity exceeds 95% of the similarity of the closest eligible common noun/);
+  assert.match(relative, /no submitted hint meets this criterion within the limit/);
+  assert.match(relative, /Displayed values remain raw cosine similarity × 100/);
+  assert.match(relative, /same dictionary-attested Kiwi common nouns \(NNG\)/);
+  assert.match(relative, /Unknown words and words outside that noun set use one attempt without a score/);
+  assert.match(relative, /simulator extension; the broadcast’s scoring formula has not been verified/);
+  assert.doesNotMatch(relative, /until a score exceeds 95%|no submitted hint exceeds 95%/);
 });

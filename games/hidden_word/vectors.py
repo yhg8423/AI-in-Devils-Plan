@@ -1,24 +1,46 @@
-"""Load shared Korean Word2Vec vectors and calculate cosine similarity locally."""
+"""Load official Korean fastText word vectors and calculate cosine locally."""
 
 import argparse
-from hashlib import sha256
-from io import TextIOWrapper
+from functools import lru_cache
+import gzip
+from hashlib import file_digest, sha256
+from importlib.metadata import version
 import json
 from pathlib import Path
 import shutil
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import TemporaryDirectory
 from urllib.request import urlopen
-from zipfile import BadZipFile, ZipFile
+import warnings
 
 import numpy as np
 
+from .words import is_noun_word
 
-MODEL_ID = "kyubyong-ko-word2vec-2016"
-SOURCE = "https://github.com/Kyubyong/wordvectors"
-DOWNLOAD = "https://drive.usercontent.google.com/download?id=0B0ZXk88koS2KbDhXdWg1Q2RydlU&export=download&confirm=t"
-ARCHIVE_SHA256 = "1f8dc03dd7d4901c33b8391b154a59f1ae7e603c354835b8f2d2fa155c587451"
-DEFAULT_PATH = Path(__file__).resolve().parents[2] / "runs/models/hidden-word/ko-word2vec.npz"
+
+MODEL_ID = "fasttext-cc-ko-300"
+SOURCE = "https://fasttext.cc/docs/en/crawl-vectors.html"
+DOWNLOAD = "https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.ko.300.vec.gz"
+ARCHIVE_SHA256 = "9d71f0ae144e0f89dd233bfa7eca421be26bd1e5dd18e2cc56888a04be982d97"
+DIMENSIONS = 300
+VOCABULARY = 2_000_000
+DEFAULT_PATH = Path(__file__).resolve().parents[2] / "runs/models/hidden-word/fasttext-cc-ko-300"
 SETUP = "uv run --locked --python 3.12 python -m games.hidden_word.vectors --download"
+NOUN_FILTER = f"kiwipiepy-{version('kiwipiepy')}/model-{version('kiwipiepy-model')}/cong/NNG/oov=false"
+BLOCK_ROWS = 8192
+
+
+@lru_cache(maxsize=1)
+def _noun_analyzer():
+    from kiwipiepy import Kiwi
+    return Kiwi(num_workers=1, model_type="cong")
+
+
+@lru_cache(maxsize=32768)
+def _common_noun(word):
+    if not is_noun_word(word):
+        return False
+    tokens = _noun_analyzer().tokenize(word)
+    return bool(tokens) and all(token.tag == "NNG" and not token.oov for token in tokens) and "".join(token.form for token in tokens) == word
 
 
 class WordVectors:
@@ -27,108 +49,147 @@ class WordVectors:
         values = np.asarray(values, dtype="<f4")
         if (not words or any(not isinstance(word, str) or not word for word in words)
                 or len(set(words)) != len(words) or values.ndim != 2
-                or values.shape[0] != len(words) or values.shape[1] == 0
-                or not np.isfinite(values).all()):
-            raise ValueError("Word2Vec 단어와 유한한 벡터 행렬이 필요합니다.")
-        normalized = values.astype(np.float64)
-        norms = np.linalg.norm(normalized, axis=1)
-        if np.any(norms == 0):
-            raise ValueError("Word2Vec에는 길이가 0인 벡터를 사용할 수 없습니다.")
-        normalized /= norms[:, None]
-        normalized.flags.writeable = False
-        self._vectors = normalized
-        self._indices = {word: index for index, word in enumerate(words)}
-        digest = sha256(json.dumps(words, ensure_ascii=False, separators=(",", ":")).encode())
+                or values.shape[0] != len(words) or values.shape[1] == 0):
+            raise ValueError("단어와 유한한 벡터 행렬이 필요합니다.")
+        # Keep the 2M × 300 matrix on disk; use float64 only for bounded blocks.
+        norms = np.empty(len(words), dtype=np.float64)
+        digest = sha256(json.dumps(words, ensure_ascii=True, separators=(",", ":")).encode())
         digest.update(b"\0")
-        digest.update(values.tobytes(order="C"))
-        self.metadata = {**(metadata or {"id": "custom-word2vec"}),
+        for start in range(0, len(words), BLOCK_ROWS):
+            block = values[start:start + BLOCK_ROWS]
+            if not np.isfinite(block).all():
+                raise ValueError("벡터에는 유한한 수치만 사용할 수 있습니다.")
+            norms[start:start + len(block)] = np.linalg.norm(block.astype(np.float64), axis=1)
+            digest.update(memoryview(block).cast("B"))
+        if np.any(norms == 0):
+            raise ValueError("길이가 0인 벡터는 사용할 수 없습니다.")
+        values.flags.writeable = False
+        self._vectors, self._norms = values, norms
+        self._words = words
+        self._indices = {word: index for index, word in enumerate(words)}
+        self._nearest = {}
+        self.metadata = {**(metadata or {"id": "custom-fasttext"}),
                          "sha256": digest.hexdigest(), "dimensions": values.shape[1],
-                         "vocabulary": len(words), "score": "cosine*100"}
+                         "vocabulary": len(words), "score": "cosine*100", "nearest_filter": NOUN_FILTER}
 
     def __contains__(self, word):
         return word in self._indices
 
+    def is_hint(self, word):
+        """Use the same dictionary-attested common nouns for hints and search."""
+        return isinstance(word, str) and word in self and _common_noun(word)
+
     def similarity(self, first, second):
-        left, right = self._vectors[self._indices[first]], self._vectors[self._indices[second]]
+        left, right = self._indices[first], self._indices[second]
+        cosine = np.dot(self._vectors[left].astype(np.float64), self._vectors[right].astype(np.float64))
+        cosine /= self._norms[left] * self._norms[right]
         # Clamp only floating-point drift outside cosine's mathematical bounds.
-        return float(np.clip(np.dot(left, right), -1, 1) * 100)
+        return float(np.clip(cosine, -1, 1) * 100)
+
+    def nearest(self, word):
+        """Find the closest eligible noun in the entire vocabulary, excluding itself."""
+        if word not in self._nearest:
+            target = self._indices[word]
+            query = self._vectors[target].astype(np.float64) / self._norms[target]
+            scores = np.empty(len(self._words), dtype=np.float64)
+            for start in range(0, len(scores), BLOCK_ROWS):
+                block = self._vectors[start:start + BLOCK_ROWS].astype(np.float64)
+                scores[start:start + len(block)] = (block @ query) / self._norms[start:start + len(block)]
+            for index in np.argsort(-scores, kind="stable"):
+                candidate = self._words[index]
+                if candidate != word and self.is_hint(candidate):
+                    self._nearest[word] = {"word": candidate, "similarity": self.similarity(word, candidate)}
+                    break
+            else:
+                raise ValueError(f"{word!r}와 비교할 수 있는 다른 명사가 fastText 사전에 없습니다.")
+        return self._nearest[word].copy()
 
 
-def read_tsv(stream, dimensions):
-    """Read the author's multiline NumPy text export without unpickling ko.bin."""
-    words, vectors, parts = [], [], []
-    word = None
-    for line in stream:
-        if word is None:
-            index, word, line = line.split("\t", 2)
-            if int(index) != len(words) or not line.startswith("["):
-                raise ValueError("Word2Vec TSV 레코드 순서가 올바르지 않습니다.")
-            line = line[1:]
-        complete = line.rstrip().endswith("]")
-        parts.append(line.rstrip().removesuffix("]"))
-        if complete:
-            vector = np.asarray(" ".join(parts).split(), dtype="<f4")
+def read_fasttext(stream, destination, *, dimensions=DIMENSIONS, vocabulary=VOCABULARY):
+    """Stream the complete official text export into a memory-mapped NumPy file."""
+    if tuple(map(int, stream.readline().split())) != (vocabulary, dimensions):
+        raise ValueError("fastText 원본의 어휘 수·차원이 일치하지 않습니다.")
+    values = np.lib.format.open_memmap(destination, mode="w+", dtype="<f4", shape=(vocabulary, dimensions))
+    words = []
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        for index in range(vocabulary):
+            word, separator, numbers = stream.readline().rstrip().partition(" ")
+            if not word or not separator:
+                raise ValueError("fastText 단어 레코드가 완전하지 않습니다.")
+            try:
+                vector = np.fromstring(numbers, dtype="<f4", sep=" ")
+            except (ValueError, DeprecationWarning) as error:
+                raise ValueError("fastText 벡터에 올바르지 않은 수치가 있습니다.") from error
             if vector.shape != (dimensions,):
-                raise ValueError("Word2Vec TSV 벡터 차원이 올바르지 않습니다.")
+                raise ValueError("fastText 벡터 차원이 올바르지 않습니다.")
             words.append(word)
-            vectors.append(vector)
-            word, parts = None, []
-    if word is not None or not words:
-        raise ValueError("Word2Vec TSV 데이터가 완전하지 않습니다.")
-    return words, np.asarray(vectors, dtype="<f4")
+            values[index] = vector
+            if (index + 1) % 250_000 == 0:
+                print(f"fastText 변환 중 · {index + 1:,}/{vocabulary:,}개 단어", flush=True)
+    if stream.read().strip():
+        raise ValueError("fastText 원본에 예상보다 많은 레코드가 있습니다.")
+    values.flush()
+    return words, values
 
 
 def load_vectors(path=DEFAULT_PATH):
     path = Path(path)
-    if not path.is_file():
-        raise FileNotFoundError(f"한국어 Word2Vec 모델이 없습니다. 먼저 실행하세요: {SETUP}")
+    if not path.exists():
+        raise FileNotFoundError(f"한국어 fastText 모델이 없습니다. 먼저 실행하세요: {SETUP}")
     try:
-        with np.load(path, allow_pickle=False) as stored:
-            metadata = json.loads(stored["metadata"].item())
-            if not isinstance(metadata, dict):
-                raise ValueError("Word2Vec 모델 정보는 JSON 객체여야 합니다.")
-            vectors = WordVectors(stored["words"].tolist(), stored["vectors"], metadata)
+        metadata = json.loads((path / "metadata.json").read_text(encoding="utf-8"))
+        if not isinstance(metadata, dict):
+            raise ValueError("fastText 모델 정보는 JSON 객체여야 합니다.")
+        words = json.loads((path / "words.json").read_text(encoding="utf-8"))
+        if not isinstance(words, list):
+            raise ValueError("fastText 단어 목록은 JSON 배열이어야 합니다.")
+        vectors = WordVectors(words, np.load(path / "vectors.npy", mmap_mode="r", allow_pickle=False), metadata)
         if metadata.get("sha256") != vectors.metadata["sha256"]:
-            raise ValueError("저장된 Word2Vec 모델의 체크섬이 일치하지 않습니다.")
+            raise ValueError("저장된 fastText 모델의 체크섬이 일치하지 않습니다.")
         return vectors
-    except (BadZipFile, EOFError, KeyError, TypeError, ValueError) as error:
-        raise ValueError(f"Word2Vec 모델을 읽을 수 없습니다: {path}. {error}") from error
+    except (OSError, EOFError, KeyError, TypeError, ValueError) as error:
+        raise ValueError(f"fastText 모델을 읽을 수 없습니다: {path}. {error}") from error
 
 
 def install_vectors(archive=None, destination=DEFAULT_PATH):
-    """Download the pinned author's archive, verify it, and atomically cache data."""
+    """Verify the pinned text export and publish a complete cache atomically."""
     destination = Path(destination)
-    with TemporaryDirectory(prefix="hidden-word-vectors-") as directory:
+    with TemporaryDirectory(prefix="hidden-word-download-") as directory:
         if archive is None:
-            archive = Path(directory) / "ko.zip"
-            print("한국어 Word2Vec 모델 내려받는 중 (약 77 MiB)...", flush=True)
-            with urlopen(DOWNLOAD, timeout=30) as response, archive.open("wb") as output:
+            if destination.exists():
+                return load_vectors(destination)
+            archive = Path(directory) / "cc.ko.300.vec.gz"
+            print("한국어 fastText 모델 내려받는 중 (약 1.27 GB)...", flush=True)
+            with urlopen(DOWNLOAD, timeout=60) as response, archive.open("wb") as output:
                 shutil.copyfileobj(response, output)
         else:
             archive = Path(archive)
-        if sha256(archive.read_bytes()).hexdigest() != ARCHIVE_SHA256:
-            raise ValueError("공개 Word2Vec 원본 파일의 SHA-256이 일치하지 않습니다.")
-        with ZipFile(archive) as packed, packed.open("ko.tsv") as data:
-            words, values = read_tsv(TextIOWrapper(data, encoding="utf-8"), 200)
-        if len(words) != 30185:
-            raise ValueError("공개 Word2Vec 원본의 어휘 수가 일치하지 않습니다.")
-        vectors = WordVectors(words, values, {"id": MODEL_ID, "source": SOURCE,
-            "source_sha256": ARCHIVE_SHA256, "license": "MIT · Copyright 2016 Kyubyong Park"})
+        with archive.open("rb") as stream:
+            if file_digest(stream, "sha256").hexdigest() != ARCHIVE_SHA256:
+                raise ValueError("공식 fastText 원본 파일의 SHA-256이 일치하지 않습니다.")
+        if destination.exists():
+            return load_vectors(destination)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        with NamedTemporaryFile(dir=destination.parent, suffix=".npz", delete=False) as output:
-            temporary = Path(output.name)
-        try:
-            np.savez_compressed(temporary, words=np.asarray(words), vectors=values,
-                                metadata=np.asarray(json.dumps(vectors.metadata)))
-            temporary.replace(destination)
-        finally:
-            temporary.unlink(missing_ok=True)
-        return vectors
+        with TemporaryDirectory(prefix=".fasttext-", dir=destination.parent) as staging:
+            cache = Path(staging) / "model"
+            cache.mkdir()
+            # The official export contains malformed UTF-8 tokens. Preserve their
+            # bytes without merging words; the Hangul noun filter excludes them.
+            with gzip.open(archive, "rt", encoding="utf-8", errors="surrogateescape") as stream:
+                words, values = read_fasttext(stream, cache / "vectors.npy", dimensions=DIMENSIONS, vocabulary=VOCABULARY)
+            vectors = WordVectors(words, values, {"id": MODEL_ID, "source": SOURCE,
+                "download": DOWNLOAD, "source_sha256": ARCHIVE_SHA256, "license": "CC BY-SA 3.0",
+                "format": "fasttext-text", "out_of_vocabulary": "reject"})
+            (cache / "words.json").write_text(json.dumps(words, ensure_ascii=True, separators=(",", ":")), encoding="utf-8")
+            (cache / "metadata.json").write_text(json.dumps(vectors.metadata, ensure_ascii=False, indent=2), encoding="utf-8")
+            cache.rename(destination)
+            return vectors
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--download", action="store_true", help="공개 한국어 Word2Vec 모델을 설치합니다.")
+    parser.add_argument("--download", action="store_true", help="공식 한국어 fastText 모델을 설치합니다.")
     args = parser.parse_args()
     try:
         vectors = install_vectors() if args.download else load_vectors()

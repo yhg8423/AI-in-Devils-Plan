@@ -1,4 +1,4 @@
-"""Validate shared Word2Vec data before opening a Hidden Word match log."""
+"""Validate shared fastText data before opening a Hidden Word match log."""
 
 import argparse
 from functools import partial

@@ -31,14 +31,27 @@ const summaries = [
 export function rulesSummary(heading, body) {
   if (heading.startsWith("히든 워드")) {
     let summary = "Five or six players set one hidden Korean noun each in both rounds, choosing from private five-word envelopes without reusing their first word. Submit up to ten private hints per phase; only similarity scores appear until a score exceeds 95%, or the highest-scoring hint of that phase is revealed. Guess simultaneously. Once per hidden word, spend one Piece for a second answer. Correct guessers earn one VP each and end the setter’s turn. With no correct answer, the setter earns one, two, then three cumulative VP across three phases. Round 2 doubles awards. The top two enter the living quarters, last place is eliminated, and the rest go to prison. First place earns four Pieces. The simulation uses original envelopes, isolated AI similarity judgments, ten opening discussion turns and up to four before each setter. Model response time replaces the fifteen-minute hint and five-minute answer timers. Drawn order resolves final ties; scripted play uses fixed associations. Korean puzzle words remain in Korean in both interface languages.";
-    if (body.includes("Word2Vec 코사인 유사도")) summary = summary.replace("isolated AI similarity judgments", "direct Korean Word2Vec cosine similarity × 100 on a −100% to 100% scale").replace(
+    const scorer = body.includes("fastText 코사인 유사도") ? "fastText" : body.includes("Word2Vec 코사인 유사도") ? "Word2Vec" : null;
+    if (scorer) summary = summary.replace("isolated AI similarity judgments", `direct Korean ${scorer} cosine similarity × 100 on a −100% to 100% scale`).replace(
       "Drawn order resolves final ties; scripted play uses fixed associations.",
       "Drawn order resolves final ties. Every player uses the same vector vocabulary and raw scores, without rescaling or AI judgments. Words outside that vocabulary have no similarity score and cannot become clues.",
     );
+    if (scorer === "fastText") summary += " The scorer uses the released cc.ko.300 text vectors: 300 dimensions trained on Common Crawl and Wikipedia. It uses a fixed vocabulary and does not generate vectors for unknown words.";
     if (body.includes("참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.")) summary = summary.replace(
       "ten opening discussion turns and up to four before each setter.",
       "and private strategy preparation. Players cannot discuss, negotiate, whisper or move rooms. Relationship reviews follow verdicts.",
     );
+    const nearest = body.includes("기준을 넘지 못하면 제출한 힌트와 관계없이 fastText 사전에서") ? "fastText" :
+      body.includes("기준을 넘지 못하면 제출한 힌트와 관계없이 Word2Vec 사전에서") ? "Word2Vec" : null;
+    if (nearest) summary = summary.replace(
+      "until a score exceeds 95%, or the highest-scoring hint of that phase is revealed.",
+      `until a score exceeds 95%. If no submitted hint exceeds 95% within the limit, reveal the closest ${nearest === "fastText" ? "common noun" : "word"} to the answer across the full ${nearest} vocabulary, excluding the answer itself, regardless of the submitted candidates.`,
+    );
+    if (body.includes("최근접 일반명사 유사도의 95%를 초과하면")) summary = summary.replace(
+      "until a score exceeds 95%",
+      "until raw cosine similarity exceeds 95% of the similarity of the closest eligible common noun to the answer, excluding the answer itself",
+    ).replace("If no submitted hint exceeds 95% within the limit", "If no submitted hint meets this criterion within the limit") +
+      " This reveal criterion is a simulator extension; the broadcast’s scoring formula has not been verified. Displayed values remain raw cosine similarity × 100. Submitted hints and nearest-word search use the same dictionary-attested Kiwi common nouns (NNG). Unknown words and words outside that noun set use one attempt without a score.";
     return summary;
   }
   heading = canonicalGameTitle(heading);

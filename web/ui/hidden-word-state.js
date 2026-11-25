@@ -10,6 +10,7 @@ export function similarityLabel(value) {
 }
 export function hintScoreLabel({similarity, valid, reason}) {
   if (reason === "out_of_vocabulary") return tr("벡터 사전에 없음", "Not in vector vocabulary");
+  if (reason === "not_common_noun") return tr("일반명사 아님", "Not a common noun");
   return valid === false ? tr("명사 아님", "Not a noun") : similarityLabel(similarity);
 }
 export const hiddenRoundLabel = (round) => tr(`${round}라운드`, `Round ${round}`);
@@ -61,6 +62,7 @@ export function applyHiddenEvent(state, type, data, event = {}) {
       const previous = state.wordHints.find((hint) => hintKey(hint) === hintKey(data));
       const update = {round: data.round, setter: data.setter, phase: data.phase,
         index: data.index, similarity: data.similarity, valid: data.valid, reason: data.reason, step: event.step};
+      if (typeof data.qualifies === "boolean") update.qualifies = data.qualifies;
       if (type === "word_hint") update.word = data.word;
       if (previous) Object.assign(previous, update);
       else state.wordHints.push(update);
@@ -106,7 +108,8 @@ export function hiddenActionText(phase, action) {
 
 export function hiddenEventText(type, data) {
   switch (type) {
-    case "word_setup": return tr(`참가자 ${data.order.length}명 · ${data.rounds}라운드`, `${data.order.length} players · ${data.rounds} rounds`) + (data.score_mode === "word2vec" ? " · Word2Vec" : "");
+    case "word_setup": return tr(`참가자 ${data.order.length}명 · ${data.rounds}라운드`, `${data.order.length} players · ${data.rounds} rounds`) +
+      (data.score_mode === "fasttext" ? " · fastText" : data.score_mode === "word2vec" ? " · Word2Vec" : "");
     case "word_envelope": return tr(`봉투 ${data.envelope} · ${data.words.join(" · ")}`, `Envelope ${data.envelope} · ${data.words.join(" · ")}`);
     case "word_secret": return `${hiddenRoundLabel(data.round)} · ${tr("비공개 히든 워드", "Private hidden word")} · ${data.word}`;
     case "word_round": return `${hiddenRoundLabel(data.round)} · ${tr(`승점 ×${data.multiplier}`, `VP ×${data.multiplier}`)}`;

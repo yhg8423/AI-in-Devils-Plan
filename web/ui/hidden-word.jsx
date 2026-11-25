@@ -46,18 +46,22 @@ function SimilarityTrail({state, replay}) {
   const turn = state.wordTurn;
   const phase = state.wordPhase?.phase;
   const own = replay.view === "operator" || hiddenPrivateOwner(state, replay) === turn?.setter;
-  const signed = state.wordSetup?.score_mode === "word2vec";
+  const signed = ["word2vec", "fasttext"].includes(state.wordSetup?.score_mode);
+  const relative = state.wordSetup?.reveal_rule === "nearest_noun_ratio_v1";
   const hints = state.wordHints?.filter((hint) => sameTurn(hint, turn) && hint.phase === phase) ?? [];
   const clue = state.wordClues?.findLast((item) => sameTurn(item, turn) && item.phase === phase);
   return <section className="hidden-similarities" aria-label={tr("힌트 후보 유사도", "Hint candidate similarities")}>
-    <div className="hidden-similarity-heading"><h3>{tr("유사도", "Similarity")}</h3><span>{tr("95% 초과 시 공개", "Reveal above 95%")}</span></div>
+    <div className="hidden-similarity-heading"><h3>{relative ? tr("원본 유사도", "Raw similarity") : tr("유사도", "Similarity")}</h3><span>{relative ?
+      tr("최근접 일반명사 유사도의 95% 초과 시 공개", "Reveal above 95% of the nearest common noun’s similarity") :
+      tr("95% 초과 시 공개", "Reveal above 95%")}</span></div>
     {!hints.length ? <p className="muted">{tr("출제자가 힌트 후보를 고르고 있습니다.", "The setter is choosing a hint candidate.")}</p> : <ol>
       {hints.map((hint) => {
         const revealed = sameTurn(clue, turn) && clue.phase === hint.phase && clue.word === hint.word;
         const word = own && hint.word || revealed && clue.word;
         const score = Number.isFinite(hint.similarity) ? Math.max(signed ? -100 : 0, Math.min(100, hint.similarity)) : 0;
-        return <li key={hint.index} data-threshold={hint.similarity > 95}>
-          <span className="hidden-candidate-name">{hint.index}. <strong lang={word ? "ko" : undefined}>{word || tr("비공개 후보", "Private candidate")}</strong></span>
+        const qualifies = typeof hint.qualifies === "boolean" ? hint.qualifies : !relative && hint.similarity > 95;
+        return <li key={hint.index} data-threshold={qualifies}>
+          <span className="hidden-candidate-name">{hint.index}. <strong lang={word ? "ko" : undefined}>{word || tr("비공개 후보", "Private candidate")}</strong>{relative && qualifies && <small>{tr(" · 기준 충족", " · Criterion met")}</small>}</span>
           <span className="hidden-meter" data-signed={signed} data-negative={score < 0}><span style={{width: `${signed ? Math.abs(score) / 2 : score}%`, left: signed ? `${50 + Math.min(0, score) / 2}%` : undefined}} /></span>
           <strong>{hintScoreLabel(hint)}</strong>
         </li>;
@@ -97,10 +101,11 @@ export function HiddenWordStage({state, replay}) {
   const clues = state.wordClues?.filter((item) => sameTurn(item, turn)) ?? [];
   const result = state.wordFinal ?? state.result;
   const secret = hiddenSecretFor(state, replay);
+  const fastText = setup?.scorer?.id === "fasttext-cc-ko-300" || setup?.score_mode === "fasttext";
   return <div className="hidden-word-stage">
     <div className="hidden-heading"><h2>{result ? tr("최종 결과", "Final results") : turn ? tr(`${turn.round} / ${setup?.rounds ?? 2}라운드`, `Round ${turn.round} of ${setup?.rounds ?? 2}`) : tr("히든 워드", "Hidden Word")}</h2>
       {turn && !result && <span>{tr(`승점 ×${turn.round === 2 ? 2 : 1}`, `VP ×${turn.round === 2 ? 2 : 1}`)}</span>}</div>
-    {setup?.score_mode === "word2vec" && <p className="hidden-score-method"><strong>Word2Vec</strong> · {tr("코사인 유사도 × 100 · −100~100%", "Cosine similarity × 100 · −100–100%")}</p>}
+    {["word2vec", "fasttext"].includes(setup?.score_mode) && <p className="hidden-score-method"><strong>{fastText ? "fastText · cc.ko.300" : "Word2Vec"}</strong> · {tr("코사인 유사도 × 100 · −100~100%", "Cosine similarity × 100 · −100–100%")}</p>}
     {result ? <Scoreboard state={state} replay={replay} /> : <>
       {setup?.discussion !== false && state.wordDiscussion && <p className="hidden-discussion">{hiddenEventText(state.wordDiscussion.turn ? "word_discussion_round" : "word_discussion", state.wordDiscussion)}</p>}
       {state.wordDealer?.stage === "enter" && <p className="hidden-discussion">{hiddenEventText("word_dealer", state.wordDealer)}</p>}
@@ -113,7 +118,10 @@ export function HiddenWordStage({state, replay}) {
         </div>
         <SimilarityTrail state={state} replay={replay} />
         {clues.map((clue) => <section key={clue.phase} className="hidden-clue"><small>{tr(`${clue.phase}차 공개 힌트`, `Phase ${clue.phase} public clue`)}</small><strong lang={clue.word ? "ko" : undefined}>{clue.word || tr("힌트 없음", "No clue")}</strong><span>{similarityLabel(clue.similarity)}</span>
-          {clue.word && clue.forced ? <p>{tr("이 단계에서 제출한 후보 중 유사도가 가장 높은 단어입니다.", "The most similar word among the candidates submitted in this phase.")}</p> : !clue.word ? <p>{tr("시간 내에 유효한 힌트가 제출되지 않았습니다.", "No valid clue was submitted before time ran out.")}</p> : null}</section>)}
+          {clue.word && clue.forced ? <p>{clue.source === "fasttext_nearest" ?
+            tr("fastText 사전에서 정답과 가장 가까운 일반명사입니다.", "The closest common noun to the answer in the fastText vocabulary.") : clue.source === "word2vec_nearest" ?
+            tr("Word2Vec 사전에서 정답과 가장 가까운 단어입니다.", "The closest word to the answer in the Word2Vec vocabulary.") :
+            tr("이 단계에서 제출한 후보 중 유사도가 가장 높은 단어입니다.", "The most similar word among the candidates submitted in this phase.")}</p> : !clue.word ? <p>{tr("시간 내에 유효한 힌트가 제출되지 않았습니다.", "No valid clue was submitted before time ran out.")}</p> : null}</section>)}
         <PendingGuesses state={state} replay={replay} />
         <CurrentVerdict state={state} />
       </> : <div className="hidden-opening"><div className="hidden-envelope-art" aria-hidden="true"><span>?</span></div>

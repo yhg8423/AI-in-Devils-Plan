@@ -12,4 +12,5 @@ dependencies = [
     "chess>=1.9.4",
     "pygame>=2.6.1",
     "shapely>=2.2,<3",
+    "kiwipiepy==0.25.1",
 ]
