@@ -50,11 +50,11 @@ function render(events, {view = "operator", selected = "", language = "ko", stat
   });
 }
 
-function renderMatch(events, view, language, selected = "") {
+function renderMatch(events, view, language, selected = "", frame = events.length) {
   const steps = events.map(({type, data, actor, visible}) => ({events: [{msg_type: type,
     content: JSON.stringify(data), agent_name: actor, visible_to: visible}]}));
   const noOp = () => {};
-  return api[language].renderMatch({id: "hidden-word-demo", frame: steps.length, mode: "paused",
+  return api[language].renderMatch({id: "hidden-word-demo", frame, mode: "paused",
     match: {game: "5일차 메인 매치 · 히든 워드", players: events.find(({type}) => type === "word_setup")?.data.order ?? players, steps, seed: 1}, view, selected,
     choosePlayer: noOp, chooseView: noOp, seek: noOp});
 }
@@ -167,6 +167,31 @@ for (const language of ["ko", "en"]) {
     assert.equal((arena.match(/data-player="P0[1-6]"/g) ?? []).length, 5);
     assert.doesNotMatch(arena, /data-player="P06"/);
   });
+  test(`${language}: silent setup suppresses discussion status while archived logs retain it`, () => {
+    const discussion = record("word_discussion_round", {stage: "opening", round: 0, rounds: 10, turn: 3});
+    const silent = record("word_setup", {...setup.data, version: 2, score_mode: "word2vec", discussion: false});
+    assert.doesNotMatch(render([silent, discussion], {view: "public", language}), /class="hidden-discussion"/);
+    assert.match(render([setup, discussion], {view: "public", language}), /class="hidden-discussion"/);
+    assert.equal(stateFor([silent], "public", language).wordSetup.discussion, false);
+  });
+  test(`${language}: silent replay keeps private strategy and perspective filtering without conversation UI`, () => {
+    const silent = record("word_setup", {...setup.data, version: 2, score_mode: "word2vec", discussion: false});
+    const plan = record("decision_note", {phase: "word_preparation", note: "단독검토 전용메모"}, "P01", ["P01"]);
+    const events = [silent, ...base.slice(1), plan];
+    const html = renderMatch(events, "operator", language);
+    assert.match(html, /id="match-strategy"/);
+    assert.match(html, /단독검토 전용메모/);
+    assert.doesNotMatch(html, /id="match-talk"|arena-speech/);
+    assert.match(renderMatch(events, "P01", language), /단독검토 전용메모/);
+    assert.doesNotMatch(renderMatch(events, "public", language), /단독검토 전용메모|보름달|추석|조약돌|달빛|달님/);
+    assert.doesNotMatch(renderMatch(events, "P03", language), /단독검토 전용메모|보름달|추석|조약돌|달빛|달님/);
+    const opening = renderMatch(events, "public", language, "", 0);
+    assert.match(opening, /id="match-strategy"/);
+    assert.doesNotMatch(opening, /id="match-talk"|arena-speech|단독검토 전용메모|보름달|추석|조약돌|달빛|달님/);
+    const archived = renderMatch(base, "public", language);
+    assert.match(archived, /id="match-talk"/);
+    assert.match(archived, /arena-speech/);
+  });
 }
 
 test("operator can inspect private candidates and sealed guesses", () => {
@@ -189,4 +214,10 @@ test("English rules distinguish raw Word2Vec rules from archived AI judgments", 
   assert.match(current, /−100% to 100%/);
   assert.match(current, /same vector vocabulary and raw scores/);
   assert.doesNotMatch(current, /isolated AI|fixed associations/);
+  assert.match(current, /ten opening discussion turns and up to four/);
+  const silent = rulesSummary(heading, "Word2Vec 코사인 유사도 × 100\n참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.");
+  assert.match(silent, /private strategy preparation/);
+  assert.match(silent, /cannot discuss, negotiate, whisper or move rooms/);
+  assert.match(silent, /Relationship reviews follow verdicts/);
+  assert.doesNotMatch(silent, /ten opening discussion turns|up to four before each setter/);
 });

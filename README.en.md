@@ -261,7 +261,7 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
 
-Hidden Word continues with five survivors from existing records; standalone play defaults to six. It uses original word envelopes and calculates cosine similarity × 100 directly from [Kyubyong’s Korean Word2Vec model](https://github.com/Kyubyong/wordvectors). Scores range from −100 to 100 and do not reproduce the broadcast’s values. All players use the same vectors regardless of their models or remaining call budget; similarity scoring makes no LLM calls.
+Hidden Word continues with five survivors from existing records; standalone play defaults to six. Players prepare private strategies, set words and submit guesses without discussions. It uses original word envelopes and calculates cosine similarity × 100 directly from [Kyubyong’s Korean Word2Vec model](https://github.com/Kyubyong/wordvectors). Scores range from −100 to 100 and do not reproduce the broadcast’s values. All players use the same vectors regardless of their models or remaining call budget; similarity scoring makes no LLM calls.
 
 Before the first run, download the vectors once with the command below. They are saved to `runs/models/hidden-word/ko-word2vec.npz`, which Git ignores. Hints outside the model’s vocabulary are rejected.
 

@@ -2,7 +2,6 @@
 
 import json
 
-from ..either_or.discussion import Discussion
 from ..match import Decision, Match, encode
 from ..models import STRATEGY_NOTE_LIMIT
 from .vectors import load_vectors
@@ -15,8 +14,6 @@ MAX_HINTS = 10
 HINT_SECONDS = 15 * 60
 GUESS_SECONDS = 5 * 60
 THRESHOLD = 95
-OPENING_TURNS = 10
-DISCUSSION_TURNS = 4
 
 RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 
@@ -49,9 +46,9 @@ Word2Vec 코사인 유사도 × 100을 적용합니다. 음수도 그대로 표�
 사전에 없는 힌트는 점수 없이 한 번의 제출 기회를 소모합니다. 시연 행동에도 같은 Word2Vec 판정을 사용합니다.
 시뮬레이터에서는 정답 자체를 힌트로 제출할 수 없습니다.
 방송은 6인 경기이며 이전 매치 생존자가 5명인 경로는 복귀자를 추가하지 않고 5인으로 진행합니다.
-첫 대화 전에 각자 비공개 전략 요약을 정리하고 시작 전 10턴, 각 출제 차례 전 최대 4턴 대화합니다.
-전체·논의실 대화, 이동, 초대와 같은 장소의 그룹 귓속말을 쓸 수 있습니다.
-힌트 제시와 동시 정답 제출 중에는 대화하지 않습니다. 대화와 판정 후 친밀도·신뢰도를 검토합니다.
+각자 게임 시작 전과 정답 제출 전에 비공개 전략 요약을 정리합니다.
+참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.
+판정 결과를 확인한 뒤 친밀도·신뢰도를 검토합니다.
 출제 힌트는 출제자의 응답 시간을, 정답 제출은 각 추측자의 전략 요약과 답 응답 시간을 합산합니다.
 기다리는 시간을 별도로 재현하지 않습니다.
 완전 동점은 처음 공개한 추첨 순서로 판정합니다. 잘못된 형식이나 호출 상한 뒤에는 시연 행동을 사용합니다.
@@ -101,6 +98,8 @@ def validate_saved_setup(setup, vectors):
         raise ValueError("저장된 경기와 Word2Vec 모델 정보·체크섬이 다릅니다. 당시 모델 파일을 사용하세요.")
     if setup.get("deck_sha256") != DECK_SHA256:
         raise ValueError("단어 봉투 구성이 변경되었습니다. 새 경기를 시작하세요.")
+    if setup.get("discussion") is not False:
+        raise ValueError("대화 구간이 있는 이전 진행 방식의 경기는 재개할 수 없습니다. 새 경기를 시작하세요.")
 
 
 def _judge(vectors, secret, hint, cache):
@@ -131,46 +130,6 @@ def _strategy(match, phase, focus, names):
     return times
 
 
-def _discuss(match, discussion, order, topic, *, stage, round_number, turns):
-    context = {"stage": stage, "round": round_number, "rounds": turns}
-    match.event("word_discussion", context)
-    discussion.rounds = turns
-    for current in range(1, turns + 1):
-        match.event("word_discussion_round", {**context, "turn": current})
-        active = False
-        for seat, name in enumerate(order):
-            if name not in match.backends or match.live_turns <= 0:
-                continue
-            turn = len(match.events)
-            prompt = discussion.request(name, turn, topic + (
-                '\nJSON 전체 발언 {"type":"speak","channel":"public","text":"...","note":"전략 요약"}, '
-                '논의실 대화는 channel:"room", 같은 장소 귓속말은 channel:"whisper", to에 상대 ID 또는 ID 배열. '
-                '이동은 {"type":"move","room":1,"note":"전략 요약"}, 복도는 room:0. '
-                '초대는 channel:"room_invite", room·to·text를 지정. '
-                '응답은 {"type":"respond_invite","invite_id":0,"decision":"accept","note":"전략 요약"}. '
-                '패스는 {"type":"pass","note":"전략 요약"}.'
-            ), action_index=(current - 1) * len(order) + seat, notes=True,
-                progress=f"대화 {current}/{turns}턴")
-            def valid(action):
-                try:
-                    discussion.parse(name, action, turn, notes=True)
-                except (ValueError, TypeError, RecursionError):
-                    return False
-                return True
-            answer = match.request_action(name, "word_discussion", prompt.content,
-                encode({"type": "pass", "note": "들은 제안과 현재 순위를 비교해 계획을 검토한다."}),
-                valid=valid, request_type=prompt.msg_type)
-            action = discussion.parse(name, answer, turn, notes=True)
-            active = active or action.room is not None or bool(action.messages)
-            for event in discussion.record(name, action, turn):
-                match.event(event.msg_type, event.content, actor=event.agent_name,
-                            private=() if event.visible_to == "all" else event.visible_to)
-        if not active and stage != "opening":
-            break
-    match.event("word_discussion_end", context)
-    match.review_relationships(f"히든 워드 {round_number}라운드 {stage} 대화 종료")
-
-
 def play(match: Match, *, vectors=None):
     players = match.players
     if len(players) not in (5, 6) or len(set(players)) != len(players):
@@ -185,16 +144,13 @@ def play(match: Match, *, vectors=None):
     scores = dict.fromkeys(players, 0)
     similarity_cache = {}
     envelopes, used = {}, {}
-    discussion = Discussion(players, DISCUSSION_TURNS)
     match.event("rules", RULES)
     match.event("word_setup", {"version": 2, "players": players, "rounds": ROUNDS,
         "order": order, "envelopes": len(ENVELOPES), "threshold": THRESHOLD,
         "max_hints": MAX_HINTS, "hint_seconds": HINT_SECONDS, "guess_seconds": GUESS_SECONDS,
         "score_mode": "word2vec", "scorer": vectors.metadata, "deck_sha256": DECK_SHA256,
-        "pieces": match.pieces.copy()})
-    _strategy(match, "word_preparation", "첫 대화 전 협상과 출제·추측 계획을 정리하세요.", players)
-    _discuss(match, discussion, order, "비공개 단어를 받기 전 생존과 협력 방안을 논의하세요.",
-             stage="opening", round_number=0, turns=OPENING_TURNS)
+        "discussion": False, "pieces": match.pieces.copy()})
+    _strategy(match, "word_preparation", "게임 시작 전 자신의 출제·추측 계획을 정리하세요.", players)
     remaining = list(range(1, len(ENVELOPES) + 1))
     for name in order:
         match.event("word_dealer", {"player": name, "stage": "enter"})
@@ -222,8 +178,6 @@ def play(match: Match, *, vectors=None):
             match.event("word_secret", {"round": number, "setter": name, "word": secret}, actor=name, private=[name])
         for index, setter in enumerate(order, 1):
             context = {"round": number, "setter": setter}
-            _discuss(match, discussion, order, f"{setter}의 출제 전입니다. 공개할 정보와 추측·피스 사용을 논의하세요.",
-                     stage="before_setter", round_number=number, turns=DISCUSSION_TURNS)
             match.event("word_turn", {**context, "index": index})
             secret, clues = secrets[setter], []
             paid = set()

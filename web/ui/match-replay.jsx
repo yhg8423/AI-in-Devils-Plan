@@ -1249,6 +1249,7 @@ export function MatchReplay({replay, transport, caseName}) {
     }
     return {...event, data};
   }), [match]);
+  const silentHiddenWord = isHiddenWord && events.find((event) => event.msg_type === "word_setup")?.data.discussion === false;
   const state = useMemo(() => matchState(events, match, frame, view, isMarket, isGemExchange, isBingo, isHiddenWord), [events, match, frame, view, isMarket, isGemExchange, isBingo, isHiddenWord]);
   const {gemCards} = state;
   const drawGemMap = useCallback((canvas) => drawGemSet(canvas, gemCards), [gemCards]);
@@ -1285,8 +1286,8 @@ export function MatchReplay({replay, transport, caseName}) {
   const views = [{value: "operator", label: tr("운영자 · 전체 기록", "Operator · Full log")}, {value: "public", label: tr("공개 시점", "Public view")},
     ...match.players.map((name) => ({value: name, label: tr(`${name} 시점`, `${name}’s view`)}))];
   const Venue = matchVenues[name];
-  const dialogueTabs = state.scene || isRoulette || isPiggyBank;
-  const logTabs = dialogueTabs || isExile || isSpot || isCode || isFence || isSymmetry;
+  const dialogueTabs = !silentHiddenWord && (state.scene || isRoulette || isPiggyBank);
+  const logTabs = dialogueTabs || isHiddenWord || isExile || isSpot || isCode || isFence || isSymmetry;
   const ranking = isMarket || isGemExchange || isBingo || isHiddenWord ? state.result?.ranking ?? state.market?.ranking ?? state.bingoReveal?.ranking : null;
   const playerDetails = ranking ? new Map(ranking.map((player, index) => [player, {
     rank: tr(`${index + 1}위`, `Rank ${index + 1}`), status: state.result?.eliminated.includes(player) ? "탈락" :
@@ -1344,6 +1345,7 @@ export function MatchReplay({replay, transport, caseName}) {
     </div>
     <div className={match.board ? "either-or-stage" : isMarket || isGemExchange || isBingo || isHiddenWord || Venue ? "venue-stage" : undefined}>
       {state.scene && <RoomScene state={state.scene} players={match.players} frame={frame} following={replay.mode === "follow"}
+          showConversation={!silentHiddenWord}
           row={latest?.step === frame ? {player: latest.agent_name} : undefined} selected={selected}
           onChoose={replay.choosePlayer} playerDetails={playerDetails} drawMap={isBingo ? drawBingoMap : isGemExchange ? drawGemMap : undefined}
           getPoint={isBingo ? bingoSetPoint : isGemExchange ? gemSetPoint : undefined}

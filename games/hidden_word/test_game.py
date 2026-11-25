@@ -8,9 +8,10 @@ import unittest
 from unittest.mock import Mock, patch
 
 from ..match import DAY_FIVE_MAIN, Match, encode, run_cli
+from ..models import StrategyNote
 from . import __main__ as cli, game
 from .vectors import WordVectors
-from .words import ASSOCIATIONS, ENVELOPES, WORDS
+from .words import ASSOCIATIONS, DECK_SHA256, ENVELOPES, WORDS
 
 
 PLAYERS = tuple(f"P{number:02}" for number in range(1, 7))
@@ -69,6 +70,52 @@ class HiddenWordTest(unittest.TestCase):
         self.assertEqual(len(verdicts), 36)
         self.assertEqual([next(iter(verdict["points"].values())) for verdict in verdicts[:3]], [1, 2, 3])
         self.assertEqual([next(iter(verdict["points"].values())) for verdict in verdicts[-3:]], [2, 4, 6])
+
+    def test_live_players_have_private_strategy_without_discussion_or_room_actions(self):
+        class LiveMatch(Match):
+            def __init__(self):
+                super().__init__(PLAYERS, 7, live_turns=5000)
+                self.backends = dict.fromkeys(PLAYERS, object())
+                self.queries, self.checkpoints = [], []
+
+            def decide_together(self, phase, decisions, **kwargs):
+                self.current_phase = phase
+                self.defaults = {name: encode({"answers": ["우주선"], "spend": False})
+                                 if phase == "word_guess" else decision.default
+                                 for name, decision in decisions.items()}
+                return super().decide_together(phase, decisions, **kwargs)
+
+            def request_action(self, name, phase, prompt, default, **kwargs):
+                if phase != "word_envelope":
+                    raise AssertionError(f"Unexpected individual action: {phase}")
+                self.current_phase, self.defaults = phase, {name: default}
+                return super().request_action(name, phase, prompt, default, **kwargs)
+
+            def _query(self, name, prompt, *args, **kwargs):
+                self.queries.append((self.current_phase, name, prompt))
+                return self.defaults[name], StrategyNote(text="공개된 정보로 내 계획을 검토한다.")
+
+            def review_relationships(self, checkpoint):
+                self.checkpoints.append(checkpoint)
+
+        match = LiveMatch()
+        result = game.play(match)
+        self.assertTrue(match.queries)
+        self.assertLess(match.live_turns, 5000)
+        self.assertEqual(result["scores"], dict.fromkeys(PLAYERS, 18))
+        self.assertIs(events(match, "word_setup")[0]["discussion"], False)
+        forbidden = {"public", "whisper", "room", "room_move", "room_invite", "room_invite_response", "discussion_note"}
+        self.assertFalse(any(event.msg_type in forbidden or event.msg_type.startswith("word_discussion")
+                             for event in match.events))
+        self.assertNotIn("word_discussion", {phase for phase, _, _ in match.queries})
+        for phase in ("word_preparation", "word_guess_preparation"):
+            notes = [event for event in match.events if event.msg_type == "decision_note"
+                     and json.loads(event.content)["phase"] == phase]
+            self.assertEqual({note.agent_name for note in notes}, set(PLAYERS))
+            self.assertTrue(all(note.visible_to == [note.agent_name] for note in notes))
+        actions = events(match, "action")
+        self.assertFalse(any(action["phase"].startswith("word_discussion") for action in actions))
+        self.assertEqual(len(match.checkpoints), len(events(match, "word_verdict")) + 1)
 
     def test_piece_extra_answer_resets_for_new_secret_but_not_next_phase(self):
         class PaidGuesses(WrongGuesses):
@@ -271,14 +318,17 @@ class HiddenWordTest(unittest.TestCase):
                 cli.main(["--help"])
             self.assertEqual(error.exception.code, 0)
 
-    def test_cli_rejects_legacy_changed_scorer_or_deck_without_changing_record(self):
+    def test_cli_rejects_incompatible_saved_setup_without_changing_record(self):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             path = Path(directory) / "events.jsonl"
             for setup in ({"version": 1}, {"version": 2, "scorer": {"sha256": "different"}},
                           {"version": 2, "scorer": self.vectors.metadata},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": "different"}):
+                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": "different"},
+                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256},
+                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256, "discussion": True}):
                 if setup.get("scorer") == self.vectors.metadata:
-                    with self.assertRaisesRegex(ValueError, "단어 봉투 구성이 변경되었습니다"):
+                    expected = "단어 봉투 구성이 변경되었습니다" if setup.get("deck_sha256") != DECK_SHA256 else "새 경기"
+                    with self.assertRaisesRegex(ValueError, expected):
                         game.validate_saved_setup(setup, self.vectors)
                 path.write_text(encode({"type": "match", "game": DAY_FIVE_MAIN}) + "\n"
                                 + encode({"type": "event", "msg_type": "word_setup", "content": encode(setup)}) + "\n")

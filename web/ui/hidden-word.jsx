@@ -102,7 +102,7 @@ export function HiddenWordStage({state, replay}) {
       {turn && !result && <span>{tr(`승점 ×${turn.round === 2 ? 2 : 1}`, `VP ×${turn.round === 2 ? 2 : 1}`)}</span>}</div>
     {setup?.score_mode === "word2vec" && <p className="hidden-score-method"><strong>Word2Vec</strong> · {tr("코사인 유사도 × 100 · −100~100%", "Cosine similarity × 100 · −100–100%")}</p>}
     {result ? <Scoreboard state={state} replay={replay} /> : <>
-      {state.wordDiscussion && <p className="hidden-discussion">{hiddenEventText(state.wordDiscussion.turn ? "word_discussion_round" : "word_discussion", state.wordDiscussion)}</p>}
+      {setup?.discussion !== false && state.wordDiscussion && <p className="hidden-discussion">{hiddenEventText(state.wordDiscussion.turn ? "word_discussion_round" : "word_discussion", state.wordDiscussion)}</p>}
       {state.wordDealer?.stage === "enter" && <p className="hidden-discussion">{hiddenEventText("word_dealer", state.wordDealer)}</p>}
       {turn ? <>
         <div className="hidden-setter"><span>{tr("출제자", "Setter")}</span><strong>{turn.setter}</strong><span>{phase ? tr(`${phase.phase} / 3차 힌트`, `Hint phase ${phase.phase} of 3`) : tr("힌트 준비", "Preparing hints")}</span></div>
