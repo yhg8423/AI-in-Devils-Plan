@@ -16,6 +16,7 @@ const gameNames = new Map([
   ["3일차 감옥 매치", "Day 3 Prison Match"], ["돼지 저금통", "Piggy Bank"],
   ["4일차 메인 매치", "Day 4 Main Match"], ["경매 빙고", "Auction Bingo"],
   ["4일차 감옥 매치", "Day 4 Prison Match"], ["벽바둑 2", "Wall Go II"],
+  ["5일차", "Day 5"], ["5일차 메인 매치", "Day 5 Main Match"], ["히든 워드", "Hidden Word"],
   ["유배지 매치 1", "Exile Match 1"], ["피스 퍼즐", "Piece Puzzle"],
   ["유배지 매치 2", "Exile Match 2"], ["달라진 그림 찾기", "Spot the Difference"],
   ["유배지 매치 3", "Exile Match 3"], ["비밀 코드", "Secret Code"],

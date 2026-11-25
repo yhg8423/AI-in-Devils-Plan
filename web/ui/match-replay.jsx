@@ -6,6 +6,7 @@ import {choiceCountLabel, choiceOptionLabel, choiceResults, optionsByChoice} fro
 import {caseMatches} from "./cases.js";
 import {BingoInformation, BingoStage, bingoSetPoint, bingoWhisperPoints, drawBingoSet} from "./auction-bingo.jsx";
 import {applyBingoEvent, bingoActionText, bingoEventText} from "./auction-bingo-state.js";
+import {applyHiddenEvent, hiddenActionText, hiddenEventText, HiddenWordStage, HiddenWordInformation} from "./hidden-word.jsx";
 import {RouletteInspection, RouletteInspectionLegend, RouletteScene} from "./day-two-scenes.jsx";
 import {applyGemEvent, gemActionText, gemDiscussionLabel, gemEventText, gemSlotLabel, GemStage} from "./gem-exchange.jsx";
 import {drawGemSet, gemSetPoint} from "./gem-floor.js";
@@ -29,6 +30,14 @@ import {canonicalGameTitle, en, gameTitle, tr} from "./locale.js";
 import {rulesSummary} from "./rule-summaries.js";
 
 const labels = {
+  word_setup: tr("히든 워드 준비", "Hidden Word setup"), word_envelope: tr("비공개 단어 봉투", "Private word envelope"),
+  word_secret: tr("비공개 출제 단어", "Private hidden word"), word_round: tr("라운드 시작", "Round begins"),
+  word_turn: tr("출제자 차례", "Setter’s turn"), word_phase: tr("힌트 단계", "Hint phase"),
+  word_hint: tr("비공개 힌트 입력", "Private hint submission"), word_similarity: tr("유사도 공개", "Similarity revealed"),
+  word_clue: tr("힌트 단어 공개", "Clue revealed"), word_guess: tr("비공개 답안", "Sealed answer"),
+  word_verdict: tr("정답 판정", "Answer verdict"), word_final: tr("최종 순위", "Final standings"),
+  word_dealer: tr("딜러룸 출입", "Dealer room visit"), word_discussion: tr("대화 시작", "Discussion begins"),
+  word_discussion_round: tr("대화 턴", "Discussion turn"), word_discussion_end: tr("대화 종료", "Discussion ends"),
   sym_setup: tr("대칭 퍼즐 준비", "Symmetrical Puzzle setup"), sym_puzzles: tr("세 색 조각 공개", "Three color piece sets revealed"), sym_tools: tr("조각 세부·전략 검토", "Piece details and strategy reviews"),
   sym_tutorial: tr("조립 연습 예시", "Worked assembly example"),
   sym_window: tr("대칭 퍼즐 조립", "Symmetrical Puzzle assembly"), sym_board: tr("비공개 배치", "Private arrangement"),
@@ -106,6 +115,10 @@ const legacyRelationshipCheckpoints = new Map([
   ["경기 종료", "매치 종료"],
 ]);
 const actions = {
+  word_envelope: tr("봉투 선택", "Choose an envelope"), word_secret: tr("출제 단어 선택", "Choose a hidden word"),
+  word_hint: tr("힌트 입력", "Submit a hint"), word_guess: tr("정답 제출", "Submit an answer"),
+  word_preparation: tr("비공개 전략 준비", "Private preparation"), word_talk: tr("히든 워드 대화", "Hidden Word discussion"),
+  word_guess_preparation: tr("정답 제출 전 검토", "Review before answering"), word_discussion: tr("히든 워드 대화", "Hidden Word discussion"),
   symmetry_arrange: tr("세 색 조립", "Arrange pieces"),
   fence_draw: tr("울타리 그리기", "Draw the loop"),
   secret_think: tr("코드 준비·버저", "Prepare code and buzz"),
@@ -291,6 +304,7 @@ function record(event, step) {
       if (data.phase.startsWith("picture_")) return pictureActionText(data.phase, displayData.action);
       if (data.phase.startsWith("exile_")) return exileActionText(data.phase, data.action);
       if (data.phase.startsWith("bingo_")) return bingoActionText(data.phase, data.action);
+      if (data.phase.startsWith("word_")) return hiddenActionText(data.phase, data.action);
       if (data.phase.startsWith("pig_")) return pigActionText(data.phase, data.action);
       if (data.phase.startsWith("wall_")) return wallActionText(data.phase, data.action);
       if (["gem_bid", "gem_auction_agreement", "gem_peek", "gem_swap"].includes(data.phase)) return gemActionText(data.phase, data.action);
@@ -398,13 +412,13 @@ function record(event, step) {
   }[type];
   const actor = ["inspection", "shift", "swap", "pass"].includes(type) ? data.player :
     type === "trade_fill" ? event.visible_to[0] : event.agent_name;
-  const fallback = text ? text() : symmetryEventText(type, data) ?? fenceEventText(type, data) ?? codeEventText(type, data) ?? pictureEventText(type, displayData) ?? exileEventText(type, data) ?? wallEventText(type, data) ?? bingoEventText(type, data) ?? pigEventText(type, data) ?? gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
+  const fallback = text ? text() : hiddenEventText(type, data) ?? symmetryEventText(type, data) ?? fenceEventText(type, data) ?? codeEventText(type, data) ?? pictureEventText(type, displayData) ?? exileEventText(type, data) ?? wallEventText(type, data) ?? bingoEventText(type, data) ?? pigEventText(type, data) ?? gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
   return {...event, agent_name: actor, step, label, creditCost: credit?.cost,
     text: type === "grass_phase" && fallback !== content ? fallback : eventText(event, fallback)};
 }
 
-function matchState(events, match, frame, perspective, isMarket, isGemExchange, isBingo) {
-  const state = {feed: [], stacks: {}, penalties: {}, rounds: 0, pigPerspective: perspective, exilePerspective: perspective};
+function matchState(events, match, frame, perspective, isMarket, isGemExchange, isBingo, isHiddenWord) {
+  const state = {feed: [], stacks: {}, penalties: {}, rounds: 0, pigPerspective: perspective, exilePerspective: perspective, wordPerspective: perspective};
   const sceneSteps = [];
   let grassNotes = 0;
   for (let index = 0; index < frame; index++) {
@@ -427,8 +441,8 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange, 
       sceneSteps.push({phase, step: index + 1, events: [event],
         round: state.negotiation?.round ?? Math.floor(grassNotes / match.players.length) + 1});
       if (type === "discussion_note" && !state.negotiation) grassNotes++;
-    } else if (isMarket || isGemExchange || isBingo) {
-      sceneSteps.push({phase: isBingo ? "bingo_discussion" : isGemExchange ? "gem_talk" : "market_turn", step: index + 1, events: [event]});
+    } else if (isMarket || isGemExchange || isBingo || isHiddenWord) {
+      sceneSteps.push({phase: isHiddenWord ? "word_talk" : isBingo ? "bingo_discussion" : isGemExchange ? "gem_talk" : "market_turn", step: index + 1, events: [event]});
     }
     // Older logs saved the boards with the result. Rebuild each public reveal at its first recorded phase marker.
     if (state.pokerMode && (type === "action" || type === "decision_note") &&
@@ -446,6 +460,7 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange, 
     state.feed.push({...record(event, index + 1), round: state.rounds});
     if (isGemExchange) applyGemEvent(state, type, data, event);
     if (isBingo) applyBingoEvent(state, type, data, state.feed.at(-1));
+    if (isHiddenWord) applyHiddenEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("sym_")) applySymmetryEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("fence_")) applyFenceEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("code_")) applyCodeEvent(state, type, data, state.feed.at(-1));
@@ -602,10 +617,11 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange, 
       case "match_result": state.result = data; break;
     }
   }
-  if (match.board || isMarket || isGemExchange || isBingo) {
+  if (match.board || isMarket || isGemExchange || isBingo || isHiddenWord) {
     const scores = match.board ? Object.fromEntries(match.players.map((name) => [name, 0])) : {};
     state.scene = snapshot({scores, steps: sceneSteps}, sceneSteps.length, perspective);
     if (isGemExchange) state.scene.scores = state.gemScores ?? {};
+    if (isHiddenWord) state.scene.scores = state.wordScores ?? {};
     const roomLabels = new Map(state.scene.feed.filter((event) => event.msg_type === "room")
       .map(({step, label}) => [step, label]));
     for (const event of state.feed) {
@@ -1094,6 +1110,7 @@ function RouletteInformation({state, replay}) {
 }
 
 function Stage({state, replay, choiceResult, gemExchange}) {
+  if (replay.match.game.endsWith(" · 히든 워드")) return <HiddenWordStage state={state} replay={replay} />;
   if (canonicalGameTitle(replay.match.game).endsWith(" · 대칭 퍼즐")) return <SymmetryStage state={state} replay={replay} />;
   if (canonicalGameTitle(replay.match.game).endsWith(" · 울타리 치기")) return <LoopFenceStage state={state} replay={replay} />;
   if (canonicalGameTitle(replay.match.game).endsWith(" · 비밀 코드")) return <SecretCodeStage state={state} replay={replay} />;
@@ -1217,6 +1234,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const isGemExchange = name === "보석 암시장";
   const isPiggyBank = name === "돼지 저금통";
   const isBingo = name === "경매 빙고";
+  const isHiddenWord = name === "히든 워드";
   const isWallGo = name === "벽바둑 2";
   const isExile = name === "피스 퍼즐";
   const isSpot = name === "달라진 그림 찾기";
@@ -1231,7 +1249,7 @@ export function MatchReplay({replay, transport, caseName}) {
     }
     return {...event, data};
   }), [match]);
-  const state = useMemo(() => matchState(events, match, frame, view, isMarket, isGemExchange, isBingo), [events, match, frame, view, isMarket, isGemExchange, isBingo]);
+  const state = useMemo(() => matchState(events, match, frame, view, isMarket, isGemExchange, isBingo, isHiddenWord), [events, match, frame, view, isMarket, isGemExchange, isBingo, isHiddenWord]);
   const {gemCards} = state;
   const drawGemMap = useCallback((canvas) => drawGemSet(canvas, gemCards), [gemCards]);
   const {bingoChoices} = state;
@@ -1246,6 +1264,7 @@ export function MatchReplay({replay, transport, caseName}) {
       (type === "gem_auction_round" && data.manito_reveal ? tr("마니또 확인 · 피스 경매", "Manito reveal and Piece auction") : null) ??
       (type === "gem_strategy" ? gemEventText(type, data) : null) ??
       (["bingo_preparation", "bingo_discussion", "bingo_round", "bingo_result", "bingo_reveal"].includes(type) ? bingoEventText(type, data) : null) ??
+      (["word_discussion", "word_round", "word_turn", "word_phase", "word_clue", "word_verdict", "word_final"].includes(type) ? hiddenEventText(type, data) : null) ??
       (["wall_setup", "wall_end", "wall_replay", "wall_advance"].includes(type) ? wallEventText(type, data) : null) ??
       (type === "sym_finish" ? tr(`${data.rank}번째 세 색 완성 판정`, `Three-color finish verdict ${data.rank}`) : null) ??
       (["sym_setup", "sym_puzzles", "sym_tools", "sym_tutorial", "sym_reveal"].includes(type) ? symmetryEventText(type, data) : null) ??
@@ -1268,7 +1287,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const Venue = matchVenues[name];
   const dialogueTabs = state.scene || isRoulette || isPiggyBank;
   const logTabs = dialogueTabs || isExile || isSpot || isCode || isFence || isSymmetry;
-  const ranking = isMarket || isGemExchange || isBingo ? state.result?.ranking ?? state.market?.ranking ?? state.bingoReveal?.ranking : null;
+  const ranking = isMarket || isGemExchange || isBingo || isHiddenWord ? state.result?.ranking ?? state.market?.ranking ?? state.bingoReveal?.ranking : null;
   const playerDetails = ranking ? new Map(ranking.map((player, index) => [player, {
     rank: tr(`${index + 1}위`, `Rank ${index + 1}`), status: state.result?.eliminated.includes(player) ? "탈락" :
       state.result?.living.includes(player) ? "생활동" : state.result?.prison.includes(player) ? "감옥동" : null,
@@ -1314,7 +1333,8 @@ export function MatchReplay({replay, transport, caseName}) {
             tr("세 번째 유배지 매치를 마쳤어요.", "End of the third exile match.") : isSpot ?
             tr("두 번째 유배지 매치를 마쳤어요.", "End of the second exile match.") : isExile ?
             tr("첫 유배지 매치를 마쳤어요.", "End of the first exile match.") : isWallGo ?
-            tr("4일차까지 마쳤어요.", "End of Day 4.") : isBingo ?
+            tr("4일차까지 마쳤어요.", "End of Day 4.") : isHiddenWord ?
+            tr("5일차 메인 매치를 마쳤어요.", "End of Day 5 Main Match.") : isBingo ?
             tr("4일차 메인 매치를 마쳤어요.", "End of Day 4 Main Match.") : isPiggyBank ?
             tr("3일차까지 마쳤어요.", "End of Day 3.") : isGemExchange ?
             tr("3일차 메인 매치를 마쳤어요.", "End of Day 3 Main Match.") : caseRecord.matches.length === 4 ?
@@ -1322,14 +1342,14 @@ export function MatchReplay({replay, transport, caseName}) {
         <p className="muted match-models">{modelLabel(match)}</p>
       </div>
     </div>
-    <div className={match.board ? "either-or-stage" : isMarket || isGemExchange || isBingo || Venue ? "venue-stage" : undefined}>
+    <div className={match.board ? "either-or-stage" : isMarket || isGemExchange || isBingo || isHiddenWord || Venue ? "venue-stage" : undefined}>
       {state.scene && <RoomScene state={state.scene} players={match.players} frame={frame} following={replay.mode === "follow"}
           row={latest?.step === frame ? {player: latest.agent_name} : undefined} selected={selected}
           onChoose={replay.choosePlayer} playerDetails={playerDetails} drawMap={isBingo ? drawBingoMap : isGemExchange ? drawGemMap : undefined}
           getPoint={isBingo ? bingoSetPoint : isGemExchange ? gemSetPoint : undefined}
           getWhisperPoints={isBingo ? bingoWhisperPoints : undefined}
           dealerVisits={isBingo ? state.bingoDealerVisits : undefined} dealerPhase={isBingo ? state.bingoDealerPhase : undefined}
-          label={isBingo ? tr("경매 빙고 메인홀", "Auction Bingo main hall") : isGemExchange ? tr("보석 암시장 메인홀", "Gem Black Market main hall") :
+          label={isHiddenWord ? tr("히든 워드 메인홀", "Hidden Word main hall") : isBingo ? tr("경매 빙고 메인홀", "Auction Bingo main hall") : isGemExchange ? tr("보석 암시장 메인홀", "Gem Black Market main hall") :
             isMarket ? tr("미스터리 거래소 메인홀", "Mystery Stock Exchange main hall") : tr("전체 세트장", "Full set")} />}
       {Venue && <Venue players={match.players} state={state} frame={frame} selected={selected} onChoose={replay.choosePlayer} />}
       <section className="match-state" aria-label={tr("현재 판세", "Current game state")}><Stage state={state} replay={replay} choiceResult={choiceResult} gemExchange={isGemExchange} /></section>
@@ -1348,7 +1368,7 @@ export function MatchReplay({replay, transport, caseName}) {
         <Selector label={tr("관전 시점", "Viewpoint")} isLabelHidden value={view} size="sm" options={views} onChange={replay.chooseView} />
       </div>
     </div>
-    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange || isPiggyBank || isBingo || isWallGo || isExile || isSpot || isCode || isFence || isSymmetry ? <div className="match-details">
+    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange || isPiggyBank || isBingo || isHiddenWord || isWallGo || isExile || isSpot || isCode || isFence || isSymmetry ? <div className="match-details">
       {records}
       {isMarket && <MarketInformation key={replay.id} state={state} replay={replay} />}
       {isRoulette && <RouletteInformation key={replay.id} state={state} replay={replay} />}
@@ -1356,6 +1376,7 @@ export function MatchReplay({replay, transport, caseName}) {
       {isGemExchange && <GemInformation key={replay.id} state={state} replay={replay} />}
       {isPiggyBank && <PiggyInformation key={replay.id} state={state} replay={replay} />}
       {isBingo && <BingoInformation key={replay.id} state={state} replay={replay} />}
+      {isHiddenWord && <HiddenWordInformation key={replay.id} state={state} replay={replay} />}
       {isWallGo && <WallGoInformation key={replay.id} state={state} replay={replay} />}
       {isSpot && <SpotInformation key={replay.id} state={state} replay={replay} />}
       {isCode && <SecretCodeInformation key={replay.id} state={state} replay={replay} />}

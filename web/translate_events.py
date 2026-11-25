@@ -38,6 +38,7 @@ GAME_TERMS = {
     "돼지 저금통": "Piggy Bank",
     "경매 빙고": "Auction Bingo",
     "벽바둑 2": "Wall Go II",
+    "히든 워드": "Hidden Word",
 }
 TERM_PATTERN = re.compile("|".join(map(re.escape, GAME_TERMS)))
 PLAYER_ID = re.compile(r"(?i)\b([pg])([0-9]{2})(?![0-9])")
@@ -122,6 +123,9 @@ def convert_value(value, translate):
 
 def translation_rows(snapshot, translate):
     for turn, event in source_events(snapshot):
+        # Korean nouns are the puzzle data, even in an English replay.
+        if event["msg_type"].startswith("word_"):
+            continue
         content = event["content"]
         if not HANGUL.search(content):
             continue
@@ -131,6 +135,7 @@ def translation_rows(snapshot, translate):
             data = None
         if isinstance(data, dict):
             fields = {key: translated for key, value in data.items()
+                      if not (key == "action" and data.get("phase") in {"word_secret", "word_hint", "word_guess"})
                       if (translated := convert_value(value, translate)) != value}
             if fields:
                 yield {"turn": turn, "fields": fields}

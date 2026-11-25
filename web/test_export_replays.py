@@ -21,6 +21,9 @@ class ExportReplaysTest(unittest.TestCase):
         self.check_round_trip(STAGES[:7])
 
     def test_exports_day_four_prison_after_its_main_match(self):
+        self.check_round_trip(STAGES[:8])
+
+    def test_exports_day_five_main_after_day_four_prison(self):
         self.check_round_trip(STAGES)
 
     def check_round_trip(self, stages):

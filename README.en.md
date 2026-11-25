@@ -161,7 +161,7 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/openai-smoke/day1-main/events.jsonl
 ```
 
-## Continue from the Day 1 main match through the Day 4 prison match
+## Continue from the Day 1 main match through the Day 5 main match
 
 Once Either/Or finishes, run the remaining matches in order and keep their logs in the same run directory. If the web server is running, open a new terminal at the project root. This example picks up the log from **Run locally**.
 
@@ -198,6 +198,11 @@ uv run --locked --python 3.12 python -m games.auction_bingo \
 uv run --locked --python 3.12 python -m games.wall_go \
   --from-main "$run_dir/day4-main/events.jsonl" \
   --output "$run_dir/day4-prison/events.jsonl"
+
+uv run --locked --python 3.12 python -m games.hidden_word \
+  --from-main "$run_dir/day4-main/events.jsonl" \
+  --from-prison "$run_dir/day4-prison/events.jsonl" \
+  --output "$run_dir/day5-main/events.jsonl"
 ```
 
 `--from-main` and `--from-prison` connect each match to the earlier result files it needs. To continue a match you ran with an LLM, set `run_dir` to that run’s folder. Pass the same model options to each match command to keep the same model lineup.
@@ -247,6 +252,7 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 3 prison match | Piggy Bank | 4 | Play without discussion or relationship assessments, deciding reset requests in seat order. Each model updates its memories of three banks and may change which banks it retains at every update. Mistaken memories are not corrected from the true contents. Score by calling doubt or recalling all banks before a reset. The main match ends at five points or after at most 100 turns. Last-place ties play extra rounds: losing points eliminates a player, gaining points secures safety, and the last remaining tied player is eliminated. |
 | Day 4 main match | Auction Bingo | 7 regular + 1 guest | Choose shapes and bid privately over seven rounds. Won shapes are automatically arranged at the end; rank by bingo lines, filled spaces, then the total value of unused coins. |
 | Day 4 prison match | Wall Go II | 3 | Move counters and build walls to claim territory without discussion. The three-player winner survives; the other two play a duel to determine elimination. Complete ties replay with only tied players and reversed turn order. |
+| Day 5 main match | Hidden Word | 5–6 | Set words over two rounds and deduce opponents’ words from AI similarity scores and revealed clues. The top two enter the living quarters, last place is eliminated, and the rest go to prison. |
 | Exile match 1 | Piece Puzzle | 4 | Assemble eight slotted pieces into a lattice by matching notch directions and depths. Players build privately; the first three to finish survive. |
 | Exile match 2 | Spot the Difference | 4 | Memorize the original picture, then mark five changed areas. The top two survive after three rounds; only ties at the survival boundary play overtime. |
 | Exile match 3 | Secret Code | 4 | Find a four-letter code from illustrated cards and clues. The first correct answer each round secures survival; the last remaining player is eliminated. |
@@ -254,6 +260,8 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Exile match 5 | Symmetrical Puzzle | 3–4 | Assemble the blue, red and green pieces into reflection-symmetric shapes without flipping them. Complete all three puzzles to survive; the last player is eliminated. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
+
+Hidden Word continues with five survivors from existing records; standalone play defaults to six. It uses original word envelopes. Live similarity judgments use an AI context separate from player conversations and do not reproduce the broadcast’s scores. Scripted demonstrations use a fixed association table.
 
 ### Run exile matches
 
