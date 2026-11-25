@@ -9,10 +9,25 @@ from unittest.mock import patch
 
 import numpy as np
 
-from .vectors import WordVectors, install_vectors, load_vectors, read_fasttext
+from .vectors import WordVectors, install_vectors, load_vectors, normalized_score, read_fasttext
 
 
 class WordVectorsTest(unittest.TestCase):
+    def test_normalized_score_caps_nearest_at_99_9_and_preserves_95_boundary(self):
+        self.assertEqual(normalized_score(60, 60), 99.9)
+        self.assertEqual(normalized_score(51, 60), 85)
+        self.assertEqual(normalized_score(57, 60), 95)
+        self.assertGreater(normalized_score(57.001, 60), 95)
+        self.assertEqual(normalized_score(-30, 60), 0)
+        self.assertEqual(normalized_score(100, 60), 99.9)
+        self.assertIsNone(normalized_score(None, 60))
+        self.assertEqual(round(normalized_score(50.77, 58.94059099845309), 2), 86.14)
+        for maximum in (0, -1, float("nan"), float("inf")):
+            with self.subTest(maximum=maximum), self.assertRaises(ValueError):
+                normalized_score(50, maximum)
+        with self.assertRaises(ValueError):
+            normalized_score(float("nan"), 60)
+
     def test_nearest_search_excludes_answer_non_nouns_and_proper_names(self):
         vectors = WordVectors(["바다", "학교의", "라인강", "sea", "쉘부르의", "살윈", "바닷", "해양", "대양"],
                               [[1, 0], [1, 0], [1, 0], [1, 0], [1, 0], [1, 0], [1, 0], [3, 4], [0, 1]])

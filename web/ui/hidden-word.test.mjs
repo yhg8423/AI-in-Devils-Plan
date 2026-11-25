@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import {mkdtempSync, rmSync} from "node:fs";
+import {mkdtempSync, readFileSync, rmSync} from "node:fs";
 import {createRequire} from "node:module";
 import {tmpdir} from "node:os";
 import {dirname, join} from "node:path";
@@ -37,7 +37,7 @@ function stateFor(events, view, language) {
   const state = {feed: []};
   events.forEach(({type, data, actor, visible}, index) => {
     if (view !== "operator" && visible !== "all" && !visible.includes(view)) return;
-    const entry = {agent_name: actor, step: index + 1};
+    const entry = {agent_name: actor, visible_to: visible, step: index + 1};
     api[language].applyHiddenEvent(state, type, data, entry);
     state.feed.push({...entry, msg_type: type, data});
   });
@@ -60,6 +60,53 @@ function renderMatch(events, view, language, selected = "", frame = events.lengt
 }
 
 for (const language of ["ko", "en"]) {
+  test(`${language}: public candidates are visible before95 points and remain through later phases`, () => {
+    const publicSetup = record("word_setup", {...setup.data, version: 2, score_mode: "fasttext", discussion: false,
+      reveal_rule: "nearest_noun_ratio_v1", score_display: "nearest_noun_99_9", hint_visibility: "public"});
+    const publicHint = record("word_hint", {...hint.data, word: "장마", similarity: 30, qualifies: false}, "P01");
+    const firstScore = record("word_similarity", {...publicHint.data});
+    const secondScore = record("word_similarity", {...similarity.data, index: 2, word: "하늘", similarity: 48.7, qualifies: false});
+    const note = record("decision_note", {phase: "word_preparation", note: "전략비밀문장"}, "P01", ["P01"]);
+    const events = [publicSetup, ...base.slice(1, 5), publicHint, firstScore, secondScore, guess, note];
+    for (const view of ["public", "operator", ...players]) {
+      const html = renderMatch(events, view, language, "P01");
+      assert.match(html, /장마/);
+      assert.match(html, /하늘/);
+      assert.match(html, language === "ko" ? /30점/ : /30 points/);
+      assert.match(html, language === "ko" ? /95점 초과 시 힌트 제시 종료/ : /Hint submission ends above 95 points/);
+      assert.doesNotMatch(html, /비공개 힌트 입력|Private hint submission/);
+      if (!["operator", "P01"].includes(view)) assert.doesNotMatch(html, /보름달|조약돌|전략비밀문장/);
+      if (!["operator", "P02"].includes(view)) assert.doesNotMatch(html, /달빛|달님/);
+    }
+    const state = stateFor(events, "public", language);
+    assert.equal(state.wordHints.length, 2);
+    assert.equal(state.wordHints[0].publicWord, "장마");
+    assert.equal(state.wordHints[1].publicWord, "하늘");
+    const later = [...events, record("word_phase", {...phase.data, phase: 2}),
+      record("word_similarity", {...similarity.data, phase: 2, word: "우산", similarity: 61.2, qualifies: false})];
+    const html = render(later, {view: "public", language});
+    assert.match(html, /장마/);
+    assert.match(html, /하늘/);
+    assert.match(html, /우산/);
+    assert.match(html, language === "ko" ? /1차 · 1\./ : /Phase 1 · 1\./);
+    assert.match(html, language === "ko" ? /2차 · 1\./ : /Phase 2 · 1\./);
+    const selected = renderMatch([...later, record("word_clue", {...clue.data, phase: 2, word: "소나기", similarity: 99.9, forced: true, source: "fasttext_nearest"})], "public", language);
+    assert.match(selected, language === "ko" ? /2차 선정 힌트/ : /Phase 2 selected clue/);
+    assert.match(selected, /장마|하늘|우산/);
+    assert.doesNotMatch(selected, /비공개 힌트 입력|Private hint submission/);
+    const next = [...later, record("word_turn", {round: 1, setter: "P03", index: 2})];
+    assert.doesNotMatch(render(next, {view: "public", language}), /장마|하늘|우산/);
+  });
+  test(`${language}: public setup cannot expose a word from a private legacy event`, () => {
+    const publicSetup = record("word_setup", {...setup.data, hint_visibility: "public"});
+    const privateHint = record("word_hint", {...hint.data, word: "비공개후보단어"}, "P01", ["P01"]);
+    const events = [publicSetup, ...base.slice(1, 5), privateHint, similarity];
+    const operator = stateFor(events, "operator", language);
+    assert.equal(operator.wordHints[0].word, "비공개후보단어");
+    assert.equal(operator.wordHints[0].publicWord, undefined);
+    for (const view of ["public", "P03"]) assert.doesNotMatch(render(events, {view, selected: "P01", language, state: operator}), /비공개후보단어|보름달|조약돌/);
+    assert.match(render(events, {view: "P01", language, state: operator}), /비공개후보단어/);
+  });
   test(`${language}: public clues preserve Korean words and hide private hints, secret and guesses`, () => {
     const html = render(base, {view: "public", selected: "P01", language});
     assert.match(html, /위성/);
@@ -238,6 +285,40 @@ for (const language of ["ko", "en"]) {
     const label = api[language].hiddenEventText("word_similarity", events.at(-1).data);
     assert.match(label, language === "ko" ? /일반명사 아님/ : /Not a common noun/);
   });
+  test(`${language}: normalized display uses corrected points in panels, feed and clue labels`, () => {
+    const normalized = record("word_setup", {...setup.data, version: 2, score_mode: "fasttext", discussion: false,
+      reveal_rule: "nearest_noun_ratio_v1", score_display: "nearest_noun_99_9", score_ceiling: 99.9, display_threshold: 95});
+    const candidate = record("word_similarity", {...similarity.data, similarity: 86.05, qualifies: false, score_display: "nearest_noun_99_9"});
+    const nearest = record("word_similarity", {...similarity.data, index: 2, similarity: 99.9, qualifies: true, score_display: "nearest_noun_99_9"});
+    const events = [normalized, ...base.slice(1, 5), candidate, nearest];
+    const unit = language === "ko" ? "점" : " points";
+    for (const view of ["public", "operator", "P01", "P03"]) {
+      const html = renderMatch(events, view, language);
+      assert.match(html, language === "ko" ? /보정 유사도/ : /Normalized similarity/);
+      assert.match(html, new RegExp(`86\\.05${unit}`));
+      assert.match(html, new RegExp(`99\\.9${unit}`));
+      assert.match(html, language === "ko" ? /95점 초과 시 공개/ : /Reveal above 95 points/);
+      assert.doesNotMatch(html, /86\.05%|99\.9%|50%|Raw similarity|원본 유사도|−100|94\.905|100 points|100점/);
+      assert.match(html, /data-signed="false"/);
+    }
+    assert.equal(api[language].similarityLabel(99.9, normalized.data), `99.9${unit}`);
+    assert.equal(api[language].similarityLabel(95.001, normalized.data), `>95${unit}`);
+    assert.match(api[language].hiddenEventText("word_similarity", candidate.data), new RegExp(`86\\.05${unit}`));
+    const announced = record("word_clue", {...clue.data, word: "휴게", similarity: 99.9, forced: true, source: "fasttext_nearest", score_display: "nearest_noun_99_9"});
+    const html = renderMatch([...events, announced], "public", language);
+    assert.match(html, /휴게/);
+    assert.match(html, new RegExp(`99\\.9${unit}`));
+    assert.doesNotMatch(html, /99\.9%|100 points|100점/);
+    const projected = record("word_setup", {...normalized.data, display_projection: "raw_cosine_v1"});
+    const projectedEvents = [projected, ...events.slice(1)];
+    const state = stateFor(projectedEvents, "public", language);
+    assert.equal(state.wordSetup.reveal_rule, "nearest_noun_ratio_v1");
+    assert.equal(state.wordHints[0].qualifies, false);
+    assert.equal(state.wordHints[1].qualifies, true);
+    const refreshed = renderMatch(projectedEvents, "public", language);
+    assert.match(refreshed, language === "ko" ? /기존 기록은 판정을 유지하고 점수 표시만 보정합니다/ : /Existing verdicts are retained; only score display is normalized/);
+    assert.doesNotMatch(refreshed, /Raw similarity|원본 유사도|94\.905|86\.05%/);
+  });
   test(`${language}: inherited five-player roster renders without adding a sixth player`, () => {
     const five = record("word_setup", {...setup.data, order: players.slice(0, 5), players: 5});
     const html = renderMatch([five, ...base.slice(1)], "public", language);
@@ -317,4 +398,28 @@ test("English rules distinguish raw Word2Vec rules from archived AI judgments", 
   assert.match(relative, /Unknown words and words outside that noun set use one attempt without a score/);
   assert.match(relative, /simulator extension; the broadcast’s scoring formula has not been verified/);
   assert.doesNotMatch(relative, /until a score exceeds 95%|no submitted hint exceeds 95%/);
+  const normalized = rulesSummary(heading, "모든 참가자에게 같은 사전학습 fastText 모델을 적용합니다.\n참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.\n정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.\n보정 점수가 95점을 초과하면 힌트를 공개합니다.\n기준을 넘지 못하면 제출한 힌트와 관계없이 fastText 사전에서 정답 자체를 제외하고 가장 가까운 일반명사를 공개합니다.");
+  assert.match(normalized, /similarity normalized to 0–99\.9 points/);
+  assert.match(normalized, /until normalized similarity exceeds 95 points/);
+  assert.match(normalized, /100 × cosine similarity \/ nearest eligible common noun cosine similarity, limited to 0–99\.9/);
+  assert.match(normalized, /closest common noun other than the answer therefore scores 99\.9 points/);
+  assert.doesNotMatch(normalized, /Displayed values remain raw|−100%|without rescaling|until a score exceeds 95%|raw cosine similarity exceeds 95%/);
+  const publicHints = rulesSummary(heading, "모든 참가자에게 같은 사전학습 fastText 모델을 적용합니다.\n참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.\n정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.\n제출한 힌트 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다.\n기준을 넘지 못하면 제출한 힌트와 관계없이 fastText 사전에서 정답 자체를 제외하고 가장 가까운 일반명사를 공개합니다.");
+  assert.match(publicHints, /Every candidate word and its normalized score are immediately visible to all players/);
+  assert.match(publicHints, /Hint submission ends as soon as a score exceeds 95 points/);
+  assert.match(publicHints, /All public candidates remain visible through later phases of the same setter’s turn/);
+  assert.match(publicHints, /Korean fastText similarity normalized/);
+  assert.doesNotMatch(publicHints, /private hints per phase|only similarity scores appear|isolated AI/);
+});
+
+test("actual engine RULES translate to public candidates and normalized fastText scores", () => {
+  const source = readFileSync(new URL("../../games/hidden_word/game.py", import.meta.url), "utf8");
+  const rules = source.match(/RULES = """([\s\S]*?)"""/)?.[1];
+  assert.ok(rules, "The engine RULES string must be available to this regression test");
+  assert.match(rules, /출제자가 제출하는 모든 힌트 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다/);
+  const summary = rulesSummary(rules.split("\n")[0], rules);
+  assert.match(summary, /Every candidate word and its normalized score are immediately visible to all players/);
+  assert.match(summary, /Hint submission ends as soon as a score exceeds 95 points/);
+  assert.match(summary, /Korean fastText similarity normalized to 0–99\.9 points/);
+  assert.doesNotMatch(summary, /private hints per phase|only similarity scores appear|isolated AI/);
 });

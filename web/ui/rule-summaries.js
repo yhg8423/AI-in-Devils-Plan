@@ -30,8 +30,9 @@ const summaries = [
 
 export function rulesSummary(heading, body) {
   if (heading.startsWith("히든 워드")) {
+    const normalized = body.includes("정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.");
     let summary = "Five or six players set one hidden Korean noun each in both rounds, choosing from private five-word envelopes without reusing their first word. Submit up to ten private hints per phase; only similarity scores appear until a score exceeds 95%, or the highest-scoring hint of that phase is revealed. Guess simultaneously. Once per hidden word, spend one Piece for a second answer. Correct guessers earn one VP each and end the setter’s turn. With no correct answer, the setter earns one, two, then three cumulative VP across three phases. Round 2 doubles awards. The top two enter the living quarters, last place is eliminated, and the rest go to prison. First place earns four Pieces. The simulation uses original envelopes, isolated AI similarity judgments, ten opening discussion turns and up to four before each setter. Model response time replaces the fifteen-minute hint and five-minute answer timers. Drawn order resolves final ties; scripted play uses fixed associations. Korean puzzle words remain in Korean in both interface languages.";
-    const scorer = body.includes("fastText 코사인 유사도") ? "fastText" : body.includes("Word2Vec 코사인 유사도") ? "Word2Vec" : null;
+    const scorer = body.includes("fastText 코사인 유사도") || normalized && body.includes("fastText") ? "fastText" : body.includes("Word2Vec 코사인 유사도") ? "Word2Vec" : null;
     if (scorer) summary = summary.replace("isolated AI similarity judgments", `direct Korean ${scorer} cosine similarity × 100 on a −100% to 100% scale`).replace(
       "Drawn order resolves final ties; scripted play uses fixed associations.",
       "Drawn order resolves final ties. Every player uses the same vector vocabulary and raw scores, without rescaling or AI judgments. Words outside that vocabulary have no similarity score and cannot become clues.",
@@ -47,11 +48,22 @@ export function rulesSummary(heading, body) {
       "until a score exceeds 95%, or the highest-scoring hint of that phase is revealed.",
       `until a score exceeds 95%. If no submitted hint exceeds 95% within the limit, reveal the closest ${nearest === "fastText" ? "common noun" : "word"} to the answer across the full ${nearest} vocabulary, excluding the answer itself, regardless of the submitted candidates.`,
     );
-    if (body.includes("최근접 일반명사 유사도의 95%를 초과하면")) summary = summary.replace(
+    if (!normalized && body.includes("최근접 일반명사 유사도의 95%를 초과하면")) summary = summary.replace(
       "until a score exceeds 95%",
       "until raw cosine similarity exceeds 95% of the similarity of the closest eligible common noun to the answer, excluding the answer itself",
     ).replace("If no submitted hint exceeds 95% within the limit", "If no submitted hint meets this criterion within the limit") +
       " This reveal criterion is a simulator extension; the broadcast’s scoring formula has not been verified. Displayed values remain raw cosine similarity × 100. Submitted hints and nearest-word search use the same dictionary-attested Kiwi common nouns (NNG). Unknown words and words outside that noun set use one attempt without a score.";
+    if (normalized) summary = summary.replace(`direct Korean ${scorer} cosine similarity × 100 on a −100% to 100% scale`,
+      `Korean ${scorer} similarity normalized to 0–99.9 points`).replace(
+      "Every player uses the same vector vocabulary and raw scores, without rescaling or AI judgments.",
+      "Every player uses the same vector vocabulary and normalized scores, without AI judgments.",
+    ).replace("until a score exceeds 95%", "until normalized similarity exceeds 95 points").replace(
+      "If no submitted hint exceeds 95% within the limit", "If no submitted hint exceeds 95 points within the limit",
+    ) + " Normalized similarity is 100 × cosine similarity / nearest eligible common noun cosine similarity, limited to 0–99.9. The closest common noun other than the answer therefore scores 99.9 points. This is a simulator scoring rule; the broadcast’s scoring formula has not been verified. Submitted hints and nearest-word search use the same dictionary-attested Kiwi common nouns (NNG). Unknown words and words outside that noun set use one attempt without a score.";
+    if (body.includes("힌트 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다.")) summary = summary.replace(
+      "Submit up to ten private hints per phase; only similarity scores appear until normalized similarity exceeds 95 points.",
+      "Submit up to ten hints per phase. Every candidate word and its normalized score are immediately visible to all players. Hint submission ends as soon as a score exceeds 95 points.",
+    ).replace("Guess simultaneously.", "All public candidates remain visible through later phases of the same setter’s turn. The selected submitted or automatic clue is highlighted before simultaneous guesses.");
     return summary;
   }
   heading = canonicalGameTitle(heading);

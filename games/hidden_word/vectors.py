@@ -6,6 +6,7 @@ import gzip
 from hashlib import file_digest, sha256
 from importlib.metadata import version
 import json
+from math import isfinite
 from pathlib import Path
 import shutil
 from tempfile import TemporaryDirectory
@@ -27,6 +28,18 @@ DEFAULT_PATH = Path(__file__).resolve().parents[2] / "runs/models/hidden-word/fa
 SETUP = "uv run --locked --python 3.12 python -m games.hidden_word.vectors --download"
 NOUN_FILTER = f"kiwipiepy-{version('kiwipiepy')}/model-{version('kiwipiepy-model')}/cong/NNG/oov=false"
 BLOCK_ROWS = 8192
+SCORE_CEILING = 99.9
+
+
+def normalized_score(similarity, maximum):
+    """Express closeness relative to the best other noun, capped at 99.9."""
+    if not isfinite(maximum) or maximum <= 0:
+        raise ValueError("보정 기준 유사도는 유한한 양수여야 합니다.")
+    if similarity is None:
+        return None
+    if not isfinite(similarity):
+        raise ValueError("보정할 유사도는 유한한 수치여야 합니다.")
+    return min(SCORE_CEILING, max(0.0, similarity / maximum * 100))
 
 
 @lru_cache(maxsize=1)

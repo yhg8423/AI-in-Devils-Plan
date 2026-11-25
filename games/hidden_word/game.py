@@ -1,10 +1,10 @@
-"""Private noun clues, shared fastText scoring, and sealed guesses."""
+"""Public noun candidates, shared fastText scoring, and sealed guesses."""
 
 import json
 
 from ..match import Decision, Match, encode
 from ..models import STRATEGY_NOTE_LIMIT
-from .vectors import load_vectors
+from .vectors import load_vectors, normalized_score
 from .words import ASSOCIATIONS, DECK_SHA256, ENVELOPES, WORDS, is_noun_word, scripted_guess
 
 
@@ -22,14 +22,13 @@ RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 둘째 라운드에는 첫 라운드에 쓰지 않은 나머지 네 단어 중 하나를 히든 워드로 정합니다.
 출제자는 자신의 정답을 숨기면서 득점하고, 다른 참가자는 상대의 단어를 맞혀 생존과 우승을 노리세요.
 
-출제자의 힌트 단어는 딜러에게 비공개로 제출하는 한글 명사입니다.
-제출한 힌트의 유사도 수치만 공개됩니다. 한 차례 힌트 제시는 최대 15분, 최대 10개입니다.
-정답 자체를 제외한 사전 전체의 일반명사 중 가장 가까운 명사의 유사도를 기준으로 삼습니다.
-최근접 일반명사 유사도의 95%를 초과하면 즉시 힌트를 마치고 그 단어를 공개합니다.
+출제자가 제출하는 모든 힌트 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다.
+한 차례 힌트 제시는 최대 15분, 최대 10개입니다.
+보정 점수가 95점을 초과하면 즉시 힌트를 마치고 그 단어를 최종 힌트로 강조합니다.
 10개를 제출하거나 제한 시간이 끝날 때까지
 기준을 넘지 못하면 제출한 힌트와 관계없이 fastText 사전에서 정답 자체를 제외하고 가장 가까운 일반명사를 공개합니다.
 최고 유사도가 같으면 사전에서 먼저 나온 단어를 택합니다. 이전에 공개한 단어가 다시 나올 수 있습니다.
-공개된 이전 힌트는 이후 단계에서도 볼 수 있습니다.
+이전 단계의 모든 후보 단어와 점수, 최종 힌트는 이후 단계에서도 볼 수 있습니다.
 
 출제자를 제외한 참가자는 5분 안에 추측 단어를 동시에 비공개 제출합니다.
 한 히든 워드에 한 번만 피스 1개를 써서 답 하나를 추가할 수 있습니다. 피스는 정답 여부와 관계없이 소모됩니다.
@@ -42,11 +41,12 @@ RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 1위는 피스 4개를 얻습니다. 이 매치에는 연맹의 징표 구제가 없습니다.
 
 시뮬레이터 진행
-방송의 봉투와 다른 새 보통명사 묶음을 사용합니다. 유사도는 모든 참가자에게 같은 사전학습 모델의
-fastText 코사인 유사도 × 100을 적용합니다. 음수도 그대로 표시하며 원시 점수를 변환하지 않습니다.
-조기 공개는 정답별 최근접 일반명사 유사도를 기준으로 판정합니다. 이 상대 기준은 시뮬레이터의 진행 규칙입니다.
+방송의 봉투와 다른 새 보통명사 묶음을 사용합니다. 모든 참가자에게 같은 사전학습 fastText 모델을 적용합니다.
+정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.
+코사인 유사도를 최근접 일반명사의 코사인 유사도로 나눈 뒤 100을 곱하고, 0~99.9점으로 제한합니다.
+이 보정·공개 기준은 시뮬레이터의 진행 규칙입니다.
 방송의 학습 모델과 같은 수치를 보장하지 않습니다. 참가자의 제공자·모델·호출 상한은 유사도에 영향을 주지 않습니다.
-사전에 없거나 일반명사로 인정되지 않은 힌트는 점수 없이 한 번의 제출 기회를 소모합니다.
+사전에 없거나 일반명사로 인정되지 않은 힌트도 단어와 무효 사유가 공개되며 점수 없이 한 번의 제출 기회를 소모합니다.
 제출 힌트와 최근접 명사 검색에 같은 명사 판정 기준을 적용하며 시연 행동에도 같은 fastText 판정을 사용합니다.
 시뮬레이터에서는 정답 자체를 힌트로 제출할 수 없습니다.
 방송은 6인 경기이며 이전 매치 생존자가 5명인 경로는 복귀자를 추가하지 않고 5인으로 진행합니다.
@@ -101,6 +101,8 @@ def validate_vectors(vectors):
 def validate_saved_setup(setup, vectors):
     if not isinstance(setup, dict) or setup.get("version") != 2:
         raise ValueError("이전 유사도 판정으로 시작한 히든 워드는 재개할 수 없습니다. fastText로 새 경기를 시작하세요.")
+    if setup.get("hint_visibility") != "public":
+        raise ValueError("힌트 후보가 비공개였던 이전 경기는 재개할 수 없습니다. 새 경기를 시작하세요.")
     if setup.get("scorer") != vectors.metadata:
         raise ValueError("저장된 경기와 fastText 모델 정보·체크섬이 다릅니다. 당시 모델 파일을 사용하세요.")
     if setup.get("deck_sha256") != DECK_SHA256:
@@ -113,6 +115,8 @@ def validate_saved_setup(setup, vectors):
         raise ValueError("힌트 공개 기준이 변경되었습니다. 새 경기를 시작하세요.")
     if setup.get("hint_filter") != "same_as_nearest":
         raise ValueError("힌트 명사 판정 규칙이 변경되었습니다. 새 경기를 시작하세요.")
+    if setup.get("score_display") != "nearest_noun_99_9" or setup.get("score_ceiling") != 99.9:
+        raise ValueError("저장된 경기의 점수 표시 규칙을 지원하지 않습니다. 새 경기를 시작하세요.")
 
 
 def _judge(vectors, secret, hint, cache):
@@ -159,12 +163,14 @@ def play(match: Match, *, vectors=None):
     similarity_cache = {}
     envelopes, used = {}, {}
     match.event("rules", RULES)
-    match.event("word_setup", {"version": 2, "players": players, "rounds": ROUNDS,
+    setup = {"version": 2, "players": players, "rounds": ROUNDS,
         "order": order, "envelopes": len(ENVELOPES), "threshold": THRESHOLD,
         "max_hints": MAX_HINTS, "hint_seconds": HINT_SECONDS, "guess_seconds": GUESS_SECONDS,
         "score_mode": "fasttext", "scorer": vectors.metadata, "deck_sha256": DECK_SHA256,
         "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
-        "hint_filter": "same_as_nearest", "pieces": match.pieces.copy()})
+        "hint_filter": "same_as_nearest", "pieces": match.pieces.copy(),
+        "score_display": "nearest_noun_99_9", "score_ceiling": 99.9, "hint_visibility": "public"}
+    match.event("word_setup", setup)
     _strategy(match, "word_preparation", "게임 시작 전 자신의 출제·추측 계획을 정리하세요.", players)
     remaining = list(range(1, len(ENVELOPES) + 1))
     for name in order:
@@ -194,9 +200,8 @@ def play(match: Match, *, vectors=None):
         for index, setter in enumerate(order, 1):
             context = {"round": number, "setter": setter}
             match.event("word_turn", {**context, "index": index})
-            secret, clues = secrets[setter], []
+            secret, clues, candidates = secrets[setter], [], []
             nearest = vectors.nearest(secret)
-            cutoff = nearest["similarity"] * THRESHOLD / 100
             paid = set()
             for phase in range(1, PHASES + 1):
                 stage = {**context, "phase": phase}
@@ -206,10 +211,12 @@ def play(match: Match, *, vectors=None):
                 for hint_index in range(1, MAX_HINTS + 1):
                     default = demo_hints[secret][(hint_index + phase - 2) % len(demo_hints[secret])]
                     times = {}
+                    history = f"이번 출제자의 모든 공개 후보와 보정 점수: {encode(candidates)}. 최종 힌트: {encode(clues)}. "
                     hint = match.decide_together("word_hint", {setter: Decision(
                         f"{phase}차 힌트 {hint_index}/{MAX_HINTS}. 정답 {secret!r}은 다른 참가자에게 숨겨져 있습니다. "
-                        "정답을 알아맞히기 어렵게 하면서 최근접 일반명사 유사도의 95%를 초과할 의미상 가까운 보통명사 한 개를 골라 딜러에게 비공개 제출하세요. "
-                        "출제자는 제출한 힌트와 판정 수치를 확인하고, 다른 참가자는 기준을 통과하기 전에는 수치만 봅니다. "
+                        "정답을 알아맞히기 어렵게 하면서 보정 점수 95점을 초과할 의미상 가까운 보통명사 한 개를 제출하세요. "
+                        "제출한 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다. "
+                        f"{history}"
                         "고유명사, 정답 자체와 설명을 제외하고 한글 명사 한 개만 출력하세요.", default,
                         valid=lambda value: is_noun_word(value) and value != secret,
                     )}, response_times=times)[setter]
@@ -217,29 +224,36 @@ def play(match: Match, *, vectors=None):
                     if elapsed > HINT_SECONDS * 1_000_000_000:
                         break
                     judgement = _judge(vectors, secret, hint, similarity_cache)
-                    similarity = judgement["similarity"]
-                    qualifies = similarity is not None and similarity > cutoff
+                    similarity = normalized_score(judgement["similarity"], nearest["similarity"])
+                    qualifies = similarity is not None and similarity > THRESHOLD
                     if not judgement["valid"]:
                         match.event("invalid_action", {"phase": "word_hint", "action": hint}, private=[setter])
                     record = {**stage, "index": hint_index, "word": hint, **judgement, "qualifies": qualifies}
-                    match.event("word_hint", record, actor=setter, private=[setter])
-                    match.event("word_similarity", {key: value for key, value in record.items() if key != "word"})
+                    record.update(similarity=similarity, score_display="nearest_noun_99_9")
+                    candidates.append(record)
+                    match.event("word_hint", record, actor=setter)
+                    match.event("word_similarity", record)
                     if qualifies:
                         revealed = {"word": hint, "similarity": similarity, "forced": False, "source": "submitted_hint"}
                         break
                 if revealed is None:
-                    revealed = {**nearest, "forced": True, "source": "fasttext_nearest"}
+                    revealed = {**nearest, "similarity": 99.9, "forced": True, "source": "fasttext_nearest"}
+                revealed["score_display"] = "nearest_noun_99_9"
                 match.event("word_clue", {**stage, **revealed})
                 if revealed["word"] is not None:
-                    clues.append(revealed["word"])
-                preparation_times = _strategy(match, "word_guess_preparation", "공개 힌트와 수치에서 답 후보와 피스 사용 계획을 정리하세요.", [name for name in players if name != setter])
+                    clues.append(revealed)
+                evidence = f"이번 출제자의 모든 공개 후보와 보정 점수: {encode(candidates)}. 최종 힌트: {encode(clues)}. "
+                preparation_times = _strategy(match, "word_guess_preparation", evidence + "모든 후보를 함께 비교해 답 후보와 피스 사용 계획을 정리하세요.", [name for name in players if name != setter])
+                strongest = max((item for item in [*candidates, *clues] if item["similarity"] is not None),
+                                key=lambda item: item["similarity"], default=None)
+                fallback_clues = [strongest["word"]] if strongest else []
                 decisions = {}
                 for seat, name in enumerate(players):
                     if name == setter:
                         continue
-                    fallback = encode({"answers": [scripted_guess(clues, seat + index + number, phase, vectors)], "spend": False})
+                    fallback = encode({"answers": [scripted_guess(fallback_clues, seat + index + number, phase, vectors)], "spend": False})
                     decisions[name] = Decision(
-                        f"{setter}의{phase}차 히든 워드를 추측하세요. 공개 힌트 {encode(clues)}. "
+                        f"{setter}의{phase}차 히든 워드를 추측하세요. {evidence}"
                         f"내 피스 {match.pieces[name]}개, 이번 워드 추가 답 사용 {'완료' if name in paid else '가능'}. "
                         'JSON {"answers":["단어"],"spend":false} 형식으로 한글 명사 답 하나를 제출하세요. '
                         '한 워드에 한 번만 피스 1개를 소모해 {"answers":["단어","다른단어"],"spend":true}로 추가 답을 쓸 수 있습니다. '

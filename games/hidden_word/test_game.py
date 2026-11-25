@@ -93,7 +93,9 @@ class HiddenWordTest(unittest.TestCase):
                 return super().request_action(name, phase, prompt, default, **kwargs)
 
             def _query(self, name, prompt, *args, **kwargs):
-                self.queries.append((self.current_phase, name, prompt))
+                stage = next((json.loads(event.content) for event in reversed(self.events)
+                              if event.msg_type == "word_phase"), {})
+                self.queries.append((self.current_phase, name, prompt, stage))
                 return self.defaults[name], StrategyNote(text="공개된 정보로 내 계획을 검토한다.")
 
             def review_relationships(self, checkpoint):
@@ -108,7 +110,7 @@ class HiddenWordTest(unittest.TestCase):
         forbidden = {"public", "whisper", "room", "room_move", "room_invite", "room_invite_response", "discussion_note"}
         self.assertFalse(any(event.msg_type in forbidden or event.msg_type.startswith("word_discussion")
                              for event in match.events))
-        self.assertNotIn("word_discussion", {phase for phase, _, _ in match.queries})
+        self.assertNotIn("word_discussion", {phase for phase, _, _, _ in match.queries})
         for phase in ("word_preparation", "word_guess_preparation"):
             notes = [event for event in match.events if event.msg_type == "decision_note"
                      and json.loads(event.content)["phase"] == phase]
@@ -117,6 +119,23 @@ class HiddenWordTest(unittest.TestCase):
         actions = events(match, "action")
         self.assertFalse(any(action["phase"].startswith("word_discussion") for action in actions))
         self.assertEqual(len(match.checkpoints), len(events(match, "word_verdict")) + 1)
+        first = events(match, "word_hint")[0]
+        for kind in ("word_hint", "word_guess_preparation", "word_guess"):
+            prompts = [prompt for phase, _, prompt, stage in match.queries if phase == kind
+                       and stage == {"round": first["round"], "setter": first["setter"], "phase": 3}]
+            self.assertTrue(prompts)
+            self.assertTrue(all(encode(first) in prompt for prompt in prompts))
+        for kind, _, prompt, stage in match.queries:
+            if kind not in {"word_hint", "word_guess_preparation", "word_guess"}:
+                continue
+            history, _ = json.JSONDecoder().raw_decode(prompt.split("모든 공개 후보와 보정 점수: ", 1)[1])
+            self.assertTrue(all(item["setter"] == stage["setter"] and item["round"] == stage["round"]
+                                and item["phase"] <= stage["phase"] for item in history))
+        second = events(match, "word_turn")[1]
+        next_prompt = next(prompt for phase, _, prompt, stage in match.queries if phase == "word_hint"
+                           and stage == {"round": second["round"], "setter": second["setter"], "phase": 1})
+        self.assertIn("모든 공개 후보와 보정 점수: []", next_prompt)
+        self.assertNotIn(encode(first), next_prompt)
 
     def test_piece_extra_answer_resets_for_new_secret_but_not_next_phase(self):
         class PaidGuesses(WrongGuesses):
@@ -190,7 +209,7 @@ class HiddenWordTest(unittest.TestCase):
                 self.assertEqual(records[-1]["type"], "result")
                 self.assertEqual(len(records[-1]["ranking"]), count)
 
-    def test_private_envelopes_secrets_and_hints_are_only_visible_to_owner(self):
+    def test_candidates_are_public_while_envelopes_secrets_and_guesses_stay_private(self):
         match = WrongGuesses(PLAYERS, 9)
         game.play(match)
         self.assertEqual(len(events(match, "word_envelope")), 6)
@@ -200,26 +219,32 @@ class HiddenWordTest(unittest.TestCase):
             own = [record["word"] for record in secrets if record["setter"] == name]
             self.assertEqual(len(set(own)), 2)
         for event in match.events:
-            if event.msg_type in {"word_envelope", "word_secret", "word_hint", "word_guess", "decision_note"}:
+            if event.msg_type in {"word_envelope", "word_secret", "word_guess", "decision_note"}:
                 self.assertEqual(event.visible_to, [event.agent_name])
             if event.msg_type == "word_similarity":
                 record = json.loads(event.content)
-                self.assertNotIn("word", record)
+                self.assertIn("word", record)
                 self.assertNotIn("nearest", record)
                 self.assertNotIn("cutoff", record)
                 self.assertNotIn("maximum", record)
+                self.assertNotIn("raw_similarity", record)
                 self.assertIsInstance(record["qualifies"], bool)
                 self.assertEqual(event.visible_to, "all")
             if event.msg_type == "word_hint":
                 record = json.loads(event.content)
+                self.assertEqual(event.visible_to, "all")
+                self.assertTrue(all(event in match.observations(name) for name in PLAYERS))
                 self.assertTrue(self.vectors.is_hint(record["word"]))
                 self.assertNotIn("nearest", record)
                 self.assertNotIn("cutoff", record)
                 self.assertNotIn("maximum", record)
+                self.assertNotIn("raw_similarity", record)
             if event.msg_type == "action":
                 self.assertEqual(event.visible_to, [event.agent_name])
         for record in events(match, "word_verdict"):
             self.assertEqual(record["word"] is None, not record["end"])
+        self.assertEqual(events(match, "word_hint"), events(match, "word_similarity"))
+        self.assertEqual(events(match, "word_setup")[0]["hint_visibility"], "public")
 
     def test_threshold_is_strict_and_fallback_searches_full_vocabulary(self):
         for score, expected_count, forced in ((57, 10, True), (57.01, 1, False), (58, 1, False)):
@@ -241,14 +266,21 @@ class HiddenWordTest(unittest.TestCase):
                     self.assertEqual(clue["source"], "submitted_hint")
                 self.assertEqual(clue["forced"], forced)
                 self.assertTrue(all(hint["qualifies"] is not forced for hint in current))
+                self.assertTrue(all(hint["score_display"] == "nearest_noun_99_9" for hint in current))
+                self.assertAlmostEqual(current[0]["similarity"], score / 60 * 100)
+                self.assertEqual(clue["score_display"], "nearest_noun_99_9")
+                if forced:
+                    self.assertEqual(clue["similarity"], 99.9)
             self.assertEqual(events(match, "word_setup")[0]["fallback"], "vocabulary_nearest")
             self.assertEqual(events(match, "word_setup")[0]["score_mode"], "fasttext")
             self.assertEqual(events(match, "word_setup")[0]["reveal_rule"], "nearest_noun_ratio_v1")
             self.assertEqual(events(match, "word_setup")[0]["hint_filter"], "same_as_nearest")
-            self.assertIn("최근접 일반명사 유사도의 95%를 초과하면", game.RULES)
+            self.assertEqual(events(match, "word_setup")[0]["score_display"], "nearest_noun_99_9")
+            self.assertEqual(events(match, "word_setup")[0]["score_ceiling"], 99.9)
+            self.assertIn("정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.", game.RULES)
             self.assertIn("기준을 넘지 못하면 제출한 힌트와 관계없이 fastText 사전에서", game.RULES)
 
-    def test_same_raw_pair_has_target_specific_qualification(self):
+    def test_same_raw_pair_has_target_specific_corrected_score(self):
         vocabulary = [*self.vectors._words, "연안"]
         special = {"학교": [1, 0, 0, 0, 0], "병원": [0.5, sqrt(0.75), 0, 0, 0],
                    "대양": [0.52, 0, sqrt(1 - 0.52 ** 2), 0, 0],
@@ -278,7 +310,8 @@ class HiddenWordTest(unittest.TestCase):
             records = [record for record in events(match, "word_similarity") if record["round"] == 1 and record["setter"] == owner]
             self.assertEqual({record["qualifies"] for record in records}, {expected})
             for record in records:
-                self.assertAlmostEqual(record["similarity"], 50, places=5)
+                corrected = vectors.similarity("학교", "병원") / vectors.nearest(secret)["similarity"] * 100
+                self.assertAlmostEqual(record["similarity"], corrected, places=5)
 
     def test_non_noun_hint_cannot_use_cached_pair_or_trigger_reveal(self):
         vectors = WordVectors(["학교의", "학교"], [[1, 0], [1, 0]])
@@ -299,6 +332,7 @@ class HiddenWordTest(unittest.TestCase):
         game.play(match, vectors=WordVectors(vocabulary, [[1, 0] for _ in vocabulary]))
         self.assertTrue(all(not record["qualifies"] and record["reason"] == "not_common_noun"
                             for record in events(match, "word_similarity")))
+        self.assertEqual({record["word"] for record in events(match, "word_similarity")}, {"학교의"})
         self.assertTrue(all(clue["forced"] for clue in events(match, "word_clue")))
 
     def test_oov_hint_consumes_opportunity_without_substitution_or_word_leak(self):
@@ -317,6 +351,7 @@ class HiddenWordTest(unittest.TestCase):
                             for record in events(match, "word_similarity")))
         self.assertEqual({record["reason"] for record in events(match, "word_similarity")}, {"out_of_vocabulary"})
         self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"없는낱말"})
+        self.assertEqual({record["word"] for record in events(match, "word_similarity")}, {"없는낱말"})
 
     def test_deadlines_are_cumulative_and_late_guesses_do_not_spend_pieces(self):
         class SlowMatch(WrongGuesses):
@@ -384,6 +419,42 @@ class HiddenWordTest(unittest.TestCase):
             self.assertEqual(after[:len(before) - 1], before[:-1])
             self.assertEqual(json.loads(after[-1])["type"], "result")
 
+    def test_old_private_hint_match_cannot_resume_as_public_game(self):
+        def interrupt(match):
+            record = match.on_event
+            def stop(event):
+                record(event)
+                if event.msg_type == "word_verdict":
+                    raise RuntimeError("test interruption")
+            match.on_event = stop
+            return game.play(match)
+
+        with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            path = Path(directory) / "events.jsonl"
+            with self.assertRaisesRegex(RuntimeError, "interruption"):
+                run_cli(interrupt, title=DAY_FIVE_MAIN, seats=6, argv=["--output", str(path)])
+            records = [json.loads(line) for line in path.read_text().splitlines()]
+            for row in records:
+                if row.get("msg_type") == "rules":
+                    row["content"] = "이전 규칙: 후보 단어는 출제자만 확인합니다."
+                if row.get("msg_type") == "word_setup":
+                    setup = json.loads(row["content"])
+                    del setup["hint_visibility"], setup["score_display"], setup["score_ceiling"]
+                    row["content"] = encode(setup)
+                if row.get("msg_type") == "word_hint":
+                    row["visible_to"] = [row["agent_name"]]
+                if row.get("msg_type") == "word_similarity":
+                    data = json.loads(row["content"])
+                    del data["word"]
+                    row["content"] = encode(data)
+            path.write_text("\n".join(map(encode, records)) + "\n")
+            before = path.read_bytes()
+            with self.assertRaisesRegex(ValueError, "비공개"):
+                game.validate_saved_setup(setup, self.vectors)
+            with patch.object(cli, "load_vectors", return_value=self.vectors), self.assertRaises(SystemExit):
+                cli.main(["--resume", "--output", str(path)])
+            self.assertEqual(path.read_bytes(), before)
+
     def test_cli_preflight_errors_do_not_create_logs_and_help_needs_no_model(self):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             path = Path(directory) / "new" / "events.jsonl"
@@ -425,7 +496,15 @@ class HiddenWordTest(unittest.TestCase):
                            "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1"},
                           {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
                            "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "raw_cosine",
-                           "hint_filter": "same_as_nearest"}):
+                           "hint_filter": "same_as_nearest"},
+                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
+                           "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
+                           "hint_filter": "same_as_nearest", "score_display": "unknown", "score_ceiling": 99.9},
+                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
+                           "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
+                           "hint_filter": "same_as_nearest", "score_display": "nearest_noun_99_9", "score_ceiling": 100}):
+                if setup.get("version") == 2:
+                    setup.setdefault("hint_visibility", "public")
                 if setup.get("version") == 2 and setup.get("scorer") != self.vectors.metadata:
                     with self.assertRaisesRegex(ValueError, "모델 정보·체크섬"):
                         game.validate_saved_setup(setup, self.vectors)

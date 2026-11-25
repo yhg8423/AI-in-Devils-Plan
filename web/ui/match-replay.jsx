@@ -1265,7 +1265,7 @@ export function MatchReplay({replay, transport, caseName}) {
       (type === "gem_auction_round" && data.manito_reveal ? tr("마니또 확인 · 피스 경매", "Manito reveal and Piece auction") : null) ??
       (type === "gem_strategy" ? gemEventText(type, data) : null) ??
       (["bingo_preparation", "bingo_discussion", "bingo_round", "bingo_result", "bingo_reveal"].includes(type) ? bingoEventText(type, data) : null) ??
-      (["word_discussion", "word_round", "word_turn", "word_phase", "word_clue", "word_verdict", "word_final"].includes(type) ? hiddenEventText(type, data) : null) ??
+      (["word_discussion", "word_round", "word_turn", "word_phase", "word_clue", "word_verdict", "word_final"].includes(type) ? hiddenEventText(type, data, state.wordSetup) : null) ??
       (["wall_setup", "wall_end", "wall_replay", "wall_advance"].includes(type) ? wallEventText(type, data) : null) ??
       (type === "sym_finish" ? tr(`${data.rank}번째 세 색 완성 판정`, `Three-color finish verdict ${data.rank}`) : null) ??
       (["sym_setup", "sym_puzzles", "sym_tools", "sym_tutorial", "sym_reveal"].includes(type) ? symmetryEventText(type, data) : null) ??

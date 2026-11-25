@@ -18,7 +18,7 @@ from games.exile_match.roster import (
     collect_exile_players, collect_second_exile_players, collect_third_exile_players, collect_fourth_exile_players,
     collect_fifth_exile_players,
 )
-from games.match import FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE, canonical_game_title
+from games.match import DAY_FIVE_MAIN, FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE, canonical_game_title
 
 
 UI = Path(__file__).with_name("ui")
@@ -412,6 +412,73 @@ def _localize_symmetry_images(content, kind, seed, pack="broadcast"):
     return json.dumps(data, ensure_ascii=False) if changed else content
 
 
+_hidden_word_display_lock = Lock()
+
+
+@lru_cache(maxsize=1)
+def _hidden_word_display_vectors():
+    from games.hidden_word.vectors import load_vectors
+
+    return load_vectors()
+
+
+def _hidden_word_display_projection(rows):
+    """Normalize old local scores in the response, leaving recorded decisions intact."""
+    events = [row for row in rows[1:] if row.get("type") == "event"]
+    setup_event = next((event for event in events if event.get("msg_type") == "word_setup"), None)
+    if setup_event is None:
+        return {}
+    setup = json.loads(setup_event["content"])
+    if (not isinstance(setup, dict) or setup.get("version") != 2 or "score_display" in setup
+            or setup.get("reveal_rule") != "nearest_noun_ratio_v1"
+            or setup.get("hint_filter") != "same_as_nearest" or setup.get("score_mode") != "fasttext"
+            or not isinstance(setup.get("scorer"), dict)
+            or setup["scorer"].get("id") != "fasttext-cc-ko-300"):
+        return {}
+    try:
+        from games.hidden_word.vectors import normalized_score
+
+        # Loading and nearest-word search are shared across concurrent replay polls.
+        with _hidden_word_display_lock:
+            vectors = _hidden_word_display_vectors()
+            if setup["scorer"] != vectors.metadata:
+                return {}
+            secrets = {}
+            for event in events:
+                if event.get("msg_type") == "word_secret":
+                    secret = json.loads(event["content"])
+                    secrets[secret["round"], secret["setter"]] = secret["word"]
+            projected = {}
+            for event in events:
+                kind = event.get("msg_type")
+                if kind not in {"word_hint", "word_similarity", "word_clue"}:
+                    continue
+                data = json.loads(event["content"])
+                if "score_display" in data:
+                    return {}
+                if data.get("similarity") is not None:
+                    secret = secrets[data["round"], data["setter"]]
+                    maximum = vectors.nearest(secret)["similarity"]
+                    data["similarity"] = normalized_score(data["similarity"], maximum)
+                data.update(score_display="nearest_noun_99_9", score_ceiling=99.9)
+                projected[id(event)] = json.dumps(data, ensure_ascii=False)
+    except (OSError, ValueError, RuntimeError, ImportError, KeyError):
+        # Historical/static replays remain readable without the local model.
+        return {}
+    setup.update(score_display="nearest_noun_99_9", score_ceiling=99.9, display_projection="raw_cosine_v1")
+    projected[id(setup_event)] = json.dumps(setup, ensure_ascii=False)
+    for event in events:
+        if event.get("msg_type") == "rules":
+            rules = event["content"].replace("유사도는 모든 참가자에게 같은 사전학습 모델의\n", "").replace(
+                "fastText 코사인 유사도 × 100을 적용합니다. 음수도 그대로 표시하며 원시 점수를 변환하지 않습니다.",
+                "정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.",
+            ).replace("최근접 일반명사 유사도의 95%를 초과하면", "보정 점수가 95점을 초과하면")
+            if "정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다." not in rules:
+                rules += "\n정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다."
+            projected[id(event)] = rules + "\n웹 표시만 보정하며 기록된 공개 판정과 경기 진행은 유지합니다."
+    return projected
+
+
 def read_match(log: Path, *, language: str = "ko") -> dict:
     # The writer appends newline-terminated rows. Leave an in-flight row for the next poll.
     rows = [json.loads(line) for line in log.read_bytes().split(b"\n")[:-1] if line.strip()]
@@ -420,6 +487,7 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
     header = rows[0]
     full_match = "game" in header
     game = canonical_game_title(header["game"]) if full_match else None
+    projection = _hidden_word_display_projection(rows) if game == DAY_FIVE_MAIN else {}
     translations, version = read_translations(log) if language == "en" else ({}, None)
     translated = {"translation_version": version} if version else {}
     symmetry_seed, symmetry_modern, symmetry_pack = None, False, "broadcast"
@@ -432,6 +500,8 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
         nonlocal symmetry_modern, symmetry_pack
         payload = {key: event[key] for key in EVENT_FIELDS}
         kind = event["msg_type"]
+        if id(event) in projection:
+            payload["content"] = projection[id(event)]
         if symmetry_seed is not None:
             if kind in ("sym_setup", "sym_tools"):
                 setup = json.loads(event["content"])
@@ -443,7 +513,7 @@ def read_match(log: Path, *, language: str = "ko") -> dict:
                 payload["content"] = _localize_symmetry_images(event["content"], kind, symmetry_seed, symmetry_pack)
         if full_match and type(event.get("turn")) is int:
             turn = event["turn"]
-        if turn in translations:
+        if turn in translations and id(event) not in projection:
             payload["translation"] = translations[turn]
         return payload
 
