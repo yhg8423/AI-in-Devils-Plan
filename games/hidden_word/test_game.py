@@ -250,7 +250,7 @@ class HiddenWordTest(unittest.TestCase):
         for score, expected_count, forced in ((57, 10, True), (57.01, 1, False), (58, 1, False)):
             match = WrongGuesses(PLAYERS, 3)
             with (patch.object(self.vectors, "nearest", return_value={"word": "대양", "similarity": 60}),
-                  patch.object(game, "_judge", return_value={"similarity": score, "valid": True, "mode": "fasttext"})):
+                  patch.object(game, "_judge", return_value={"similarity": score, "valid": True, "mode": "openai"})):
                 game.play(match)
             clues = events(match, "word_clue")
             hints = events(match, "word_hint")
@@ -260,7 +260,7 @@ class HiddenWordTest(unittest.TestCase):
                 if forced:
                     self.assertEqual(clue["word"], "대양")
                     self.assertNotIn(clue["word"], [hint["word"] for hint in current])
-                    self.assertEqual(clue["source"], "fasttext_nearest")
+                    self.assertEqual(clue["source"], "openai_stdict_nearest")
                 else:
                     self.assertEqual(clue["word"], current[0]["word"])
                     self.assertEqual(clue["source"], "submitted_hint")
@@ -272,13 +272,15 @@ class HiddenWordTest(unittest.TestCase):
                 if forced:
                     self.assertEqual(clue["similarity"], 99.9)
             self.assertEqual(events(match, "word_setup")[0]["fallback"], "vocabulary_nearest")
-            self.assertEqual(events(match, "word_setup")[0]["score_mode"], "fasttext")
+            self.assertEqual(events(match, "word_setup")[0]["version"], 3)
+            self.assertEqual(events(match, "word_setup")[0]["score_mode"], "openai")
             self.assertEqual(events(match, "word_setup")[0]["reveal_rule"], "nearest_noun_ratio_v1")
-            self.assertEqual(events(match, "word_setup")[0]["hint_filter"], "same_as_nearest")
+            self.assertEqual(events(match, "word_setup")[0]["hint_filter"], "stdict_noun_membership_v1")
             self.assertEqual(events(match, "word_setup")[0]["score_display"], "nearest_noun_99_9")
             self.assertEqual(events(match, "word_setup")[0]["score_ceiling"], 99.9)
-            self.assertIn("정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.", game.RULES)
-            self.assertIn("기준을 넘지 못하면 제출한 힌트와 관계없이 fastText 사전에서", game.RULES)
+            self.assertIn("정답을 제외한 최근접 사전 명사를 99.9점으로 놓고 보정합니다.", game.RULES)
+            self.assertIn("기준을 넘지 못하면 제출한 힌트와 관계없이 표준국어대사전 명사 전체에서", game.RULES)
+            self.assertIn("표준국어대사전 명사 213,810개와 OpenAI text-embedding-3-large 임베딩을 사용합니다.", game.RULES)
 
     def test_same_raw_pair_has_target_specific_corrected_score(self):
         vocabulary = [*self.vectors._words, "연안"]
@@ -313,29 +315,37 @@ class HiddenWordTest(unittest.TestCase):
                 corrected = vectors.similarity("학교", "병원") / vectors.nearest(secret)["similarity"] * 100
                 self.assertAlmostEqual(record["similarity"], corrected, places=5)
 
-    def test_non_noun_hint_cannot_use_cached_pair_or_trigger_reveal(self):
-        vectors = WordVectors(["학교의", "학교"], [[1, 0], [1, 0]])
-        cache = {}
-        self.assertTrue(game._judge(vectors, "학교의", "학교", cache)["valid"])
-        invalid = game._judge(vectors, "학교", "학교의", cache)
-        self.assertEqual(invalid["reason"], "not_common_noun")
-        self.assertIsNone(invalid["similarity"])
+    def test_registered_dictionary_nouns_have_no_extra_common_noun_or_hangul_filter(self):
+        registered = ("학교의", "강", "바다", "봄", "별", "쾨펜", "ㄱ")
+        vocabulary = [*self.vectors._words, *(word for word in registered if word not in self.vectors)]
+        vectors = WordVectors(vocabulary, [[1, 0] for _ in vocabulary])
+        for word in registered:
+            with self.subTest(word=word):
+                self.assertTrue(game._judge(vectors, "도서관", word, {})["valid"])
 
-        class NonNounHints(WrongGuesses):
+        class DictionaryHints(WrongGuesses):
             def decide_together(self, phase, decisions, **kwargs):
                 if phase == "word_hint":
-                    decisions = {name: replace(decision, default="학교의") for name, decision in decisions.items()}
+                    for decision in decisions.values():
+                        self_test.assertTrue(decision.accepts(hint))
+                        self_test.assertNotIn("고유명사, 정답 자체와 설명을 제외", decision.prompt)
+                    decisions = {name: replace(decision, default=hint) for name, decision in decisions.items()}
                 return super().decide_together(phase, decisions, **kwargs)
 
-        vocabulary = [*self.vectors._words, "학교의"]
-        match = NonNounHints(PLAYERS, 4)
-        game.play(match, vectors=WordVectors(vocabulary, [[1, 0] for _ in vocabulary]))
-        self.assertTrue(all(not record["qualifies"] and record["reason"] == "not_common_noun"
-                            for record in events(match, "word_similarity")))
-        self.assertEqual({record["word"] for record in events(match, "word_similarity")}, {"학교의"})
-        self.assertTrue(all(clue["forced"] for clue in events(match, "word_clue")))
+        self_test = self
+        for hint in ("학교의", "쾨펜", "ㄱ"):
+            with self.subTest(submitted_hint=hint):
+                match = DictionaryHints(PLAYERS, 4)
+                game.play(match, vectors=vectors)
+                records = events(match, "word_similarity")
+                self.assertEqual({record["word"] for record in records}, {hint})
+                self.assertTrue(all(record["valid"] and record["qualifies"] for record in records))
+                self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
+        self.assertIn("등재된 고유명사·옛말·방언·전문어도 허용합니다.", game.RULES)
 
     def test_oov_hint_consumes_opportunity_without_substitution_or_word_leak(self):
+        stale_cache = {tuple(sorted(("학교", "없는낱말"))): {"similarity": 100, "valid": True, "mode": "openai"}}
+        self.assertEqual(game._judge(self.vectors, "학교", "없는낱말", stale_cache)["reason"], "not_registered_noun")
         class UnknownHints(WrongGuesses):
             def decide_together(self, phase, decisions, **kwargs):
                 if phase == "word_hint":
@@ -345,11 +355,11 @@ class HiddenWordTest(unittest.TestCase):
         match = UnknownHints(PLAYERS, 4)
         game.play(match)
         clues = events(match, "word_clue")
-        self.assertTrue(all(clue["word"] == "대양" and clue["source"] == "fasttext_nearest" for clue in clues))
+        self.assertTrue(all(clue["word"] == "대양" and clue["source"] == "openai_stdict_nearest" for clue in clues))
         self.assertEqual(len(events(match, "word_hint")), len(clues) * 10)
         self.assertTrue(all(record["similarity"] is None and record["valid"] is False
                             for record in events(match, "word_similarity")))
-        self.assertEqual({record["reason"] for record in events(match, "word_similarity")}, {"out_of_vocabulary"})
+        self.assertEqual({record["reason"] for record in events(match, "word_similarity")}, {"not_registered_noun"})
         self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"없는낱말"})
         self.assertEqual({record["word"] for record in events(match, "word_similarity")}, {"없는낱말"})
 
@@ -369,7 +379,7 @@ class HiddenWordTest(unittest.TestCase):
 
         for hint_seconds, expected_hints in ((600, 36), (901, 0)):
             match = SlowMatch(PLAYERS, 5, pieces=[2] * 6)
-            with patch.object(game, "_judge", return_value={"similarity": 50, "valid": True, "mode": "fasttext"}):
+            with patch.object(game, "_judge", return_value={"similarity": 50, "valid": True, "mode": "openai"}):
                 result = game.play(match)
             self.assertEqual(len(events(match, "word_hint")), expected_hints)
             self.assertEqual({clue["word"] for clue in events(match, "word_clue")}, {"대양"})
@@ -377,12 +387,12 @@ class HiddenWordTest(unittest.TestCase):
             for name, balance in result["pieces"].items():
                 self.assertEqual(balance, 2 + result["pieces_awarded"].get(name, 0))
 
-    def test_fasttext_scores_preserve_negatives_and_cache_symmetric_pair(self):
+    def test_embedding_scores_preserve_negatives_and_cache_symmetric_pair(self):
         vectors = WordVectors(["학교", "병원"], [[1, 0], [-1, 0]])
         vectors.similarity = Mock(wraps=vectors.similarity)
         cache = {}
         first = game._judge(vectors, "학교", "병원", cache)
-        self.assertEqual(first, {"similarity": -100, "valid": True, "mode": "fasttext"})
+        self.assertEqual(first, {"similarity": -100, "valid": True, "mode": "openai"})
         self.assertEqual(game._judge(vectors, "병원", "학교", cache), first)
         vectors.similarity.assert_called_once()
 
@@ -396,7 +406,7 @@ class HiddenWordTest(unittest.TestCase):
             model.sample_text.assert_not_called()
             self.assertEqual(match.live_turns, remaining)
             scores.append(events(match, "word_similarity"))
-            self.assertTrue(all(record["mode"] == "fasttext" for record in scores[-1]))
+            self.assertTrue(all(record["mode"] == "openai" for record in scores[-1]))
         self.assertEqual(*scores)
 
     def test_interrupted_match_replays_with_same_vectors(self):
@@ -414,6 +424,11 @@ class HiddenWordTest(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "interruption"):
                 run_cli(interrupt, title=DAY_FIVE_MAIN, seats=6, argv=["--output", str(path)])
             before = path.read_text().splitlines()
+            wrong_vectors = WordVectors(self.vectors._words, [[0, 1] for _ in self.vectors._words])
+            original = path.read_bytes()
+            with patch.object(cli, "load_vectors", return_value=wrong_vectors), self.assertRaises(SystemExit):
+                cli.main(["--resume", "--output", str(path)])
+            self.assertEqual(path.read_bytes(), original)
             run_cli(game.play, title=DAY_FIVE_MAIN, seats=6, argv=["--resume", "--output", str(path)])
             after = path.read_text().splitlines()
             self.assertEqual(after[:len(before) - 1], before[:-1])
@@ -480,38 +495,30 @@ class HiddenWordTest(unittest.TestCase):
     def test_cli_rejects_incompatible_saved_setup_without_changing_record(self):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             path = Path(directory) / "events.jsonl"
-            for setup in ({"version": 1}, {"version": 2, "scorer": {"sha256": "different"}},
-                          {"version": 2, "scorer": {**self.vectors.metadata, "id": "kyubyong-ko-word2vec-2016"},
-                           "deck_sha256": DECK_SHA256, "discussion": False, "fallback": "vocabulary_nearest"},
-                          {"version": 2, "scorer": self.vectors.metadata},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": "different"},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256, "discussion": True},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256, "discussion": False},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
-                           "discussion": False, "fallback": "submitted_highest"},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
-                           "discussion": False, "fallback": "vocabulary_nearest"},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
-                           "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1"},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
-                           "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "raw_cosine",
-                           "hint_filter": "same_as_nearest"},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
-                           "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
-                           "hint_filter": "same_as_nearest", "score_display": "unknown", "score_ceiling": 99.9},
-                          {"version": 2, "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
-                           "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
-                           "hint_filter": "same_as_nearest", "score_display": "nearest_noun_99_9", "score_ceiling": 100}):
-                if setup.get("version") == 2:
-                    setup.setdefault("hint_visibility", "public")
-                if setup.get("version") == 2 and setup.get("scorer") != self.vectors.metadata:
-                    with self.assertRaisesRegex(ValueError, "모델 정보·체크섬"):
-                        game.validate_saved_setup(setup, self.vectors)
-                elif setup.get("scorer") == self.vectors.metadata:
-                    expected = "단어 봉투 구성이 변경되었습니다" if setup.get("deck_sha256") != DECK_SHA256 else "새 경기"
-                    with self.assertRaisesRegex(ValueError, expected):
-                        game.validate_saved_setup(setup, self.vectors)
+            valid = {"version": 3, "hint_visibility": "public", "score_mode": "openai",
+                     "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
+                     "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
+                     "hint_filter": "stdict_noun_membership_v1", "score_display": "nearest_noun_99_9", "score_ceiling": 99.9}
+            game.validate_saved_setup(valid, self.vectors)
+            changes = (
+                ({"version": 1}, "이전 유사도"),
+                ({"version": 2, "score_mode": "fasttext", "hint_filter": "same_as_nearest"}, "이전 유사도"),
+                ({"hint_visibility": "private"}, "비공개"),
+                ({"score_mode": "fasttext"}, "판정기가 변경"),
+                ({"scorer": {**self.vectors.metadata, "id": "fasttext-cc-ko-300"}}, "모델 정보·체크섬"),
+                ({"scorer": {**self.vectors.metadata, "sha256": "different"}}, "모델 정보·체크섬"),
+                ({"deck_sha256": "different"}, "단어 봉투"),
+                ({"discussion": True}, "대화 구간"),
+                ({"fallback": "submitted_highest"}, "힌트 공개 규칙"),
+                ({"reveal_rule": "raw_cosine"}, "힌트 공개 기준"),
+                ({"hint_filter": "same_as_nearest"}, "힌트 명사 판정"),
+                ({"score_display": "unknown"}, "점수 표시"),
+                ({"score_ceiling": 100}, "점수 표시"),
+            )
+            for change, expected in changes:
+                setup = {**valid, **change}
+                with self.subTest(change=change), self.assertRaisesRegex(ValueError, expected):
+                    game.validate_saved_setup(setup, self.vectors)
                 path.write_text(encode({"type": "match", "game": DAY_FIVE_MAIN}) + "\n"
                                 + encode({"type": "event", "msg_type": "word_setup", "content": encode(setup)}) + "\n")
                 before = path.read_bytes()

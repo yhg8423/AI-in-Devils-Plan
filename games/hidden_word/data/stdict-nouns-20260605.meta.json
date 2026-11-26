@@ -1,0 +1,783 @@
+{
+  "schema_version": 1,
+  "id": "stdict-nouns-20260605",
+  "artifact": "stdict-nouns-20260605.json.gz",
+  "word_count": 213810,
+  "encoding": "gzip-compressed compact UTF-8 JSON array",
+  "sha256": "3eb7cd7110d36b2fd058cdb7055aefe3c050f17030df9c3938a1c34135148d3c",
+  "compressed_sha256": "0d44eaad62b246b51ce3cd5858ffa5bd9580140a848f1af461433f99aca5f0de",
+  "uncompressed_bytes": 2638140,
+  "compressed_bytes": 785700,
+  "compression": {
+    "format": "gzip",
+    "level": 9,
+    "mtime": 0,
+    "filename": ""
+  },
+  "source": {
+    "title": "Standard Korean Language Dictionary (표준국어대사전)",
+    "author": "National Institute of Korean Language (국립국어원)",
+    "official_url": "https://stdict.korean.go.kr/",
+    "mirror": "https://github.com/spellcheck-ko/korean-dict-nikl",
+    "revision": "42c0d01889f34536e9cf94fe57f62bd2055b1bde",
+    "snapshot_date": "2026-06-05",
+    "mirror_managed_by_nikl": false,
+    "license": "CC-BY-SA-2.0-KR",
+    "license_url": "https://creativecommons.org/licenses/by-sa/2.0/kr/",
+    "mirror_readme": "https://github.com/spellcheck-ko/korean-dict-nikl/blob/42c0d01889f34536e9cf94fe57f62bd2055b1bde/README.md",
+    "source_tree_sha256": "3ec3015a4baf42195392b9448bfd0d345837a87345c36308b536fd7811e58363",
+    "extracted_noun_records_sha256": "52c392220e68f4ae87ce55d36be4d758231996a7c47d10da15e8c0b7816a664e"
+  },
+  "selection": "Every source entry with at least one direct word_info/pos_info/pos exactly equal to 명사. All categories and characters retained; no Kiwi analysis, frequency, vocabulary-intersection, proper-name or length filter.",
+  "normalization": {
+    "unicode": "NFC",
+    "component_marker": "Remove ASCII '-'",
+    "optional_spacing_marker": "Remove '^' to use its permitted joined representative",
+    "homonym_number": "Remove this snapshot's terminal two ASCII homonym digits [0-9]{2}$; all source digits were verified to be such suffixes",
+    "actual_whitespace": "Preserved",
+    "other_characters": "Preserved",
+    "deduplication": "Identical normalized surface; first appearance in source XML files sorted by filename",
+    "official_marker_guidance": "https://www.korean.go.kr/front/onlineQna/onlineQnaView.do?mn_id=216&pageIndex=1&qna_seq=326855&searchCondition=&searchKeyword="
+  },
+  "extraction": {
+    "source_file_count": 88,
+    "source_total_bytes": 688715471,
+    "source_item_count": 436578,
+    "noun_entry_count": 270033,
+    "noun_pos_count": 270033,
+    "noun_sense_count": 307274,
+    "unique_raw_noun_surfaces": 270033,
+    "unique_unnumbered_raw_noun_surfaces": 215609,
+    "candidate_count": 213810,
+    "homonym_numbered_entries": 83452,
+    "homonym_suffix_lengths": {
+      "2": 83452
+    },
+    "homonym_duplicate_entries": 54424,
+    "normalized_surface_duplicate_entries": 56223,
+    "distinct_raw_surface_normalization_merges": 1799,
+    "noun_word_units": {
+      "단어": 270033
+    },
+    "noun_sense_types": {
+      "일반어": 307274
+    },
+    "noun_entries_with_hyphen": 140264,
+    "noun_entries_with_caret": 2,
+    "noun_entries_with_actual_whitespace": 0,
+    "noun_entries_changed_by_nfc": 0,
+    "non_hangul_syllable_surface_count": 98,
+    "unexpected_character_counts": {
+      "·": 40,
+      "": 1,
+      "": 1,
+      "": 3
+    }
+  },
+  "source_files": [
+    {
+      "path": "stdict/005000.xml",
+      "bytes": 8032123,
+      "git_blob_sha1": "a45f2babd64778bc85d071a381f0f150a0eb2ed5",
+      "sha256": "fc632cd492735e6f049e47215f124c28cf3939e3f186c22e72856f64fa8c9a74",
+      "items": 5000,
+      "noun_entries": 2938
+    },
+    {
+      "path": "stdict/010000.xml",
+      "bytes": 7832278,
+      "git_blob_sha1": "e37ff7f1930f828502721487fba7783d0ea3b84b",
+      "sha256": "8e230cdc0dcf4c46450a003882ab5d23646e4a0edda1c124e0239e2a6e2d2838",
+      "items": 5000,
+      "noun_entries": 3077
+    },
+    {
+      "path": "stdict/015000.xml",
+      "bytes": 8098502,
+      "git_blob_sha1": "41ed321dd52609f887be099ae436cc764ec05b55",
+      "sha256": "15a8b626b2a2b0608e81ef1f90ebc2980a35309e57dee2f09fbe99c27e951e1f",
+      "items": 5000,
+      "noun_entries": 3003
+    },
+    {
+      "path": "stdict/020000.xml",
+      "bytes": 7915193,
+      "git_blob_sha1": "e71d76df78b276b42a8fd2d4f33299bb1a16dfe0",
+      "sha256": "0d9db2fe8f87216e6620623cff40eda2a376e72b70be0afae434b61fe619a96d",
+      "items": 5000,
+      "noun_entries": 3038
+    },
+    {
+      "path": "stdict/025000.xml",
+      "bytes": 7860124,
+      "git_blob_sha1": "832d2b14fa170f7a67d9749a9815089888fb69ef",
+      "sha256": "4a2288d48d78b7846b3d784e9ce169dfdbe761bf7eb54585abb6dbca579ef720",
+      "items": 5000,
+      "noun_entries": 3210
+    },
+    {
+      "path": "stdict/030000.xml",
+      "bytes": 7678774,
+      "git_blob_sha1": "f2c4145046282fe56524cde627fc2c83e8197661",
+      "sha256": "506389b433326668e97cbfecd6293cd62d578d243ff9e038c9420d39865be9a4",
+      "items": 5000,
+      "noun_entries": 3155
+    },
+    {
+      "path": "stdict/035000.xml",
+      "bytes": 7752007,
+      "git_blob_sha1": "687473e885a6b04fbc7111ccd0c0971d28983eb3",
+      "sha256": "88a5ca55924006ce3033f98e343b3cd5711f0c32a9c7b887a5055355fce5e179",
+      "items": 5000,
+      "noun_entries": 2942
+    },
+    {
+      "path": "stdict/040000.xml",
+      "bytes": 7699309,
+      "git_blob_sha1": "18734bb7310e11ee3ab520c42c545ac2e33f706d",
+      "sha256": "4c10417ca7a0da20876261b62ce630c97975730e9bdc5a9734522943a9667b0b",
+      "items": 5000,
+      "noun_entries": 3165
+    },
+    {
+      "path": "stdict/045000.xml",
+      "bytes": 7761157,
+      "git_blob_sha1": "4c3cc91b79fe34438d0f659bac4f13987efe8731",
+      "sha256": "590e2c5b5c3590fd473509ceff76bbd5610559902aca76949bbe30d66267d7d5",
+      "items": 5000,
+      "noun_entries": 3211
+    },
+    {
+      "path": "stdict/050000.xml",
+      "bytes": 7668252,
+      "git_blob_sha1": "59eb67bbd99c75eb1534d00e0526ef8d242fdc80",
+      "sha256": "b7667dd23820c0a5d94b3e68c89b160588be898cd042a42e14af22b69d62b1dc",
+      "items": 5000,
+      "noun_entries": 2954
+    },
+    {
+      "path": "stdict/055000.xml",
+      "bytes": 7860667,
+      "git_blob_sha1": "626ff16d41f37deb217009ff1356e757e0c6149b",
+      "sha256": "847a559c422dd707f6c74bb5d729de71cfe2c20aa6c8a815d1a9784203c64751",
+      "items": 5000,
+      "noun_entries": 3145
+    },
+    {
+      "path": "stdict/060000.xml",
+      "bytes": 7789550,
+      "git_blob_sha1": "66d206b25682a9c97b899f01f7a7bb32afe05b8e",
+      "sha256": "cb915b7f772a9c7aa8f78a4a8d9f6c464fd0666efa808b92ee0180c113129d49",
+      "items": 5000,
+      "noun_entries": 2997
+    },
+    {
+      "path": "stdict/065000.xml",
+      "bytes": 8274568,
+      "git_blob_sha1": "535b9bb4110b4613c2f52e606c68e347282c59ce",
+      "sha256": "a98d30afe798694e0c9bcef1d8758454ea48acf1f5ed39500d9cbd3c8f6f5682",
+      "items": 5000,
+      "noun_entries": 2463
+    },
+    {
+      "path": "stdict/070000.xml",
+      "bytes": 8118144,
+      "git_blob_sha1": "0eec480caf454af021c2c6e68134f5bd6a516911",
+      "sha256": "9908e8b8f6e94c02783a3230b742c7db032fd1cfb3164b1bccc775d1c941f51e",
+      "items": 5000,
+      "noun_entries": 3246
+    },
+    {
+      "path": "stdict/075000.xml",
+      "bytes": 8201948,
+      "git_blob_sha1": "ed40b08f2511833b5bc9537d954f7c7a0c85a889",
+      "sha256": "87263af3d7a575fbcc26cce2295b6998259086f40ae2a557fe927cd618ee7f3b",
+      "items": 5000,
+      "noun_entries": 2929
+    },
+    {
+      "path": "stdict/080000.xml",
+      "bytes": 7680472,
+      "git_blob_sha1": "11c48e24413f239d8d45ba60db7a1b13608ebc04",
+      "sha256": "e28183a3784e7da8cb6ed65e3aff070dc133b46371d4b0d1d57a4d93d7850d03",
+      "items": 5000,
+      "noun_entries": 3160
+    },
+    {
+      "path": "stdict/085000.xml",
+      "bytes": 7885966,
+      "git_blob_sha1": "3ecdd280d78f0f898d13c884600727770a5b8bde",
+      "sha256": "5589703ea51145c05d1ea7a8a592af09620c7ab5bc088594a53b15fdcc2c7b86",
+      "items": 5000,
+      "noun_entries": 2782
+    },
+    {
+      "path": "stdict/090000.xml",
+      "bytes": 7993421,
+      "git_blob_sha1": "fd6e3192cf5437b5785a7796bc0036f1a88e3bf8",
+      "sha256": "dcb2aa931915a9bb070ef108907a7092ba9db7cf7af118c8f14a1933c174b2b8",
+      "items": 5000,
+      "noun_entries": 3340
+    },
+    {
+      "path": "stdict/095000.xml",
+      "bytes": 7841751,
+      "git_blob_sha1": "6e3bc1472043264223870f3db392d8b2793c0f36",
+      "sha256": "18a47e78f32a04626477293d7e964d70af08301ce7ef6e50ca35d140ed6d0e66",
+      "items": 5000,
+      "noun_entries": 2984
+    },
+    {
+      "path": "stdict/100000.xml",
+      "bytes": 7754304,
+      "git_blob_sha1": "4dad6b691e140d151ce98fc23f4449cb846d4e8d",
+      "sha256": "c56d7e22cb27a16d6ccfa616072e0f496d995c88a5cab5de3d2ee4a0e2c12c94",
+      "items": 5000,
+      "noun_entries": 3503
+    },
+    {
+      "path": "stdict/105000.xml",
+      "bytes": 8199944,
+      "git_blob_sha1": "842dab488e72a5568d3ad604bc22f9fe3bbfb374",
+      "sha256": "7107742106fa71857216b2c7fa1c5de24fb27fd55688703dc4de5dcf78b5f8bd",
+      "items": 5000,
+      "noun_entries": 3030
+    },
+    {
+      "path": "stdict/110000.xml",
+      "bytes": 8453882,
+      "git_blob_sha1": "fc3d7f4a14bfd68108f80a53e1129bdeebf8d356",
+      "sha256": "d21cd933ed102dacfd679e90fbf351eb4bb111ad5450c38e0740dacf2a3fb578",
+      "items": 5000,
+      "noun_entries": 2529
+    },
+    {
+      "path": "stdict/115000.xml",
+      "bytes": 7499621,
+      "git_blob_sha1": "05faab359d981edb11fba3ae5fb91cd4ddd4b546",
+      "sha256": "7d7df41b650b97529e3a46648ee2c037c507c97a8b9537e64fecf7fa57d30905",
+      "items": 5000,
+      "noun_entries": 3361
+    },
+    {
+      "path": "stdict/120000.xml",
+      "bytes": 7906712,
+      "git_blob_sha1": "0c58d9b77eac1c1cf72b6c15f96c58d71b92095f",
+      "sha256": "9d2dfe8a74ba286fea7b0d4b98e26de5dffa1168e78babeb8b3561f4e69f365f",
+      "items": 5000,
+      "noun_entries": 3198
+    },
+    {
+      "path": "stdict/125000.xml",
+      "bytes": 7638587,
+      "git_blob_sha1": "29e1eabc3f030f5ba79af6f2818414b57fa3ff65",
+      "sha256": "3875a8aed15d81f5eba8c219d0c38f57cee82766cff235ce548e0377f058a6ad",
+      "items": 5000,
+      "noun_entries": 3328
+    },
+    {
+      "path": "stdict/130000.xml",
+      "bytes": 7747975,
+      "git_blob_sha1": "91eb43f3d9bd400b0b814831b431f69cf8f74e88",
+      "sha256": "2441c9b645cc074ce94db43386cc41a70d01dbd9eb6e26aba1b1ce90b0e045d0",
+      "items": 5000,
+      "noun_entries": 3152
+    },
+    {
+      "path": "stdict/135000.xml",
+      "bytes": 7792935,
+      "git_blob_sha1": "da026ce2704f9dd5c3fe5d9b0bc622944116b21c",
+      "sha256": "89ee0942059de7b15477a1115da41b5c9fe2d8e05d1208ac6a19d7dfbfc2f5d8",
+      "items": 5000,
+      "noun_entries": 3088
+    },
+    {
+      "path": "stdict/140000.xml",
+      "bytes": 7877776,
+      "git_blob_sha1": "ec68b59a109660c2a06f55ab5346d60d0f093820",
+      "sha256": "b07d065840d20e378eac518fc1c3379944942933e928591dd4eba89d4f962ced",
+      "items": 5000,
+      "noun_entries": 3210
+    },
+    {
+      "path": "stdict/145000.xml",
+      "bytes": 8292360,
+      "git_blob_sha1": "ce51aab95f801058fa9d5f29d859c76158be67d3",
+      "sha256": "1ca34de2d3de3a0a4f379cb44164f2ca27a22731d9b480633ad4fc4c09fa9f72",
+      "items": 5000,
+      "noun_entries": 3036
+    },
+    {
+      "path": "stdict/150000.xml",
+      "bytes": 7877423,
+      "git_blob_sha1": "ad92781bc18e7580166918a6f2cb60ab16883ccb",
+      "sha256": "55a55b9b30302c9537b769f9ef10d8224e12571284b3eae6f74daabdba2814af",
+      "items": 5000,
+      "noun_entries": 3372
+    },
+    {
+      "path": "stdict/155000.xml",
+      "bytes": 7995272,
+      "git_blob_sha1": "66b0bdcca154744eda7326938d54fd83f7c7a08a",
+      "sha256": "3ee4b077e8e37166f274deb86fb269f8841b154a4c5f5b9338fb446ff907ce85",
+      "items": 5000,
+      "noun_entries": 3165
+    },
+    {
+      "path": "stdict/160000.xml",
+      "bytes": 7868084,
+      "git_blob_sha1": "357cda5b0621386dcf43e245476431280513cf2b",
+      "sha256": "cd18904f017d3308b320d4cd3b3a9bf164ae361f763254f97e5229c0947b3aed",
+      "items": 5000,
+      "noun_entries": 3230
+    },
+    {
+      "path": "stdict/165000.xml",
+      "bytes": 7942749,
+      "git_blob_sha1": "56a787fbbeea25cc120c337dc341f1aa0eb3cecf",
+      "sha256": "b87b8accad0432960bf3908c15aefadf0be9d2ed5a768240f919adbba1933ba9",
+      "items": 5000,
+      "noun_entries": 3124
+    },
+    {
+      "path": "stdict/170000.xml",
+      "bytes": 8207867,
+      "git_blob_sha1": "acf0ce9bf87a7a29992f46c52dec0add522e9ec3",
+      "sha256": "59afde4122806454ef2d43e4bf12863221499c4f04b3b03ce1d4e9d7ddd324dd",
+      "items": 5000,
+      "noun_entries": 2982
+    },
+    {
+      "path": "stdict/175000.xml",
+      "bytes": 8100852,
+      "git_blob_sha1": "1909d22ca1e4f221da7a5060acae2eddc2b883f7",
+      "sha256": "b8525b1de41fa952852cef72f03230150e7fc62942115cace5ff3ab715a25ab6",
+      "items": 5000,
+      "noun_entries": 2870
+    },
+    {
+      "path": "stdict/180000.xml",
+      "bytes": 8359937,
+      "git_blob_sha1": "58189a7b556617590bb3f0a6324bb6f340da62ff",
+      "sha256": "a91952dad444bd729d30377391def9bf504e055924ecbc8fef37ae5a6c891f68",
+      "items": 5000,
+      "noun_entries": 2633
+    },
+    {
+      "path": "stdict/185000.xml",
+      "bytes": 7817351,
+      "git_blob_sha1": "785ce6eb46426df930596278c824b518d8fd1a48",
+      "sha256": "363bc4b4cb426df496cb0ccad29140b3a18d9ed7c3fe58c847bc474ecdbae583",
+      "items": 5000,
+      "noun_entries": 3373
+    },
+    {
+      "path": "stdict/190000.xml",
+      "bytes": 7888358,
+      "git_blob_sha1": "85aff4277aab6c4385bf36c29f4b0d2f886af621",
+      "sha256": "883b4273ae2a815da93290bde57d8738ac5a0bc7706a83ac27f49f47d349e73a",
+      "items": 5000,
+      "noun_entries": 3369
+    },
+    {
+      "path": "stdict/195000.xml",
+      "bytes": 7811205,
+      "git_blob_sha1": "34e9cd0badef9ea1b0c58d12b931543463ec443d",
+      "sha256": "fe7b8b04dc312652467e57967ee0bf37aac4ff9e24a0f59847e853dc981b8566",
+      "items": 5000,
+      "noun_entries": 3144
+    },
+    {
+      "path": "stdict/200000.xml",
+      "bytes": 7646469,
+      "git_blob_sha1": "b188d2c88a354a9b9e003970ffc8af2c1ea8b176",
+      "sha256": "e8212fa5499a9641a821cc098d53831ddc0456b87692c96110be6a27028eed03",
+      "items": 5000,
+      "noun_entries": 3468
+    },
+    {
+      "path": "stdict/205000.xml",
+      "bytes": 7764639,
+      "git_blob_sha1": "af94b0349bbf109f72800ad6a44d0b046845344b",
+      "sha256": "795061a9d7f80657ef5a609a791d4459462c73006178d7d813daaf3cae1f68dc",
+      "items": 5000,
+      "noun_entries": 3397
+    },
+    {
+      "path": "stdict/210000.xml",
+      "bytes": 7742010,
+      "git_blob_sha1": "cfbf338e9910b842937ed6e2497b2bb117b557e1",
+      "sha256": "899633df4e02b6d6c4de3a00569944b05eb295ebc018ceccbc4279cc8c05b7f6",
+      "items": 5000,
+      "noun_entries": 3255
+    },
+    {
+      "path": "stdict/215000.xml",
+      "bytes": 7591845,
+      "git_blob_sha1": "7c036fa8bcee1ea3857bf453c9e80dee98c23cd7",
+      "sha256": "761ad1c435f6654b0436bf829100320b27d3966597e18f9a6f79224ad27ec2eb",
+      "items": 5000,
+      "noun_entries": 3390
+    },
+    {
+      "path": "stdict/220000.xml",
+      "bytes": 7684675,
+      "git_blob_sha1": "13b01e728658202100c4cb0223e1f89ca43be673",
+      "sha256": "0dbc169555fb96664f15681726e72e073fe5297c59d5595cd4c9cce8c18917e3",
+      "items": 5000,
+      "noun_entries": 3172
+    },
+    {
+      "path": "stdict/225000.xml",
+      "bytes": 7752179,
+      "git_blob_sha1": "5a21f01a2968451ffd5f8e56ee4bc5c6e13914a4",
+      "sha256": "cff679a3573fca84cdfaf71b6b5184da17c41604cfd23d05a84ffd0f4f6fef45",
+      "items": 5000,
+      "noun_entries": 3112
+    },
+    {
+      "path": "stdict/230000.xml",
+      "bytes": 7661632,
+      "git_blob_sha1": "e2c98e21e619f33d2cbb85567c9e12d43cd9237f",
+      "sha256": "ee80b7b11cd73e4e85a6c2f8d9ff18e3e809fe64b6bb182f2e71ec4f20d666c1",
+      "items": 5000,
+      "noun_entries": 3227
+    },
+    {
+      "path": "stdict/235000.xml",
+      "bytes": 8384604,
+      "git_blob_sha1": "18c803d441549eaa5d876f93fcbce66b5306d932",
+      "sha256": "f6bc5794c1be3a5a01e256111713d19ca1764809a0ac42ea5fb84c43891475a6",
+      "items": 5000,
+      "noun_entries": 2736
+    },
+    {
+      "path": "stdict/240000.xml",
+      "bytes": 7795670,
+      "git_blob_sha1": "fd38432904b2ecd000e51a55ae697238585e251f",
+      "sha256": "9ee628c5c22cbf7a6fed9015bfb5ac2617a46b1058d172a46064730bcda3bfb9",
+      "items": 5000,
+      "noun_entries": 3187
+    },
+    {
+      "path": "stdict/245000.xml",
+      "bytes": 7717469,
+      "git_blob_sha1": "4b680eb7dff2a5bfc739afe1d1612d79da2bc9bb",
+      "sha256": "d2538fca75944216fb1e75a8b9d42bc913c84ea083ae1962bd373788da12a36a",
+      "items": 5000,
+      "noun_entries": 3177
+    },
+    {
+      "path": "stdict/250000.xml",
+      "bytes": 7967264,
+      "git_blob_sha1": "fbff17c988684e23c78393d0c71aecf454537212",
+      "sha256": "f67d68df7189ddd874239e98032f56be3309ac6f0f0787569aa990b8e42e1263",
+      "items": 5000,
+      "noun_entries": 2963
+    },
+    {
+      "path": "stdict/255000.xml",
+      "bytes": 7859243,
+      "git_blob_sha1": "302ccfd444a1315b24e24780882e10a0d37d142a",
+      "sha256": "70c571e9fc8d62366919af0da41024216e94ec577aab29693c90746decf77bff",
+      "items": 5000,
+      "noun_entries": 3174
+    },
+    {
+      "path": "stdict/260000.xml",
+      "bytes": 7810759,
+      "git_blob_sha1": "24447ef74065e1714631611c0dc5daf1774847fc",
+      "sha256": "de8f4a6d85a1c8503fb4621c22d3f153af329e2252c634453f54f8e00c5dc95a",
+      "items": 5000,
+      "noun_entries": 3179
+    },
+    {
+      "path": "stdict/265000.xml",
+      "bytes": 7678794,
+      "git_blob_sha1": "cbd4f36bb7e46f229f57ee3f09c829505e433c4a",
+      "sha256": "c0292fcd8edcba3801efb8e4daae7adae4d318fc00f1db03cd65c6da8c230958",
+      "items": 5000,
+      "noun_entries": 3197
+    },
+    {
+      "path": "stdict/270000.xml",
+      "bytes": 8067993,
+      "git_blob_sha1": "ede5e8260bfa7878ab8e5f951ec075654eb6908e",
+      "sha256": "4d2a726996189b11151ffaf1e9b88e5bca78d1e199193447739022d73e3043e5",
+      "items": 5000,
+      "noun_entries": 3046
+    },
+    {
+      "path": "stdict/275000.xml",
+      "bytes": 7930381,
+      "git_blob_sha1": "f7b27ce99c4e1679f00c510fb4bdbe176b0b2712",
+      "sha256": "c024c5e05155c82ba2259189095fa490abe23226df4d66ad2d8eec9c66bed0c6",
+      "items": 5000,
+      "noun_entries": 3232
+    },
+    {
+      "path": "stdict/280000.xml",
+      "bytes": 7779304,
+      "git_blob_sha1": "2b70f74a847a5bf93151933c4fc87d7f0932f26e",
+      "sha256": "af815e9ac28ce6f8e9427524afdd9d09d4ab30992a3071a65679af135f836c90",
+      "items": 5000,
+      "noun_entries": 3009
+    },
+    {
+      "path": "stdict/285000.xml",
+      "bytes": 7709915,
+      "git_blob_sha1": "d7987f776e5eff3652fba1db0d5d08ef3fbb82bc",
+      "sha256": "bc31d3a167bccab1b03fb1530ff917bd39b569b6eed784eb1f2a43188714b0b0",
+      "items": 5000,
+      "noun_entries": 3124
+    },
+    {
+      "path": "stdict/290000.xml",
+      "bytes": 7877066,
+      "git_blob_sha1": "bd1305daf409be7cfbb603143a281bd292475c26",
+      "sha256": "37fd5e991b3a41b9f04aa4c3a1c283445e979c8afc5ed1092fb22cd3e9785e87",
+      "items": 5000,
+      "noun_entries": 3129
+    },
+    {
+      "path": "stdict/295000.xml",
+      "bytes": 7845413,
+      "git_blob_sha1": "a97deaddb05d5d5c62f5e7d008a99fe43da3d17d",
+      "sha256": "47ef3d8592e8df41af7ae6814ea439bd1648b7cb27de3360d1b8299c76236f03",
+      "items": 5000,
+      "noun_entries": 3151
+    },
+    {
+      "path": "stdict/300000.xml",
+      "bytes": 7776280,
+      "git_blob_sha1": "86fe282df739c69158c63072b0bedc710abe0436",
+      "sha256": "df83dcff55e53c35e48fe722f0505df2c0720b47d2fa7538a2479ffde301cdc1",
+      "items": 5000,
+      "noun_entries": 3164
+    },
+    {
+      "path": "stdict/305000.xml",
+      "bytes": 7856303,
+      "git_blob_sha1": "20d1d993a079d4b319f07404d482323a5bee0915",
+      "sha256": "efffab0a1cb64686665cc349dce068707f7d347770eb081babe6a31655a2cb62",
+      "items": 5000,
+      "noun_entries": 2863
+    },
+    {
+      "path": "stdict/310000.xml",
+      "bytes": 7916357,
+      "git_blob_sha1": "5cf964ddf1b4b348445b7f9432438bd42ee43485",
+      "sha256": "a48a8bf093a187ea9ef6e2c34d47db3f14e3d56e0827d9380134b6de268785e0",
+      "items": 5000,
+      "noun_entries": 2822
+    },
+    {
+      "path": "stdict/315000.xml",
+      "bytes": 8121386,
+      "git_blob_sha1": "104c96bedf12e71afcd24fb1394f4197d5b09ae0",
+      "sha256": "a5f2092c8c02bbb7dbbd51d19f5e1d9b486bfbea5dcb9c3c73f362ff8b803414",
+      "items": 5000,
+      "noun_entries": 3196
+    },
+    {
+      "path": "stdict/320000.xml",
+      "bytes": 7732672,
+      "git_blob_sha1": "9d97c3c93698523fcbb89b75a0f2f3b6e2050dbd",
+      "sha256": "4fbc003b9fcd21aeb45ac82d6b01f77f7edc9a7d9fbb3ef5d08ac1b423558486",
+      "items": 5000,
+      "noun_entries": 2804
+    },
+    {
+      "path": "stdict/325000.xml",
+      "bytes": 8036880,
+      "git_blob_sha1": "2c0b6b6f48fde1824ee17e94161f915bb058bb8a",
+      "sha256": "64582502f0b02f96be19334c216439b062d7df43606b26310f6228f9f31fe08a",
+      "items": 5000,
+      "noun_entries": 2764
+    },
+    {
+      "path": "stdict/330000.xml",
+      "bytes": 7742559,
+      "git_blob_sha1": "99c0c64c64840e73ab6cd6dddbb946521fc5819c",
+      "sha256": "1c1230d0d57b097f403e8a6fe52cc1a241b18c534b317ed89bf5ad1d2faae479",
+      "items": 5000,
+      "noun_entries": 3071
+    },
+    {
+      "path": "stdict/335000.xml",
+      "bytes": 7699293,
+      "git_blob_sha1": "a956eef5f3c25071b19f8400b8e58a371d3f63ed",
+      "sha256": "079371c9b283611bd8e13f7938fa09acf019a58cda7efe28b46809015ff35d44",
+      "items": 5000,
+      "noun_entries": 2969
+    },
+    {
+      "path": "stdict/340000.xml",
+      "bytes": 7866262,
+      "git_blob_sha1": "3c0ebc888d055bb426911c3b921070bced324503",
+      "sha256": "b2776cb4fabfa9be0414e51f2d0c917e226d2840176403f40cd7496d39a067a4",
+      "items": 5000,
+      "noun_entries": 3367
+    },
+    {
+      "path": "stdict/345000.xml",
+      "bytes": 7706604,
+      "git_blob_sha1": "e5d31bbed0bf9ec7aafc58d015b0ede3798f4478",
+      "sha256": "3a4113572a00f03cdf075fa1b3835df9886e8c015e569b8dd19dd9ef2ee31c7c",
+      "items": 5000,
+      "noun_entries": 3251
+    },
+    {
+      "path": "stdict/350000.xml",
+      "bytes": 7892979,
+      "git_blob_sha1": "bd7c29c0e0ee8d1349a769ef4d4cd0fcf46dc385",
+      "sha256": "109ab3cce72ffab12968428746a9d3c1aba71fb8c58ebe85d4d169f483d94747",
+      "items": 5000,
+      "noun_entries": 2808
+    },
+    {
+      "path": "stdict/355000.xml",
+      "bytes": 7747199,
+      "git_blob_sha1": "5657ee7be52d7f346f3e75ec2a6dc35cf00deca7",
+      "sha256": "e21dc4e308687355b5aaf861068780edfada04af37842ba86502e9dff7d23948",
+      "items": 5000,
+      "noun_entries": 2837
+    },
+    {
+      "path": "stdict/360000.xml",
+      "bytes": 8871219,
+      "git_blob_sha1": "b4b1366d56f8dae948f95ead1a79ffbf8311708f",
+      "sha256": "383ba15e8afb4f7d6ccf61b29640776f8740e8fdd517fe01b95d6f2900e4feef",
+      "items": 5000,
+      "noun_entries": 2302
+    },
+    {
+      "path": "stdict/365000.xml",
+      "bytes": 7931369,
+      "git_blob_sha1": "f0875b66e062f4a3b1792e05db6f8d70c2f34a3e",
+      "sha256": "fecc3ad700cf6fb259569b38771f31ee24855425a8179322c0ce45c8fafd9cd8",
+      "items": 5000,
+      "noun_entries": 3338
+    },
+    {
+      "path": "stdict/370000.xml",
+      "bytes": 7779744,
+      "git_blob_sha1": "7c2cd2305b534e042705544dd14258503ce138d5",
+      "sha256": "720a09089cba56cde39c498664425206ca9241e021eeab477617e0d85af4b159",
+      "items": 5000,
+      "noun_entries": 3340
+    },
+    {
+      "path": "stdict/375000.xml",
+      "bytes": 7870028,
+      "git_blob_sha1": "6f3574cf4332a50610ef6a9b333fe9b052df3903",
+      "sha256": "d4ac58907b631fc6ff145f6d8d555f7f16afd8fcd227701df71f00a9793c5b08",
+      "items": 5000,
+      "noun_entries": 3188
+    },
+    {
+      "path": "stdict/380000.xml",
+      "bytes": 7735721,
+      "git_blob_sha1": "76d2028a041631e548faf2fb0060821ef4dde226",
+      "sha256": "34aac726cd7ad4e21dd6af4dd3d1fa48a2b0a7a5c7bb7bb2c8d27c835edca3cc",
+      "items": 5000,
+      "noun_entries": 3297
+    },
+    {
+      "path": "stdict/385000.xml",
+      "bytes": 7668113,
+      "git_blob_sha1": "8b405e194127528cbcd87bc664932525d573336b",
+      "sha256": "e6e05c406b0e85139e5c4b6de8703fb4079f473f4f3a3b1f65c525a1badbb185",
+      "items": 5000,
+      "noun_entries": 3232
+    },
+    {
+      "path": "stdict/390000.xml",
+      "bytes": 7970719,
+      "git_blob_sha1": "56bff951e2f9595f26cef0776321559e355ce080",
+      "sha256": "facc92506425ece3d316b494a91be72c50a7784ec43df51f469e726806ea6598",
+      "items": 5000,
+      "noun_entries": 3080
+    },
+    {
+      "path": "stdict/395000.xml",
+      "bytes": 8046559,
+      "git_blob_sha1": "3fee0cc90ff838b327d7d52494f89776ec88bfa1",
+      "sha256": "d66aa05042534e980ec78a8e31c09d633b0188dc7877f3451705eceda83b81ef",
+      "items": 5000,
+      "noun_entries": 2854
+    },
+    {
+      "path": "stdict/400000.xml",
+      "bytes": 8077370,
+      "git_blob_sha1": "277e8c5974acbc620c554e65d810bad21fb27387",
+      "sha256": "f79f3a322a54115267c2b616bcd1bdbffc27b3c4ca2f4d764880e4d78ba2b06e",
+      "items": 5000,
+      "noun_entries": 3053
+    },
+    {
+      "path": "stdict/405000.xml",
+      "bytes": 7992732,
+      "git_blob_sha1": "c7b073f11bab769f2d4fc852eca1b50dd3b4f495",
+      "sha256": "6483e4802eb51da961727f0b2d8b5c67ebc24f8dbfb6b094b33fec63c432b8da",
+      "items": 5000,
+      "noun_entries": 3100
+    },
+    {
+      "path": "stdict/410000.xml",
+      "bytes": 7727385,
+      "git_blob_sha1": "616e79fbb9a9e02ad34504affb9316b134427000",
+      "sha256": "352091a4a8881dcf30bde036ec80131d987fb00f352ea5abed884b59a2a84ff4",
+      "items": 5000,
+      "noun_entries": 3197
+    },
+    {
+      "path": "stdict/415000.xml",
+      "bytes": 7676119,
+      "git_blob_sha1": "d5b4c5c0509eb799b1f480a0d7e5ae90aeb9584e",
+      "sha256": "4c3bbd84ba3b5a560760a29e2b1ee820a1b444eeb7e507bb664417f80d9505b8",
+      "items": 5000,
+      "noun_entries": 2896
+    },
+    {
+      "path": "stdict/420000.xml",
+      "bytes": 7721918,
+      "git_blob_sha1": "e19e26a58ebfce4aeb65e5c80a9563f628325359",
+      "sha256": "1142f03af9e569a8a31dae7c91fa190789e52f9a28c9d0ed6ce32cd33e0136cf",
+      "items": 5000,
+      "noun_entries": 3004
+    },
+    {
+      "path": "stdict/425000.xml",
+      "bytes": 7780230,
+      "git_blob_sha1": "632d83cdcf1a90fa2f58564faf7451b08936cba7",
+      "sha256": "1a51087384d32ba6dc65c21a1663c28f4f66c89ab9f2c944a4e92b910b2e64e4",
+      "items": 5000,
+      "noun_entries": 3309
+    },
+    {
+      "path": "stdict/430000.xml",
+      "bytes": 7783150,
+      "git_blob_sha1": "e038cd46b4f4bb1ee0e275609e0229c1322f2a19",
+      "sha256": "77f812c38f9470c271740169b626f0d9722b559c16c88736d2897b9c2de61e69",
+      "items": 5000,
+      "noun_entries": 3263
+    },
+    {
+      "path": "stdict/435000.xml",
+      "bytes": 8199628,
+      "git_blob_sha1": "4558172658dde8306ae09986ecb9189c1e488918",
+      "sha256": "e94c8f983eb4bdc9f56bf3929f0f746117462901085ae7d1aacec9b90260dffc",
+      "items": 5000,
+      "noun_entries": 2996
+    },
+    {
+      "path": "stdict/436578.xml",
+      "bytes": 2543969,
+      "git_blob_sha1": "9fe2cd875ac94b143b65c4ad2ac3428866cf55be",
+      "sha256": "573b21665338fa5f33282be2824f48dcec385467292ba129782c0e2b4781df89",
+      "items": 1578,
+      "noun_entries": 907
+    }
+  ]
+}

@@ -341,7 +341,7 @@ class HiddenWordDisplayProjectionTest(unittest.TestCase):
     def test_concurrent_refreshes_share_one_model_load_and_never_double_normalize(self):
         spectator._hidden_word_display_vectors.cache_clear()
         self.addCleanup(spectator._hidden_word_display_vectors.cache_clear)
-        with patch("games.hidden_word.vectors.load_vectors", return_value=self.vectors) as loader:
+        with patch("games.hidden_word.vectors.load_legacy_vectors", return_value=self.vectors) as loader:
             with ThreadPoolExecutor(max_workers=2) as executor:
                 first, second = executor.map(read_match, (self.log, self.log))
             self.assertEqual(first, second)

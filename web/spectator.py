@@ -417,9 +417,9 @@ _hidden_word_display_lock = Lock()
 
 @lru_cache(maxsize=1)
 def _hidden_word_display_vectors():
-    from games.hidden_word.vectors import load_vectors
+    from games.hidden_word.vectors import load_legacy_vectors
 
-    return load_vectors()
+    return load_legacy_vectors()
 
 
 def _hidden_word_display_projection(rows):

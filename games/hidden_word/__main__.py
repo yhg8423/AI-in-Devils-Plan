@@ -1,4 +1,4 @@
-"""Validate shared fastText data before opening a Hidden Word match log."""
+"""Validate the shared dictionary embeddings before opening a match log."""
 
 import argparse
 from functools import partial
@@ -33,7 +33,7 @@ def main(argv=None):
                     if row.get("msg_type") == "word_setup":
                         setup = json.loads(row["content"])
                         break
-            if not isinstance(setup, dict) or setup.get("version") != 2:
+            if not isinstance(setup, dict) or setup.get("version") != 3:
                 validate_saved_setup(setup, None)
         vectors = validate_vectors(load_vectors())
         if args.resume:

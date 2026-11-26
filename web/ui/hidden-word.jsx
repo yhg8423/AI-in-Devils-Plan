@@ -4,7 +4,7 @@ import {Tab, TabList} from "@astryxdesign/core/TabList";
 import {Table} from "./records.jsx";
 import {tr} from "./locale.js";
 import {scoreText} from "./replay.js";
-import {hiddenEventText, hiddenPrivateOwner, hiddenRoundLabel, hiddenSecretFor, hintScoreLabel, normalizedHiddenScores, similarityLabel} from "./hidden-word-state.js";
+import {hiddenEventText, hiddenPrivateOwner, hiddenRoundLabel, hiddenScorerLabel, hiddenSecretFor, hintScoreLabel, normalizedHiddenScores, similarityLabel, standardDictionaryScorer} from "./hidden-word-state.js";
 import "./hidden-word.css";
 
 export {applyHiddenEvent, hiddenEventText, hiddenActionText} from "./hidden-word-state.js";
@@ -104,12 +104,12 @@ export function HiddenWordStage({state, replay}) {
   const clues = state.wordClues?.filter((item) => sameTurn(item, turn)) ?? [];
   const result = state.wordFinal ?? state.result;
   const secret = hiddenSecretFor(state, replay);
-  const fastText = setup?.scorer?.id === "fasttext-cc-ko-300" || setup?.score_mode === "fasttext";
+  const scorer = hiddenScorerLabel(setup);
   const normalized = normalizedHiddenScores(setup);
   return <div className="hidden-word-stage">
     <div className="hidden-heading"><h2>{result ? tr("최종 결과", "Final results") : turn ? tr(`${turn.round} / ${setup?.rounds ?? 2}라운드`, `Round ${turn.round} of ${setup?.rounds ?? 2}`) : tr("히든 워드", "Hidden Word")}</h2>
       {turn && !result && <span>{tr(`승점 ×${turn.round === 2 ? 2 : 1}`, `VP ×${turn.round === 2 ? 2 : 1}`)}</span>}</div>
-    {["word2vec", "fasttext"].includes(setup?.score_mode) && <p className="hidden-score-method"><strong>{fastText ? "fastText · cc.ko.300" : "Word2Vec"}</strong> · {normalized ? tr("보정 유사도 · 0–99.9점", "Normalized similarity · 0–99.9 points") : tr("코사인 유사도 × 100 · −100~100%", "Cosine similarity × 100 · −100–100%")}</p>}
+    {scorer && <p className="hidden-score-method"><strong>{scorer}</strong> · {standardDictionaryScorer(setup) && <>{tr("표준국어대사전 명사", "Standard Korean Language Dictionary nouns")} · </>}{normalized ? tr("보정 유사도 · 0–99.9점", "Normalized similarity · 0–99.9 points") : tr("코사인 유사도 × 100 · −100~100%", "Cosine similarity × 100 · −100–100%")}</p>}
     {setup?.display_projection === "raw_cosine_v1" && <p className="hidden-score-method">{tr("기존 기록은 판정을 유지하고 점수 표시만 보정합니다.", "Existing verdicts are retained; only score display is normalized.")}</p>}
     {result ? <Scoreboard state={state} replay={replay} /> : <>
       {setup?.discussion !== false && state.wordDiscussion && <p className="hidden-discussion">{hiddenEventText(state.wordDiscussion.turn ? "word_discussion_round" : "word_discussion", state.wordDiscussion)}</p>}
@@ -123,7 +123,8 @@ export function HiddenWordStage({state, replay}) {
         </div>
         <SimilarityTrail state={state} replay={replay} />
         {clues.map((clue) => <section key={clue.phase} className="hidden-clue"><small>{setup?.hint_visibility === "public" ? tr(`${clue.phase}차 선정 힌트`, `Phase ${clue.phase} selected clue`) : tr(`${clue.phase}차 공개 힌트`, `Phase ${clue.phase} public clue`)}</small><strong lang={clue.word ? "ko" : undefined}>{clue.word || tr("힌트 없음", "No clue")}</strong><span>{similarityLabel(clue.similarity, setup)}</span>
-          {clue.word && clue.forced ? <p>{clue.source === "fasttext_nearest" ?
+          {clue.word && clue.forced ? <p>{clue.source === "openai_stdict_nearest" ?
+            tr("표준국어대사전 명사 중 정답과 가장 가까운 단어입니다.", "The closest noun to the answer among Standard Korean Language Dictionary entries.") : clue.source === "fasttext_nearest" ?
             tr("fastText 사전에서 정답과 가장 가까운 일반명사입니다.", "The closest common noun to the answer in the fastText vocabulary.") : clue.source === "word2vec_nearest" ?
             tr("Word2Vec 사전에서 정답과 가장 가까운 단어입니다.", "The closest word to the answer in the Word2Vec vocabulary.") :
             tr("이 단계에서 제출한 후보 중 유사도가 가장 높은 단어입니다.", "The most similar word among the candidates submitted in this phase.")}</p> : !clue.word ? <p>{tr("시간 내에 유효한 힌트가 제출되지 않았습니다.", "No valid clue was submitted before time ran out.")}</p> : null}</section>)}

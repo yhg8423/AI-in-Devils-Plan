@@ -1,34 +1,74 @@
-"""Load official Korean fastText word vectors and calculate cosine locally."""
+"""Cache OpenAI embeddings for registered Korean dictionary nouns; score locally."""
 
 import argparse
+import base64
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import lru_cache
+import fcntl
 import gzip
 from hashlib import file_digest, sha256
-from importlib.metadata import version
 import json
 from math import isfinite
 from pathlib import Path
 import shutil
 from tempfile import TemporaryDirectory
-from urllib.request import urlopen
-import warnings
 
 import numpy as np
 
 from .words import is_noun_word
 
 
-MODEL_ID = "fasttext-cc-ko-300"
-SOURCE = "https://fasttext.cc/docs/en/crawl-vectors.html"
-DOWNLOAD = "https://dl.fbaipublicfiles.com/fasttext/vectors-crawl/cc.ko.300.vec.gz"
-ARCHIVE_SHA256 = "9d71f0ae144e0f89dd233bfa7eca421be26bd1e5dd18e2cc56888a04be982d97"
-DIMENSIONS = 300
-VOCABULARY = 2_000_000
-DEFAULT_PATH = Path(__file__).resolve().parents[2] / "runs/models/hidden-word/fasttext-cc-ko-300"
+MODEL_ID = "text-embedding-3-large"
+DICTIONARY_ID = "stdict-nouns-20260605"
+SCORER_ID = f"openai-{MODEL_ID}-stdict-20260605"
+DIMENSIONS = 3072
+VOCABULARY = 213_810
+DICTIONARY_SHA256 = "3eb7cd7110d36b2fd058cdb7055aefe3c050f17030df9c3938a1c34135148d3c"
+ROOT = Path(__file__).resolve().parents[2]
+DATA = Path(__file__).with_name("data")
+DEFAULT_PATH = ROOT / "runs/models/hidden-word" / SCORER_ID
+LEGACY_PATH = ROOT / "runs/models/hidden-word/fasttext-cc-ko-300"
 SETUP = "uv run --locked --python 3.12 python -m games.hidden_word.vectors --download"
-NOUN_FILTER = f"kiwipiepy-{version('kiwipiepy')}/model-{version('kiwipiepy-model')}/cong/NNG/oov=false"
-BLOCK_ROWS = 8192
+NOUN_FILTER = "stdict_noun_membership_v1"
+BLOCK_ROWS = 4096
+BATCH_ROWS = 512
 SCORE_CEILING = 99.9
+INPUT_PROTOCOL = "plain isolated dictionary headword; no prompt"
+
+
+def _file_hash(path):
+    with Path(path).open("rb") as stream:
+        return file_digest(stream, "sha256").hexdigest()
+
+
+def _write_json(path, value):
+    path = Path(path)
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        temporary.write_text(json.dumps(value, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+        temporary.replace(path)
+    finally:
+        temporary.unlink(missing_ok=True)
+
+
+@lru_cache(maxsize=1)
+def load_nouns():
+    """Verify the complete, pinned noun export shipped with the project."""
+    metadata = json.loads((DATA / f"{DICTIONARY_ID}.meta.json").read_text(encoding="utf-8"))
+    archive = DATA / f"{DICTIONARY_ID}.json.gz"
+    if _file_hash(archive) != metadata["compressed_sha256"]:
+        raise ValueError("표준국어대사전 명사 파일의 체크섬이 일치하지 않습니다.")
+    with gzip.open(archive, "rb") as stream:
+        payload = stream.read()
+    words = json.loads(payload)
+    if (sha256(payload).hexdigest() != DICTIONARY_SHA256 or metadata["sha256"] != DICTIONARY_SHA256
+            or metadata["id"] != DICTIONARY_ID or metadata["word_count"] != VOCABULARY
+            or not isinstance(words, list) or len(words) != VOCABULARY
+            or any(not isinstance(word, str) or not word for word in words) or len(set(words)) != VOCABULARY):
+        raise ValueError("표준국어대사전 명사 목록의 수량·체크섬이 올바르지 않습니다.")
+    dictionary = {key: metadata[key] for key in ("id", "sha256", "word_count")}
+    dictionary.update({key: metadata["source"][key] for key in ("snapshot_date", "revision", "mirror", "license")})
+    return tuple(words), dictionary
 
 
 def normalized_score(similarity, maximum):
@@ -43,13 +83,21 @@ def normalized_score(similarity, maximum):
 
 
 @lru_cache(maxsize=1)
+def _legacy_noun_filter():
+    from importlib.metadata import version
+
+    return f"kiwipiepy-{version('kiwipiepy')}/model-{version('kiwipiepy-model')}/cong/NNG/oov=false"
+
+
+@lru_cache(maxsize=1)
 def _noun_analyzer():
     from kiwipiepy import Kiwi
+
     return Kiwi(num_workers=1, model_type="cong")
 
 
 @lru_cache(maxsize=32768)
-def _common_noun(word):
+def _legacy_common_noun(word):
     if not is_noun_word(word):
         return False
     tokens = _noun_analyzer().tokenize(word)
@@ -64,7 +112,6 @@ class WordVectors:
                 or len(set(words)) != len(words) or values.ndim != 2
                 or values.shape[0] != len(words) or values.shape[1] == 0):
             raise ValueError("단어와 유한한 벡터 행렬이 필요합니다.")
-        # Keep the 2M × 300 matrix on disk; use float64 only for bounded blocks.
         norms = np.empty(len(words), dtype=np.float64)
         digest = sha256(json.dumps(words, ensure_ascii=True, separators=(",", ":")).encode())
         digest.update(b"\0")
@@ -77,30 +124,29 @@ class WordVectors:
         if np.any(norms == 0):
             raise ValueError("길이가 0인 벡터는 사용할 수 없습니다.")
         values.flags.writeable = False
-        self._vectors, self._norms = values, norms
-        self._words = words
+        self._vectors, self._norms, self._words = values, norms, words
         self._indices = {word: index for index, word in enumerate(words)}
         self._nearest = {}
-        self.metadata = {**(metadata or {"id": "custom-fasttext"}),
+        self._legacy = (metadata or {}).get("id") == "fasttext-cc-ko-300"
+        self.metadata = {**(metadata or {"id": "custom-embeddings"}),
                          "sha256": digest.hexdigest(), "dimensions": values.shape[1],
-                         "vocabulary": len(words), "score": "cosine*100", "nearest_filter": NOUN_FILTER}
+                         "vocabulary": len(words), "score": "cosine*100",
+                         "nearest_filter": _legacy_noun_filter() if self._legacy else NOUN_FILTER}
 
     def __contains__(self, word):
-        return word in self._indices
+        return isinstance(word, str) and word in self._indices
 
     def is_hint(self, word):
-        """Use the same dictionary-attested common nouns for hints and search."""
-        return isinstance(word, str) and word in self and _common_noun(word)
+        """The complete dictionary membership governs hints and nearest search."""
+        return word in self and (not self._legacy or _legacy_common_noun(word))
 
     def similarity(self, first, second):
         left, right = self._indices[first], self._indices[second]
         cosine = np.dot(self._vectors[left].astype(np.float64), self._vectors[right].astype(np.float64))
         cosine /= self._norms[left] * self._norms[right]
-        # Clamp only floating-point drift outside cosine's mathematical bounds.
         return float(np.clip(cosine, -1, 1) * 100)
 
     def nearest(self, word):
-        """Find the closest eligible noun in the entire vocabulary, excluding itself."""
         if word not in self._nearest:
             target = self._indices[word]
             query = self._vectors[target].astype(np.float64) / self._norms[target]
@@ -114,100 +160,179 @@ class WordVectors:
                     self._nearest[word] = {"word": candidate, "similarity": self.similarity(word, candidate)}
                     break
             else:
-                raise ValueError(f"{word!r}와 비교할 수 있는 다른 명사가 fastText 사전에 없습니다.")
+                raise ValueError(f"{word!r}와 비교할 수 있는 다른 명사가 사전에 없습니다.")
         return self._nearest[word].copy()
 
 
-def read_fasttext(stream, destination, *, dimensions=DIMENSIONS, vocabulary=VOCABULARY):
-    """Stream the complete official text export into a memory-mapped NumPy file."""
-    if tuple(map(int, stream.readline().split())) != (vocabulary, dimensions):
-        raise ValueError("fastText 원본의 어휘 수·차원이 일치하지 않습니다.")
-    values = np.lib.format.open_memmap(destination, mode="w+", dtype="<f4", shape=(vocabulary, dimensions))
-    words = []
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", DeprecationWarning)
-        for index in range(vocabulary):
-            word, separator, numbers = stream.readline().rstrip().partition(" ")
-            if not word or not separator:
-                raise ValueError("fastText 단어 레코드가 완전하지 않습니다.")
-            try:
-                vector = np.fromstring(numbers, dtype="<f4", sep=" ")
-            except (ValueError, DeprecationWarning) as error:
-                raise ValueError("fastText 벡터에 올바르지 않은 수치가 있습니다.") from error
-            if vector.shape != (dimensions,):
-                raise ValueError("fastText 벡터 차원이 올바르지 않습니다.")
-            words.append(word)
-            values[index] = vector
-            if (index + 1) % 250_000 == 0:
-                print(f"fastText 변환 중 · {index + 1:,}/{vocabulary:,}개 단어", flush=True)
-    if stream.read().strip():
-        raise ValueError("fastText 원본에 예상보다 많은 레코드가 있습니다.")
-    values.flush()
-    return words, values
-
-
-def load_vectors(path=DEFAULT_PATH):
+def _read_vectors(path):
     path = Path(path)
-    if not path.exists():
-        raise FileNotFoundError(f"한국어 fastText 모델이 없습니다. 먼저 실행하세요: {SETUP}")
     try:
         metadata = json.loads((path / "metadata.json").read_text(encoding="utf-8"))
         if not isinstance(metadata, dict):
-            raise ValueError("fastText 모델 정보는 JSON 객체여야 합니다.")
+            raise ValueError("모델 정보는 JSON 객체여야 합니다.")
         words = json.loads((path / "words.json").read_text(encoding="utf-8"))
         if not isinstance(words, list):
-            raise ValueError("fastText 단어 목록은 JSON 배열이어야 합니다.")
-        vectors = WordVectors(words, np.load(path / "vectors.npy", mmap_mode="r", allow_pickle=False), metadata)
+            raise ValueError("단어 목록은 JSON 배열이어야 합니다.")
+        matrix = np.load(path / "vectors.npy", mmap_mode="r", allow_pickle=False)
+        if matrix.dtype != np.dtype("<f4"):
+            raise ValueError("캐시 벡터는 float32 형식이어야 합니다.")
+        vectors = WordVectors(words, matrix, metadata)
         if metadata.get("sha256") != vectors.metadata["sha256"]:
-            raise ValueError("저장된 fastText 모델의 체크섬이 일치하지 않습니다.")
+            raise ValueError("저장된 모델의 체크섬이 일치하지 않습니다.")
         return vectors
     except (OSError, EOFError, KeyError, TypeError, ValueError) as error:
-        raise ValueError(f"fastText 모델을 읽을 수 없습니다: {path}. {error}") from error
+        raise ValueError(f"임베딩 모델을 읽을 수 없습니다: {path}. {error}") from error
 
 
-def install_vectors(archive=None, destination=DEFAULT_PATH):
-    """Verify the pinned text export and publish a complete cache atomically."""
+def _scorer_metadata(dictionary):
+    return {"id": SCORER_ID, "provider": "openai", "model": MODEL_ID,
+            "dictionary": dictionary, "input_protocol": INPUT_PROTOCOL,
+            "format": "openai-embeddings", "out_of_vocabulary": "reject"}
+
+
+def load_vectors(path=DEFAULT_PATH):
+    if not Path(path).exists():
+        raise FileNotFoundError(f"OpenAI 명사 임베딩 캐시가 없습니다. 먼저 실행하세요: {SETUP}")
+    words, dictionary = load_nouns()
+    vectors = _read_vectors(path)
+    if (vectors._words != words or vectors.metadata["dimensions"] != DIMENSIONS
+            or any(vectors.metadata.get(key) != value for key, value in _scorer_metadata(dictionary).items())):
+        raise ValueError("표준국어대사전 명사 목록 또는 OpenAI 임베딩 모델 설정이 다릅니다.")
+    return vectors
+
+
+def load_legacy_vectors(path=LEGACY_PATH):
+    """Read the old cache only for historical fastText replay display projection."""
+    vectors = _read_vectors(path)
+    if vectors.metadata.get("id") != "fasttext-cc-ko-300":
+        raise ValueError("이전 fastText 기록에 해당하는 캐시가 아닙니다.")
+    return vectors
+
+
+def _publish(matrix_path, destination, words, dictionary):
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix=".openai-", dir=destination.parent) as staging:
+        cache = Path(staging) / "model"
+        cache.mkdir()
+        shutil.copyfile(matrix_path, cache / "vectors.npy")
+        matrix = np.load(cache / "vectors.npy", mmap_mode="r", allow_pickle=False)
+        if matrix.shape != (len(words), DIMENSIONS) or matrix.dtype != np.dtype("<f4"):
+            raise ValueError("OpenAI 임베딩 캐시의 단어 수·차원·형식이 다릅니다.")
+        vectors = WordVectors(words, matrix, {**_scorer_metadata(dictionary),
+            "vectors_sha256": _file_hash(cache / "vectors.npy")})
+        _write_json(cache / "words.json", words)
+        _write_json(cache / "metadata.json", vectors.metadata)
+        cache.rename(destination)
+    return load_vectors(destination)
+
+
+def install_vectors(destination=DEFAULT_PATH, *, source=None, client=None):
+    """Publish a complete cache; interrupted API batches remain reusable."""
     destination = Path(destination)
-    with TemporaryDirectory(prefix="hidden-word-download-") as directory:
-        if archive is None:
-            if destination.exists():
-                return load_vectors(destination)
-            archive = Path(directory) / "cc.ko.300.vec.gz"
-            print("한국어 fastText 모델 내려받는 중 (약 1.27 GB)...", flush=True)
-            with urlopen(DOWNLOAD, timeout=60) as response, archive.open("wb") as output:
-                shutil.copyfileobj(response, output)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    # Concurrent setup commands share paid batches; the OS releases this lock on exit.
+    with (destination.parent / f".{destination.name}.lock").open("a+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return _install_vectors(destination, source=source, client=client)
+
+
+def _install_vectors(destination, *, source=None, client=None):
+    if destination.exists():
+        return load_vectors(destination)
+    words, dictionary = load_nouns()
+    if source is not None:
+        source = Path(source)
+        metadata = json.loads((source / "metadata.json").read_text(encoding="utf-8"))
+        if (not isinstance(metadata, dict) or metadata.get("model") != MODEL_ID
+                or metadata.get("input_protocol") not in
+                {INPUT_PROTOCOL, "plain isolated Korean dictionary headword, no prompt"}
+                or json.loads((source / "words.json").read_text(encoding="utf-8")) != list(words)
+                or metadata.get("vectors_sha256") != _file_hash(source / "vectors.npy")):
+            raise ValueError("가져올 임베딩 캐시의 모델·사전·체크섬이 일치하지 않습니다.")
+        return _publish(source / "vectors.npy", destination, words, dictionary)
+    if client is None:
+        from openai import OpenAI
+        from ..models import _openai_key
+
+        with OpenAI(api_key=_openai_key(ROOT / ".env"), base_url="https://api.openai.com/v1",
+                    timeout=180, max_retries=5) as client:
+            return _install_vectors(destination, client=client)
+    partials = destination.parent / f".{destination.name}-partials"
+    partials.mkdir(parents=True, exist_ok=True)
+    manifest = {**_scorer_metadata(dictionary), "dimensions": DIMENSIONS, "batch_rows": BATCH_ROWS}
+    manifest_path = partials / "metadata.json"
+    if manifest_path.exists() and json.loads(manifest_path.read_text(encoding="utf-8")) != manifest:
+        raise ValueError("중단된 임베딩 캐시의 모델·사전 설정이 다릅니다.")
+    _write_json(manifest_path, manifest)
+
+    def encode_batch(start):
+        batch = words[start:start + BATCH_ROWS]
+        matrix_path = partials / f"{start:06}.npy"
+        receipt_path = matrix_path.with_suffix(".json")
+        cached = matrix_path.exists() and receipt_path.exists()
+        if cached:
+            receipt = json.loads(receipt_path.read_text(encoding="utf-8"))
+            if receipt != {"start": start, "count": len(batch), "sha256": _file_hash(matrix_path)}:
+                raise ValueError("중단된 임베딩 배치의 체크섬이 다릅니다.")
+            values = np.load(matrix_path, allow_pickle=False)
         else:
-            archive = Path(archive)
-        with archive.open("rb") as stream:
-            if file_digest(stream, "sha256").hexdigest() != ARCHIVE_SHA256:
-                raise ValueError("공식 fastText 원본 파일의 SHA-256이 일치하지 않습니다.")
-        if destination.exists():
-            return load_vectors(destination)
-        destination.parent.mkdir(parents=True, exist_ok=True)
-        with TemporaryDirectory(prefix=".fasttext-", dir=destination.parent) as staging:
-            cache = Path(staging) / "model"
-            cache.mkdir()
-            # The official export contains malformed UTF-8 tokens. Preserve their
-            # bytes without merging words; the Hangul noun filter excludes them.
-            with gzip.open(archive, "rt", encoding="utf-8", errors="surrogateescape") as stream:
-                words, values = read_fasttext(stream, cache / "vectors.npy", dimensions=DIMENSIONS, vocabulary=VOCABULARY)
-            vectors = WordVectors(words, values, {"id": MODEL_ID, "source": SOURCE,
-                "download": DOWNLOAD, "source_sha256": ARCHIVE_SHA256, "license": "CC BY-SA 3.0",
-                "format": "fasttext-text", "out_of_vocabulary": "reject"})
-            (cache / "words.json").write_text(json.dumps(words, ensure_ascii=True, separators=(",", ":")), encoding="utf-8")
-            (cache / "metadata.json").write_text(json.dumps(vectors.metadata, ensure_ascii=False, indent=2), encoding="utf-8")
-            cache.rename(destination)
-            return vectors
+            response = client.embeddings.create(model=MODEL_ID, input=list(batch),
+                dimensions=DIMENSIONS, encoding_format="base64")
+            data = sorted(response.data, key=lambda row: row.index)
+            if response.model != MODEL_ID or [row.index for row in data] != list(range(len(batch))):
+                raise ValueError("OpenAI 임베딩 응답의 모델·입력 순서가 다릅니다.")
+            values = np.asarray([np.frombuffer(base64.b64decode(row.embedding, validate=True), dtype="<f4")
+                                 if isinstance(row.embedding, str) else row.embedding for row in data], dtype="<f4")
+        if (values.shape != (len(batch), DIMENSIONS) or values.dtype != np.dtype("<f4")
+                or not np.isfinite(values).all() or np.any(np.linalg.norm(values.astype(np.float64), axis=1) == 0)):
+            raise ValueError("임베딩 배치의 수량·차원·수치가 올바르지 않습니다.")
+        if not cached:
+            temporary = matrix_path.with_suffix(".npy.tmp")
+            with temporary.open("wb") as stream:
+                np.save(stream, values)
+            temporary.replace(matrix_path)
+            _write_json(receipt_path, {"start": start, "count": len(batch), "sha256": _file_hash(matrix_path)})
+        return start, values
+
+    with TemporaryDirectory(prefix=".openai-build-", dir=destination.parent) as directory:
+        matrix_path = Path(directory) / "vectors.npy"
+        matrix = np.lib.format.open_memmap(matrix_path, mode="w+", dtype="<f4", shape=(len(words), DIMENSIONS))
+        starts = range(0, len(words), BATCH_ROWS)
+        with ThreadPoolExecutor(max_workers=3) as executor:
+            futures = {executor.submit(encode_batch, start): start for start in starts}
+            total = len(futures)
+            try:
+                for count, future in enumerate(as_completed(futures), 1):
+                    start, values = future.result()
+                    matrix[start:start + len(values)] = values
+                    del futures[future]
+                    if count % 10 == 0 or count == total:
+                        print(f"OpenAI 임베딩 준비 · {count}/{total}개 배치", flush=True)
+            except BaseException:
+                for future in futures:
+                    future.cancel()
+                raise
+        matrix.flush()
+        del matrix
+        vectors = _publish(matrix_path, destination, words, dictionary)
+    shutil.rmtree(partials)
+    return vectors
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--download", action="store_true", help="공식 한국어 fastText 모델을 설치합니다.")
+    install = parser.add_mutually_exclusive_group()
+    install.add_argument("--download", action="store_true", help="OpenAI API로 전체 명사 임베딩을 한 번 준비합니다.")
+    install.add_argument("--from-cache", type=Path, help="검증된 동일 사전·모델 캐시를 가져옵니다.")
     args = parser.parse_args()
+    from openai import APIError
+
     try:
-        vectors = install_vectors() if args.download else load_vectors()
+        vectors = install_vectors(source=args.from_cache) if args.download or args.from_cache else load_vectors()
     except (OSError, ValueError) as error:
         parser.exit(1, f"{error}\n")
+    except APIError:
+        parser.exit(1, "OpenAI 임베딩 요청에 실패했습니다. 키·사용 한도·연결을 확인한 뒤 같은 명령으로 재개하세요.\n")
     print(json.dumps({"path": str(DEFAULT_PATH), **vectors.metadata}, ensure_ascii=False, indent=2))
 
 

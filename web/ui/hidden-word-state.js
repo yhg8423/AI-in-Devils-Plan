@@ -4,6 +4,12 @@ const keyFor = ({round, setter}) => `${round}:${setter}`;
 const hintKey = ({round, setter, phase, index}) => `${round}:${setter}:${phase}:${index}`;
 const number = new Intl.NumberFormat("en", {maximumFractionDigits: 2});
 export const normalizedHiddenScores = (setup) => setup?.score_display === "nearest_noun_99_9";
+export const standardDictionaryScorer = (setup) => setup?.score_mode === "openai" || setup?.scorer?.id === "openai-text-embedding-3-large-stdict-20260605";
+export function hiddenScorerLabel(setup) {
+  if (standardDictionaryScorer(setup)) return "OpenAI · text-embedding-3-large";
+  if (setup?.score_mode === "fasttext" || setup?.scorer?.id === "fasttext-cc-ko-300") return "fastText · cc.ko.300";
+  return setup?.score_mode === "word2vec" ? "Word2Vec" : "";
+}
 export function similarityLabel(value, setup) {
   if (!Number.isFinite(value)) return "–";
   const rounded = number.format(value);
@@ -13,6 +19,7 @@ export function similarityLabel(value, setup) {
 export function hintScoreLabel({similarity, valid, reason}, setup) {
   if (reason === "out_of_vocabulary") return tr("벡터 사전에 없음", "Not in vector vocabulary");
   if (reason === "not_common_noun") return tr("일반명사 아님", "Not a common noun");
+  if (reason === "not_registered_noun") return tr("등록된 명사 아님", "Not a registered noun");
   return valid === false ? tr("명사 아님", "Not a noun") : similarityLabel(similarity, setup);
 }
 export const hiddenRoundLabel = (round) => tr(`${round}라운드`, `Round ${round}`);
@@ -119,7 +126,7 @@ export function hiddenActionText(phase, action) {
 export function hiddenEventText(type, data, setup = data) {
   switch (type) {
     case "word_setup": return tr(`참가자 ${data.order.length}명 · ${data.rounds}라운드`, `${data.order.length} players · ${data.rounds} rounds`) +
-      (data.score_mode === "fasttext" ? " · fastText" : data.score_mode === "word2vec" ? " · Word2Vec" : "");
+      (hiddenScorerLabel(data) ? ` · ${hiddenScorerLabel(data)}` : "");
     case "word_envelope": return tr(`봉투 ${data.envelope} · ${data.words.join(" · ")}`, `Envelope ${data.envelope} · ${data.words.join(" · ")}`);
     case "word_secret": return `${hiddenRoundLabel(data.round)} · ${tr("비공개 히든 워드", "Private hidden word")} · ${data.word}`;
     case "word_round": return `${hiddenRoundLabel(data.round)} · ${tr(`승점 ×${data.multiplier}`, `VP ×${data.multiplier}`)}`;

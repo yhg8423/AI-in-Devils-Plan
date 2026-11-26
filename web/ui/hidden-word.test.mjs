@@ -60,6 +60,28 @@ function renderMatch(events, view, language, selected = "", frame = events.lengt
 }
 
 for (const language of ["ko", "en"]) {
+  test(`${language}: registered dictionary nouns use OpenAI scores without relabeling archived scorers`, () => {
+    const current = record("word_setup", {...setup.data, version: 3, score_mode: "openai", discussion: false,
+      scorer: {id: "openai-text-embedding-3-large-stdict-20260605", model: "text-embedding-3-large", provider: "openai", dimensions: 3072},
+      hint_filter: "stdict_noun_membership_v1", reveal_rule: "nearest_noun_ratio_v1", score_display: "nearest_noun_99_9", hint_visibility: "public"});
+    const proper = record("word_similarity", {...similarity.data, word: "우산국", similarity: 94.4, qualifies: false, valid: true});
+    const unknown = record("word_similarity", {...similarity.data, index: 2, word: "미등록후보", similarity: null, valid: false, reason: "not_registered_noun"});
+    const nearest = record("word_clue", {...clue.data, word: "우산도", similarity: 99.9, forced: true, source: "openai_stdict_nearest"});
+    const events = [current, ...base.slice(1, 5), proper, unknown, nearest, guess];
+    for (const view of ["public", "operator", ...players]) {
+      const html = renderMatch(events, view, language);
+      assert.match(html, /OpenAI · text-embedding-3-large/);
+      assert.match(html, language === "ko" ? /표준국어대사전 명사/ : /Standard Korean Language Dictionary nouns/);
+      assert.match(html, /우산국|우산도/);
+      assert.match(html, language === "ko" ? /94\.4점/ : /94\.4 points/);
+      assert.match(html, language === "ko" ? /등록된 명사 아님/ : /Not a registered noun/);
+      assert.match(html, language === "ko" ? /표준국어대사전 명사 중 정답과 가장 가까운 단어/ : /closest noun to the answer among Standard Korean Language Dictionary entries/);
+      assert.doesNotMatch(html, /fastText|Word2Vec|Kiwi|NNG|일반명사|common noun|94\.4%/);
+      if (!["operator", "P01"].includes(view)) assert.doesNotMatch(html, /보름달|조약돌/);
+      if (!["operator", "P02"].includes(view)) assert.doesNotMatch(html, /달빛|달님/);
+    }
+    assert.match(api[language].hiddenEventText("word_setup", current.data), /OpenAI · text-embedding-3-large/);
+  });
   test(`${language}: public candidates are visible before95 points and remain through later phases`, () => {
     const publicSetup = record("word_setup", {...setup.data, version: 2, score_mode: "fasttext", discussion: false,
       reveal_rule: "nearest_noun_ratio_v1", score_display: "nearest_noun_99_9", hint_visibility: "public"});
@@ -412,7 +434,7 @@ test("English rules distinguish raw Word2Vec rules from archived AI judgments", 
   assert.doesNotMatch(publicHints, /private hints per phase|only similarity scores appear|isolated AI/);
 });
 
-test("actual engine RULES translate to public candidates and normalized fastText scores", () => {
+test("actual engine RULES translate to public candidates and cached OpenAI dictionary scores", () => {
   const source = readFileSync(new URL("../../games/hidden_word/game.py", import.meta.url), "utf8");
   const rules = source.match(/RULES = """([\s\S]*?)"""/)?.[1];
   assert.ok(rules, "The engine RULES string must be available to this regression test");
@@ -420,6 +442,10 @@ test("actual engine RULES translate to public candidates and normalized fastText
   const summary = rulesSummary(rules.split("\n")[0], rules);
   assert.match(summary, /Every candidate word and its normalized score are immediately visible to all players/);
   assert.match(summary, /Hint submission ends as soon as a score exceeds 95 points/);
-  assert.match(summary, /Korean fastText similarity normalized to 0–99\.9 points/);
-  assert.doesNotMatch(summary, /private hints per phase|only similarity scores appear|isolated AI/);
+  assert.match(summary, /213,810 registered nouns/);
+  assert.match(summary, /3,072-dimensional OpenAI text-embedding-3-large/);
+  assert.match(summary, /Registered proper names, archaic nouns/);
+  assert.match(summary, /nearest eligible dictionary noun cosine similarity, limited to 0–99\.9 points/);
+  assert.match(summary, /no embedding API calls during play/);
+  assert.doesNotMatch(summary, /private hints per phase|only similarity scores appear|isolated AI|fastText|Word2Vec|Kiwi|NNG|common noun/);
 });
