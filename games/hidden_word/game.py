@@ -1,6 +1,7 @@
 """Public term hints, shared OpenAI embeddings, and sealed guesses."""
 
 import json
+from dataclasses import replace
 
 from ..match import Decision, Match, encode
 from ..models import STRATEGY_NOTE_LIMIT
@@ -14,6 +15,7 @@ MAX_HINTS = 10
 HINT_SECONDS = 15 * 60
 GUESS_SECONDS = 5 * 60
 THRESHOLD = 95
+HINT_PREPARATION = "strategy_draft_review_v1"
 
 RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 
@@ -56,12 +58,22 @@ RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 시뮬레이터에서는 정답 자체를 힌트로 제출할 수 없습니다.
 방송은 6인 경기이며 이전 매치 생존자가 5명인 경로는 복귀자를 추가하지 않고 5인으로 진행합니다.
 각자 게임 시작 전과 정답 제출 전에 비공개 전략 요약을 정리합니다.
+힌트마다 비공개 전략 수립, 초안 작성, 재검토를 거친 뒤 최종 힌트와 판단 요약을 제출합니다.
+네 단계는 각각 별도의 모델 호출이며, 초안은 채점하거나 다른 참가자에게 공개하지 않습니다.
 참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.
 이 매치에서는 친밀도·신뢰도 관계 평가를 갱신하지 않습니다.
-출제 힌트는 출제자의 응답 시간을, 정답 제출은 각 추측자의 전략 요약과 답 응답 시간을 합산합니다.
+출제 힌트는 전략 수립·초안 작성·재검토·최종 제출 시간을 모두, 정답 제출은 각 추측자의 전략 요약과 답 응답 시간을 합산합니다.
 기다리는 시간을 별도로 재현하지 않습니다.
 완전 동점은 처음 공개한 추첨 순서로 판정합니다. 잘못된 형식이나 호출 상한 뒤에는 시연 행동을 사용합니다.
 """
+
+LEGACY_RULES = RULES.replace(
+    "힌트마다 비공개 전략 수립, 초안 작성, 재검토를 거친 뒤 최종 힌트와 판단 요약을 제출합니다.\n"
+    "네 단계는 각각 별도의 모델 호출이며, 초안은 채점하거나 다른 참가자에게 공개하지 않습니다.\n", "",
+).replace(
+    "출제 힌트는 전략 수립·초안 작성·재검토·최종 제출 시간을 모두, 정답 제출은 각 추측자의 전략 요약과 답 응답 시간을 합산합니다.",
+    "출제 힌트는 출제자의 응답 시간을, 정답 제출은 각 추측자의 전략 요약과 답 응답 시간을 합산합니다.",
+)
 
 
 def parse_guesses(text, pieces, spent):
@@ -118,6 +130,8 @@ def validate_saved_setup(setup, vectors):
         raise ValueError("대화 구간이 있는 이전 진행 방식의 경기는 재개할 수 없습니다. 새 경기를 시작하세요.")
     if setup.get("relationship_reviews") is not False:
         raise ValueError("관계 평가가 있는 이전 진행 방식의 경기는 재개할 수 없습니다. 새 경기를 시작하세요.")
+    if "hint_preparation" in setup and setup["hint_preparation"] != HINT_PREPARATION:
+        raise ValueError("저장된 경기의 힌트 준비 방식을 지원하지 않습니다. 새 경기를 시작하세요.")
     if setup.get("fallback") != "vocabulary_nearest":
         raise ValueError("힌트 공개 규칙이 변경되었습니다. 새 경기를 시작하세요.")
     if setup.get("reveal_rule") != "nearest_noun_ratio_v1":
@@ -153,22 +167,54 @@ def _strategy(match, phase, focus, names):
     return times
 
 
+def _prepared_hint(match, setter, decision, remaining_ns):
+    """Keep preparation private, with all four calls sharing the hint deadline."""
+    times = _strategy(match, "word_hint_preparation", decision.prompt + "\n"
+        "아직 힌트를 제출하지 않습니다. 의미상 가까우면서 정답을 숨길 수 있는 방향과 "
+        "이전 공개 후보를 통해 상대가 추론할 위험을 비교해 짧은 계획을 정리하세요.", [setter])
+    elapsed = times.get(setter, 0)
+    if elapsed > remaining_ns:
+        return None, elapsed
+    times = {}
+    draft = match.decide_together("word_hint_draft", {setter: replace(decision,
+        prompt=decision.prompt + "\n방금 세운 비공개 계획을 참고해 힌트 초안 한 개를 고르세요. "
+        "이 초안은 아직 채점하거나 공개하지 않습니다.")}, response_times=times)[setter]
+    elapsed += times.get(setter, 0)
+    if elapsed > remaining_ns:
+        return None, elapsed
+    times = _strategy(match, "word_hint_review", decision.prompt + "\n"
+        f"비공개 힌트 초안: {encode(draft)}. 아직 실제 유사도 점수는 없습니다. "
+        "초안이 정답을 너무 쉽게 드러내는지, 95점 초과가 가능한지, 이전 후보의 반복인지 "
+        "검토하고 유지 또는 수정 방향을 짧게 요약하세요. 점수를 확인한 사실처럼 단정하지 마세요.", [setter])
+    elapsed += times.get(setter, 0)
+    if elapsed > remaining_ns:
+        return None, elapsed
+    times = {}
+    hint = match.decide_together("word_hint", {setter: replace(decision, default=draft,
+        prompt=decision.prompt + f"\n비공개 힌트 초안: {encode(draft)}. "
+        "방금 정리한 전략과 재검토 요약을 반영해 초안을 유지하거나 수정하고 최종 힌트를 제출하세요. "
+        "이번 선택의 짧은 판단 요약은 note에, 최종 힌트 한 개는 action에 적으세요.")}, response_times=times)[setter]
+    return hint, elapsed + times.get(setter, 0)
+
+
 def play(match: Match, *, vectors=None):
     players = match.players
     if len(players) not in (5, 6) or len(set(players)) != len(players):
         raise ValueError("히든 워드에는 서로 다른 참가자 5~6명이 필요합니다.")
     vectors = validate_vectors(load_vectors() if vectors is None else vectors)
+    saved_setup = None
     if match.resume_log is not None and match.resume_log.resume:
-        setup = next((json.loads(event["content"]) for event in match.resume_log.events
+        saved_setup = next((json.loads(event["content"]) for event in match.resume_log.events
                       if event["msg_type"] == "word_setup"), None)
-        validate_saved_setup(setup, vectors)
+        validate_saved_setup(saved_setup, vectors)
+    prepared_hints = saved_setup is None or saved_setup.get("hint_preparation") == HINT_PREPARATION
     match.relationship_reviews_enabled = False
     demo_hints = {word: tuple(hint for hint in ASSOCIATIONS[word] if vectors.is_hint(hint)) for word in WORDS}
     order = match.rng.sample(list(players), len(players))
     scores = dict.fromkeys(players, 0)
     similarity_cache = {}
     envelopes, used = {}, {}
-    match.event("rules", RULES)
+    match.event("rules", RULES if prepared_hints else LEGACY_RULES)
     setup = {"version": 4, "players": players, "rounds": ROUNDS,
         "order": order, "envelopes": len(ENVELOPES), "threshold": THRESHOLD,
         "max_hints": MAX_HINTS, "hint_seconds": HINT_SECONDS, "guess_seconds": GUESS_SECONDS,
@@ -177,6 +223,8 @@ def play(match: Match, *, vectors=None):
         "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
         "hint_filter": "openai_text_embedding_v1", "pieces": match.pieces.copy(),
         "score_display": "nearest_noun_99_9", "score_ceiling": 99.9, "hint_visibility": "public"}
+    if prepared_hints:
+        setup["hint_preparation"] = HINT_PREPARATION
     match.event("word_setup", setup)
     _strategy(match, "word_preparation", "게임 시작 전 자신의 출제·추측 계획을 정리하세요.", players)
     remaining = list(range(1, len(ENVELOPES) + 1))
@@ -217,9 +265,8 @@ def play(match: Match, *, vectors=None):
                 revealed = None
                 for hint_index in range(1, MAX_HINTS + 1):
                     default = demo_hints[secret][(hint_index + phase - 2) % len(demo_hints[secret])]
-                    times = {}
                     history = f"이번 출제자의 모든 공개 후보와 보정 점수: {encode(candidates)}. 최종 힌트: {encode(clues)}. "
-                    hint = match.decide_together("word_hint", {setter: Decision(
+                    decision = Decision(
                         f"{phase}차 힌트 {hint_index}/{MAX_HINTS}. 정답 {secret!r}은 다른 참가자에게 숨겨져 있습니다. "
                         "정답을 알아맞히기 어렵게 하면서 보정 점수 95점을 초과할 의미상 가까운 명사나 용어 한 개를 제출하세요. "
                         "제출한 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다. "
@@ -227,11 +274,17 @@ def play(match: Match, *, vectors=None):
                         "사전 등재 여부와 관계없이 힌트를 제출할 수 있습니다. "
                         "정답 자체와 설명을 제외하고 명사나 용어 한 개만 그대로 출력하세요.", default,
                         valid=lambda value: isinstance(value, str) and bool(value.strip()) and normalize_hint(value) != secret,
-                    )}, response_times=times)[setter]
-                    hint = normalize_hint(hint)
-                    elapsed += times.get(setter, 0)
-                    if elapsed > HINT_SECONDS * 1_000_000_000:
+                    )
+                    if prepared_hints:
+                        hint, duration = _prepared_hint(match, setter, decision, HINT_SECONDS * 1_000_000_000 - elapsed)
+                    else:
+                        times = {}
+                        hint = match.decide_together("word_hint", {setter: decision}, response_times=times)[setter]
+                        duration = times.get(setter, 0)
+                    elapsed += duration
+                    if hint is None or elapsed > HINT_SECONDS * 1_000_000_000:
                         break
+                    hint = normalize_hint(hint)
                     judgement = match.decision(["word_hint_score_v4", number, setter, phase, hint_index],
                         lambda: _judge(vectors, secret, hint, similarity_cache))
                     similarity = normalized_score(judgement["similarity"], nearest["similarity"])

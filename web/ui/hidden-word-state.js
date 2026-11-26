@@ -116,6 +116,7 @@ export function hiddenActionText(phase, action) {
   if (phase === "word_envelope") return tr(`봉투 ${data} 선택`, `Choose envelope ${data}`);
   if (phase === "word_secret") return tr(`히든 워드 선택 · ${data}`, `Choose hidden word · ${data}`);
   if (phase === "word_hint") return tr(`힌트 후보 · ${data}`, `Hint candidate · ${data}`);
+  if (phase === "word_hint_draft") return tr(`비공개 힌트 초안 · ${data}`, `Private hint draft · ${data}`);
   if (phase === "word_guess") {
     const answers = Array.isArray(data) ? data : data?.answers;
     if (Array.isArray(answers)) return tr(`답안 · ${answers.join(" / ")}`, `Answers · ${answers.join(" / ")}`);

@@ -117,6 +117,8 @@ const legacyRelationshipCheckpoints = new Map([
 const actions = {
   word_envelope: tr("봉투 선택", "Choose an envelope"), word_secret: tr("출제 단어 선택", "Choose a hidden word"),
   word_hint: tr("힌트 입력", "Submit a hint"), word_guess: tr("정답 제출", "Submit an answer"),
+  word_hint_preparation: tr("힌트 전략 수립", "Hint planning"), word_hint_draft: tr("힌트 초안 작성", "Draft a hint"),
+  word_hint_review: tr("힌트 재검토", "Review the hint"),
   word_preparation: tr("비공개 전략 준비", "Private preparation"), word_talk: tr("히든 워드 대화", "Hidden Word discussion"),
   word_guess_preparation: tr("정답 제출 전 검토", "Review before answering"), word_discussion: tr("히든 워드 대화", "Hidden Word discussion"),
   symmetry_arrange: tr("세 색 조립", "Arrange pieces"),

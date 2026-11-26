@@ -41,6 +41,7 @@ export function rulesSummary(heading, body) {
         "Relationship reviews follow verdicts.",
         "Inherited affinity and trust ratings remain static context; this match does not update them during play or at its end.",
       );
+      if (body.includes("힌트마다 비공개 전략 수립, 초안 작성, 재검토")) summary += " Before every hint, the setter separately plans, drafts, and reviews privately, then submits the final hint with a short decision summary. Drafts and planning or review notes remain visible only to the setter and operator; only the final submitted candidate is scored and published. All four response times count toward the hint timer.";
       return summary;
     }
     const normalized = body.includes("정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.");

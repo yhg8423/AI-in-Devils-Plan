@@ -60,6 +60,35 @@ function renderMatch(events, view, language, selected = "", frame = events.lengt
 }
 
 for (const language of ["ko", "en"]) {
+  test(`${language}: hint strategy, draft and review stay private until the final candidate is submitted`, () => {
+    const current = record("word_setup", {...setup.data, version: 4, discussion: false,
+      hint_visibility: "public", hint_preparation: "strategy_draft_review_v1"});
+    const plan = record("decision_note", {phase: "word_hint_preparation", note: "힌트전략비밀"}, "P01", ["P01"]);
+    const draftNote = record("decision_note", {phase: "word_hint_draft", note: "초안판단비밀"}, "P01", ["P01"]);
+    const draft = record("action", {phase: "word_hint_draft", action: "초안전용단어"}, "P01", ["P01"]);
+    const review = record("decision_note", {phase: "word_hint_review", note: "재검토비밀"}, "P01", ["P01"]);
+    const events = [current, ...base.slice(1, 5), plan, draftNote, draft, review];
+    for (const view of ["operator", ...players, "public"]) {
+      const html = renderMatch(events, view, language);
+      assert.equal(stateFor(events, view, language).wordHints.length, 0);
+      if (["operator", "P01"].includes(view)) {
+        for (const text of ["힌트전략비밀", "초안판단비밀", "초안전용단어", "재검토비밀"]) assert.match(html, new RegExp(text));
+        assert.match(html, language === "ko" ? /힌트 전략 수립/ : /Hint planning/);
+        assert.match(html, language === "ko" ? /힌트 초안 작성/ : /Draft a hint/);
+        assert.match(html, language === "ko" ? /비공개 힌트 초안/ : /Private hint draft/);
+        assert.match(html, language === "ko" ? /힌트 재검토/ : /Review the hint/);
+      } else {
+        assert.doesNotMatch(html, /힌트전략비밀|초안판단비밀|초안전용단어|재검토비밀|보름달|조약돌|word_hint_/);
+      }
+    }
+    const submitted = record("word_hint", {...hint.data, word: "최종공개단어"}, "P01");
+    for (const view of ["public", "P03"]) {
+      const html = renderMatch([...events, submitted], view, language);
+      assert.match(html, /최종공개단어/);
+      assert.doesNotMatch(html, /힌트전략비밀|초안판단비밀|초안전용단어|재검토비밀/);
+      assert.equal(stateFor([...events, submitted], view, language).wordHints.length, 1);
+    }
+  });
   test(`${language}: archived v3 noun-list rejections retain their recorded outcome`, () => {
     const current = record("word_setup", {...setup.data, version: 3, score_mode: "openai", discussion: false,
       scorer: {id: "openai-text-embedding-3-large-stdict-20260605", model: "text-embedding-3-large", provider: "openai", dimensions: 3072},
@@ -462,7 +491,7 @@ test("saved v3 OpenAI rules keep their historical noun-list restriction and cach
   assert.match(summary, /unregistered words use one attempt without a score/);
   assert.match(summary, /no embedding API calls during play/);
   assert.match(summary, /Relationship reviews follow verdicts/);
-  assert.doesNotMatch(summary, /need not appear in the dictionary|On first use|OPENAI_API_KEY/);
+  assert.doesNotMatch(summary, /need not appear in the dictionary|On first use|OPENAI_API_KEY|Before every hint|All four response times/);
 });
 
 test("actual engine RULES translate on-demand hints independently of the fixed dictionary reference", () => {
@@ -472,6 +501,7 @@ test("actual engine RULES translate on-demand hints independently of the fixed d
   assert.match(rules, /출제자가 제출하는 모든 힌트 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다/);
   assert.match(rules, /힌트는 사전 등재 여부와 관계없이/);
   assert.match(rules, /이 매치에서는 친밀도·신뢰도 관계 평가를 갱신하지 않습니다/);
+  assert.match(rules, /힌트마다 비공개 전략 수립, 초안 작성, 재검토/);
   const summary = rulesSummary(rules.split("\n")[0], rules);
   assert.match(summary, /Every candidate word and its normalized score are immediately visible to all players/);
   assert.match(summary, /Hint submission ends as soon as a score exceeds 95 points/);
@@ -486,6 +516,9 @@ test("actual engine RULES translate on-demand hints independently of the fixed d
   assert.match(summary, /independent of player models and makes no LLM similarity judgments/);
   assert.match(summary, /Inherited affinity and trust ratings remain static context/);
   assert.match(summary, /does not update them during play or at its end/);
+  assert.match(summary, /Before every hint, the setter separately plans, drafts, and reviews privately/);
+  assert.match(summary, /only the final submitted candidate is scored and published/);
+  assert.match(summary, /All four response times count toward the hint timer/);
   assert.doesNotMatch(summary, /Relationship reviews follow verdicts/);
   assert.doesNotMatch(summary, /private hints per phase|only similarity scores appear|isolated AI|fastText|Word2Vec|Kiwi|NNG|common noun|unregistered words use one attempt|no embedding API calls during play/);
 });
