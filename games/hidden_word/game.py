@@ -1,10 +1,10 @@
-"""Public dictionary-noun candidates, shared OpenAI embeddings, and sealed guesses."""
+"""Public term hints, shared OpenAI embeddings, and sealed guesses."""
 
 import json
 
 from ..match import Decision, Match, encode
 from ..models import STRATEGY_NOTE_LIMIT
-from .vectors import load_vectors, normalized_score
+from .vectors import load_vectors, normalize_hint, normalized_score, scorer_metadata
 from .words import ASSOCIATIONS, DECK_SHA256, ENVELOPES, WORDS, is_noun_word, scripted_guess
 
 
@@ -41,21 +41,23 @@ RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 1위는 피스 4개를 얻습니다. 이 매치에는 연맹의 징표 구제가 없습니다.
 
 시뮬레이터 진행
-방송의 봉투와 다른 새 보통명사 묶음을 사용합니다. 명사 기준은 2026년 6월 5일자 사전 스냅샷입니다.
+방송의 봉투와 다른 새 보통명사 묶음을 사용합니다. 최근접 공개와 보정 기준은 2026년 6월 5일자 사전 스냅샷입니다.
 표준국어대사전 명사 213,810개와 OpenAI text-embedding-3-large 임베딩을 사용합니다.
-힌트는 이 사전 목록에 등재된 명사여야 하며, 등재된 고유명사·옛말·방언·전문어도 허용합니다.
-모든 참가자에게 같은 사전과 미리 계산한 임베딩을 적용하며 코사인 유사도는 로컬에서 계산합니다.
+제출 힌트는 사전 등재 여부와 관계없이 임베딩으로 채점합니다.
+명사나 용어 한 개를 제출하세요. 사전에 없는 힌트는 처음 제출할 때 같은 OpenAI 모델로 임베딩을 요청해 캐시합니다.
+이 캐시는 힌트 판정에만 쓰며, 최근접 공개와 99.9점 보정 기준은 고정 사전 213,810개에서만 구합니다.
+모든 참가자에게 같은 모델과 기준 사전을 적용하며 코사인 유사도는 로컬에서 계산합니다.
 정답을 제외한 최근접 사전 명사를 99.9점으로 놓고 보정합니다.
 코사인 유사도를 최근접 사전 명사의 코사인 유사도로 나눈 뒤 100을 곱하고, 0~99.9점으로 제한합니다.
 이 보정·공개 기준은 시뮬레이터의 진행 규칙입니다.
 방송의 학습 모델과 같은 수치를 보장하지 않습니다. 참가자의 제공자·모델·호출 상한은 유사도에 영향을 주지 않습니다.
-사전 목록에 등재되지 않은 힌트도 단어와 무효 사유가 공개되며 점수 없이 한 번의 제출 기회를 소모합니다.
-제출 힌트와 최근접 명사 검색에 같은 사전 명사 기준을 적용하며 시연 행동에도 같은 임베딩 판정을 사용합니다.
+사전 밖 힌트도 단어와 점수가 즉시 공개됩니다. 임베딩 요청 오류는 무효 힌트로 넘기지 않고 경기를 중단합니다.
+시연 행동에도 같은 임베딩 판정을 사용합니다.
 시뮬레이터에서는 정답 자체를 힌트로 제출할 수 없습니다.
 방송은 6인 경기이며 이전 매치 생존자가 5명인 경로는 복귀자를 추가하지 않고 5인으로 진행합니다.
 각자 게임 시작 전과 정답 제출 전에 비공개 전략 요약을 정리합니다.
 참가자 간 대화·협상·귓속말과 룸 이동은 없습니다.
-판정 결과를 확인한 뒤 친밀도·신뢰도를 검토합니다.
+이 매치에서는 친밀도·신뢰도 관계 평가를 갱신하지 않습니다.
 출제 힌트는 출제자의 응답 시간을, 정답 제출은 각 추측자의 전략 요약과 답 응답 시간을 합산합니다.
 기다리는 시간을 별도로 재현하지 않습니다.
 완전 동점은 처음 공개한 추첨 순서로 판정합니다. 잘못된 형식이나 호출 상한 뒤에는 시연 행동을 사용합니다.
@@ -102,35 +104,35 @@ def validate_vectors(vectors):
 
 
 def validate_saved_setup(setup, vectors):
-    if not isinstance(setup, dict) or setup.get("version") != 3:
-        raise ValueError("이전 유사도 판정으로 시작한 히든 워드는 재개할 수 없습니다. 표준국어대사전·OpenAI 판정으로 새 경기를 시작하세요.")
+    if not isinstance(setup, dict) or setup.get("version") != 4:
+        raise ValueError("이전 유사도 판정으로 시작한 히든 워드는 재개할 수 없습니다. 사전 밖 힌트를 허용하는 새 경기를 시작하세요.")
     if setup.get("hint_visibility") != "public":
         raise ValueError("힌트 후보가 비공개였던 이전 경기는 재개할 수 없습니다. 새 경기를 시작하세요.")
     if setup.get("score_mode") != "openai":
         raise ValueError("유사도 판정기가 변경되었습니다. 새 경기를 시작하세요.")
-    if setup.get("scorer") != vectors.metadata:
+    if setup.get("scorer") != scorer_metadata(vectors):
         raise ValueError("저장된 경기와 사전·임베딩 모델 정보·체크섬이 다릅니다. 당시 모델 파일을 사용하세요.")
     if setup.get("deck_sha256") != DECK_SHA256:
         raise ValueError("단어 봉투 구성이 변경되었습니다. 새 경기를 시작하세요.")
     if setup.get("discussion") is not False:
         raise ValueError("대화 구간이 있는 이전 진행 방식의 경기는 재개할 수 없습니다. 새 경기를 시작하세요.")
+    if setup.get("relationship_reviews") is not False:
+        raise ValueError("관계 평가가 있는 이전 진행 방식의 경기는 재개할 수 없습니다. 새 경기를 시작하세요.")
     if setup.get("fallback") != "vocabulary_nearest":
         raise ValueError("힌트 공개 규칙이 변경되었습니다. 새 경기를 시작하세요.")
     if setup.get("reveal_rule") != "nearest_noun_ratio_v1":
         raise ValueError("힌트 공개 기준이 변경되었습니다. 새 경기를 시작하세요.")
-    if setup.get("hint_filter") != "stdict_noun_membership_v1":
+    if setup.get("hint_filter") != "openai_text_embedding_v1":
         raise ValueError("힌트 명사 판정 규칙이 변경되었습니다. 새 경기를 시작하세요.")
     if setup.get("score_display") != "nearest_noun_99_9" or setup.get("score_ceiling") != 99.9:
         raise ValueError("저장된 경기의 점수 표시 규칙을 지원하지 않습니다. 새 경기를 시작하세요.")
 
 
 def _judge(vectors, secret, hint, cache):
-    if not vectors.is_hint(hint):
-        return {"similarity": None, "valid": False, "mode": "openai", "reason": "not_registered_noun"}
     key = tuple(sorted((secret, hint)))
     if key in cache:
         return cache[key]
-    result = {"similarity": vectors.similarity(secret, hint), "valid": True, "mode": "openai"}
+    result = {"similarity": vectors.hint_similarity(secret, hint), "valid": True, "mode": "openai"}
     cache[key] = result
     return result
 
@@ -160,18 +162,20 @@ def play(match: Match, *, vectors=None):
         setup = next((json.loads(event["content"]) for event in match.resume_log.events
                       if event["msg_type"] == "word_setup"), None)
         validate_saved_setup(setup, vectors)
+    match.relationship_reviews_enabled = False
     demo_hints = {word: tuple(hint for hint in ASSOCIATIONS[word] if vectors.is_hint(hint)) for word in WORDS}
     order = match.rng.sample(list(players), len(players))
     scores = dict.fromkeys(players, 0)
     similarity_cache = {}
     envelopes, used = {}, {}
     match.event("rules", RULES)
-    setup = {"version": 3, "players": players, "rounds": ROUNDS,
+    setup = {"version": 4, "players": players, "rounds": ROUNDS,
         "order": order, "envelopes": len(ENVELOPES), "threshold": THRESHOLD,
         "max_hints": MAX_HINTS, "hint_seconds": HINT_SECONDS, "guess_seconds": GUESS_SECONDS,
-        "score_mode": "openai", "scorer": vectors.metadata, "deck_sha256": DECK_SHA256,
-        "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
-        "hint_filter": "stdict_noun_membership_v1", "pieces": match.pieces.copy(),
+        "score_mode": "openai", "scorer": scorer_metadata(vectors), "deck_sha256": DECK_SHA256,
+        "discussion": False, "relationship_reviews": False,
+        "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
+        "hint_filter": "openai_text_embedding_v1", "pieces": match.pieces.copy(),
         "score_display": "nearest_noun_99_9", "score_ceiling": 99.9, "hint_visibility": "public"}
     match.event("word_setup", setup)
     _strategy(match, "word_preparation", "게임 시작 전 자신의 출제·추측 계획을 정리하세요.", players)
@@ -217,21 +221,21 @@ def play(match: Match, *, vectors=None):
                     history = f"이번 출제자의 모든 공개 후보와 보정 점수: {encode(candidates)}. 최종 힌트: {encode(clues)}. "
                     hint = match.decide_together("word_hint", {setter: Decision(
                         f"{phase}차 힌트 {hint_index}/{MAX_HINTS}. 정답 {secret!r}은 다른 참가자에게 숨겨져 있습니다. "
-                        "정답을 알아맞히기 어렵게 하면서 보정 점수 95점을 초과할 의미상 가까운 사전 등재 명사 한 개를 제출하세요. "
+                        "정답을 알아맞히기 어렵게 하면서 보정 점수 95점을 초과할 의미상 가까운 명사나 용어 한 개를 제출하세요. "
                         "제출한 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다. "
                         f"{history}"
-                        "표준국어대사전에 명사로 등재된 고유명사·옛말·방언·전문어도 허용합니다. "
-                        "정답 자체와 설명을 제외하고 사전 등재 명사 한 개만 그대로 출력하세요.", default,
-                        valid=lambda value: isinstance(value, str) and bool(value.strip()) and value != secret,
+                        "사전 등재 여부와 관계없이 힌트를 제출할 수 있습니다. "
+                        "정답 자체와 설명을 제외하고 명사나 용어 한 개만 그대로 출력하세요.", default,
+                        valid=lambda value: isinstance(value, str) and bool(value.strip()) and normalize_hint(value) != secret,
                     )}, response_times=times)[setter]
+                    hint = normalize_hint(hint)
                     elapsed += times.get(setter, 0)
                     if elapsed > HINT_SECONDS * 1_000_000_000:
                         break
-                    judgement = _judge(vectors, secret, hint, similarity_cache)
+                    judgement = match.decision(["word_hint_score_v4", number, setter, phase, hint_index],
+                        lambda: _judge(vectors, secret, hint, similarity_cache))
                     similarity = normalized_score(judgement["similarity"], nearest["similarity"])
                     qualifies = similarity is not None and similarity > THRESHOLD
-                    if not judgement["valid"]:
-                        match.event("invalid_action", {"phase": "word_hint", "action": hint}, private=[setter])
                     record = {**stage, "index": hint_index, "word": hint, **judgement, "qualifies": qualifies}
                     record.update(similarity=similarity, score_display="nearest_noun_99_9")
                     candidates.append(record)
@@ -255,7 +259,8 @@ def play(match: Match, *, vectors=None):
                 for seat, name in enumerate(players):
                     if name == setter:
                         continue
-                    fallback = encode({"answers": [scripted_guess(fallback_clues, seat + index + number, phase, vectors)], "spend": False})
+                    fallback = match.decision(["word_scripted_guess_v4", number, setter, phase, name], lambda: encode({
+                        "answers": [scripted_guess(fallback_clues, seat + index + number, phase, vectors)], "spend": False}))
                     decisions[name] = Decision(
                         f"{setter}의{phase}차 히든 워드를 추측하세요. {evidence}"
                         f"내 피스 {match.pieces[name]}개, 이번 워드 추가 답 사용 {'완료' if name in paid else '가능'}. "
@@ -284,7 +289,6 @@ def play(match: Match, *, vectors=None):
                 end = bool(correct) or phase == PHASES
                 match.event("word_verdict", {**stage, "word": secret if end else None, "correct": correct,
                     "guesses": guesses, "points": points, "scores": scores.copy(), "pieces": match.pieces.copy(), "end": end})
-                match.review_relationships(f"히든 워드 {number}라운드 {setter} {phase}차 판정")
                 if end:
                     break
     ranking = sorted(players, key=lambda name: (-scores[name], order.index(name)))
@@ -293,5 +297,4 @@ def play(match: Match, *, vectors=None):
               "living": ranking[:2], "prison": ranking[2:-1], "eliminated": ranking[-1:],
               "pieces_awarded": {ranking[0]: 4}, "tie_order": order}
     match.event("word_final", result)
-    match.review_relationships("히든 워드 매치 종료")
     return result

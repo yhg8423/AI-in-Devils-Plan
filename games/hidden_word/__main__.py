@@ -33,7 +33,7 @@ def main(argv=None):
                     if row.get("msg_type") == "word_setup":
                         setup = json.loads(row["content"])
                         break
-            if not isinstance(setup, dict) or setup.get("version") != 3:
+            if not isinstance(setup, dict) or setup.get("version") != 4:
                 validate_saved_setup(setup, None)
         vectors = validate_vectors(load_vectors())
         if args.resume:

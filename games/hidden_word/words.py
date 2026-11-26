@@ -50,5 +50,5 @@ def scripted_guess(clues, player_index, phase, vectors):
     if not clues:
         return WORDS[player_index % len(WORDS)]
     last = clues[-1]
-    candidates = sorted(WORDS, key=lambda word: (-vectors.similarity(word, last), word))
+    candidates = sorted(WORDS, key=lambda word: (-vectors.hint_similarity(word, last), word))
     return candidates[(player_index + phase) % min(3, len(candidates))]

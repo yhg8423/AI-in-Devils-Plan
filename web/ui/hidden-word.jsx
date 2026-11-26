@@ -109,7 +109,7 @@ export function HiddenWordStage({state, replay}) {
   return <div className="hidden-word-stage">
     <div className="hidden-heading"><h2>{result ? tr("최종 결과", "Final results") : turn ? tr(`${turn.round} / ${setup?.rounds ?? 2}라운드`, `Round ${turn.round} of ${setup?.rounds ?? 2}`) : tr("히든 워드", "Hidden Word")}</h2>
       {turn && !result && <span>{tr(`승점 ×${turn.round === 2 ? 2 : 1}`, `VP ×${turn.round === 2 ? 2 : 1}`)}</span>}</div>
-    {scorer && <p className="hidden-score-method"><strong>{scorer}</strong> · {standardDictionaryScorer(setup) && <>{tr("표준국어대사전 명사", "Standard Korean Language Dictionary nouns")} · </>}{normalized ? tr("보정 유사도 · 0–99.9점", "Normalized similarity · 0–99.9 points") : tr("코사인 유사도 × 100 · −100~100%", "Cosine similarity × 100 · −100–100%")}</p>}
+    {scorer && <p className="hidden-score-method"><strong>{scorer}</strong> · {standardDictionaryScorer(setup) && <>{tr("최근접 기준: 표준국어대사전 명사", "Nearest-word reference: Standard Korean Language Dictionary nouns")} · </>}{normalized ? tr("보정 유사도 · 0–99.9점", "Normalized similarity · 0–99.9 points") : tr("코사인 유사도 × 100 · −100~100%", "Cosine similarity × 100 · −100–100%")}</p>}
     {setup?.display_projection === "raw_cosine_v1" && <p className="hidden-score-method">{tr("기존 기록은 판정을 유지하고 점수 표시만 보정합니다.", "Existing verdicts are retained; only score display is normalized.")}</p>}
     {result ? <Scoreboard state={state} replay={replay} /> : <>
       {setup?.discussion !== false && state.wordDiscussion && <p className="hidden-discussion">{hiddenEventText(state.wordDiscussion.turn ? "word_discussion_round" : "word_discussion", state.wordDiscussion)}</p>}

@@ -19,7 +19,7 @@ export function similarityLabel(value, setup) {
 export function hintScoreLabel({similarity, valid, reason}, setup) {
   if (reason === "out_of_vocabulary") return tr("벡터 사전에 없음", "Not in vector vocabulary");
   if (reason === "not_common_noun") return tr("일반명사 아님", "Not a common noun");
-  if (reason === "not_registered_noun") return tr("등록된 명사 아님", "Not a registered noun");
+  if (reason === "not_registered_noun") return tr("당시 명사 후보 목록에 없음", "Not in the noun list used for that match");
   return valid === false ? tr("명사 아님", "Not a noun") : similarityLabel(similarity, setup);
 }
 export const hiddenRoundLabel = (round) => tr(`${round}라운드`, `Round ${round}`);

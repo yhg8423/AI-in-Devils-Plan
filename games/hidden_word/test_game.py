@@ -7,6 +7,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, patch
+from unicodedata import normalize
 
 from ..match import DAY_FIVE_MAIN, Match, encode, run_cli
 from ..models import StrategyNote
@@ -27,6 +28,15 @@ class WrongGuesses(Match):
         if phase == "word_guess":
             decisions = {name: replace(decision, default=encode({"answers": ["우주선"], "spend": False}))
                          for name, decision in decisions.items()}
+        return super().decide_together(phase, decisions, **kwargs)
+
+
+class OutsideHints(WrongGuesses):
+    hint = "없는낱말"
+
+    def decide_together(self, phase, decisions, **kwargs):
+        if phase == "word_hint":
+            decisions = {name: replace(decision, default=self.hint) for name, decision in decisions.items()}
         return super().decide_together(phase, decisions, **kwargs)
 
 
@@ -71,6 +81,24 @@ class HiddenWordTest(unittest.TestCase):
         self.assertEqual(len(verdicts), 36)
         self.assertEqual([next(iter(verdict["points"].values())) for verdict in verdicts[:3]], [1, 2, 3])
         self.assertEqual([next(iter(verdict["points"].values())) for verdict in verdicts[-3:]], [2, 4, 6])
+
+    def test_no_relationship_reviews_during_play_or_generic_final_checkpoint(self):
+        previous = {PLAYERS[0]: {PLAYERS[1]: {"affinity": 65, "trust": 40, "reason": "이전 경기 근거"}}}
+        match = WrongGuesses(PLAYERS, 7, relationships=previous)
+        with patch.object(match, "review_relationships", side_effect=AssertionError("no review checkpoints")):
+            game.play(match)
+        self.assertFalse(match.relationship_reviews_enabled)
+        self.assertEqual(match.relationships[PLAYERS[0]], previous[PLAYERS[0]])
+        self.assertFalse(events(match, "relationship_update"))
+        self.assertTrue(events(match, "decision_note"))
+        self.assertIs(events(match, "word_setup")[0]["relationship_reviews"], False)
+        model = Mock()
+        match.models = {PLAYERS[0]: model}
+        match.backends = {PLAYERS[0]: object()}
+        match.live_turns = 100
+        match.review_relationships("매치 종료")
+        model.sample_text.assert_not_called()
+        self.assertEqual(match.live_turns, 100)
 
     def test_live_players_have_private_strategy_without_discussion_or_room_actions(self):
         class LiveMatch(Match):
@@ -118,7 +146,8 @@ class HiddenWordTest(unittest.TestCase):
             self.assertTrue(all(note.visible_to == [note.agent_name] for note in notes))
         actions = events(match, "action")
         self.assertFalse(any(action["phase"].startswith("word_discussion") for action in actions))
-        self.assertEqual(len(match.checkpoints), len(events(match, "word_verdict")) + 1)
+        self.assertEqual(match.checkpoints, [])
+        self.assertFalse(match.relationship_reviews_enabled)
         first = events(match, "word_hint")[0]
         for kind in ("word_hint", "word_guess_preparation", "word_guess"):
             prompts = [prompt for phase, _, prompt, stage in match.queries if phase == kind
@@ -272,10 +301,11 @@ class HiddenWordTest(unittest.TestCase):
                 if forced:
                     self.assertEqual(clue["similarity"], 99.9)
             self.assertEqual(events(match, "word_setup")[0]["fallback"], "vocabulary_nearest")
-            self.assertEqual(events(match, "word_setup")[0]["version"], 3)
+            self.assertEqual(events(match, "word_setup")[0]["version"], 4)
             self.assertEqual(events(match, "word_setup")[0]["score_mode"], "openai")
             self.assertEqual(events(match, "word_setup")[0]["reveal_rule"], "nearest_noun_ratio_v1")
-            self.assertEqual(events(match, "word_setup")[0]["hint_filter"], "stdict_noun_membership_v1")
+            self.assertEqual(events(match, "word_setup")[0]["hint_filter"], "openai_text_embedding_v1")
+            self.assertEqual(events(match, "word_setup")[0]["scorer"], game.scorer_metadata(self.vectors))
             self.assertEqual(events(match, "word_setup")[0]["score_display"], "nearest_noun_99_9")
             self.assertEqual(events(match, "word_setup")[0]["score_ceiling"], 99.9)
             self.assertIn("정답을 제외한 최근접 사전 명사를 99.9점으로 놓고 보정합니다.", game.RULES)
@@ -341,27 +371,63 @@ class HiddenWordTest(unittest.TestCase):
                 self.assertEqual({record["word"] for record in records}, {hint})
                 self.assertTrue(all(record["valid"] and record["qualifies"] for record in records))
                 self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
-        self.assertIn("등재된 고유명사·옛말·방언·전문어도 허용합니다.", game.RULES)
+        self.assertIn("제출 힌트는 사전 등재 여부와 관계없이 임베딩으로 채점합니다.", game.RULES)
 
-    def test_oov_hint_consumes_opportunity_without_substitution_or_word_leak(self):
-        stale_cache = {tuple(sorted(("학교", "없는낱말"))): {"similarity": 100, "valid": True, "mode": "openai"}}
-        self.assertEqual(game._judge(self.vectors, "학교", "없는낱말", stale_cache)["reason"], "not_registered_noun")
-        class UnknownHints(WrongGuesses):
-            def decide_together(self, phase, decisions, **kwargs):
-                if phase == "word_hint":
-                    decisions = {name: replace(decision, default="없는낱말") for name, decision in decisions.items()}
-                return super().decide_together(phase, decisions, **kwargs)
+    def test_outside_dictionary_hint_is_scored_without_changing_reference_maximum(self):
+        with (patch.object(self.vectors, "is_hint", side_effect=AssertionError("must not gate submitted hints")),
+              patch.object(self.vectors, "hint_similarity", return_value=98) as scorer):
+            cache = {}
+            judgement = game._judge(self.vectors, "학교", "없는낱말", cache)
+            self.assertEqual(judgement, {"similarity": 98, "valid": True, "mode": "openai"})
+            self.assertEqual(game._judge(self.vectors, "학교", "없는낱말", cache), judgement)
+            scorer.assert_called_once_with("학교", "없는낱말")
 
-        match = UnknownHints(PLAYERS, 4)
-        game.play(match)
+        original_metadata = self.vectors.metadata.copy()
+        match = OutsideHints(PLAYERS, 4)
+        with (patch.object(self.vectors, "hint_similarity", return_value=98),
+              patch.object(self.vectors, "nearest", return_value={"word": "대양", "similarity": 60})):
+            game.play(match)
         clues = events(match, "word_clue")
-        self.assertTrue(all(clue["word"] == "대양" and clue["source"] == "openai_stdict_nearest" for clue in clues))
-        self.assertEqual(len(events(match, "word_hint")), len(clues) * 10)
-        self.assertTrue(all(record["similarity"] is None and record["valid"] is False
-                            for record in events(match, "word_similarity")))
-        self.assertEqual({record["reason"] for record in events(match, "word_similarity")}, {"not_registered_noun"})
+        self.assertTrue(all(clue["word"] == "없는낱말" and clue["source"] == "submitted_hint" and not clue["forced"] for clue in clues))
+        self.assertEqual(len(events(match, "word_hint")), len(clues))
+        self.assertTrue(all(record["similarity"] == 99.9 and record["valid"] and record["qualifies"]
+                            and "reason" not in record for record in events(match, "word_similarity")))
         self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"없는낱말"})
         self.assertEqual({record["word"] for record in events(match, "word_similarity")}, {"없는낱말"})
+        self.assertNotIn("없는낱말", self.vectors)
+        self.assertEqual(self.vectors.metadata, original_metadata)
+        self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
+
+    def test_hint_normalization_precedes_scoring_and_rejects_secret_variants(self):
+        self_test = self
+
+        class NormalizedHints(OutsideHints):
+            def decide_together(self, phase, decisions, **kwargs):
+                if phase == "word_hint":
+                    stage = events(self, "word_phase")[-1]
+                    secret = next(item["word"] for item in events(self, "word_secret")
+                                  if item["round"] == stage["round"] and item["setter"] == stage["setter"])
+                    for decision in decisions.values():
+                        for forbidden in ("  ", secret, " " + secret + " ", normalize("NFD", secret)):
+                            self_test.assertFalse(decision.accepts(forbidden))
+                        self_test.assertNotIn("사전 등재 명사", decision.prompt)
+                return super().decide_together(phase, decisions, **kwargs)
+
+        match = NormalizedHints(PLAYERS, 4)
+        match.hint = "  " + normalize("NFD", "새힌트") + "  "
+        with patch.object(self.vectors, "hint_similarity", return_value=100) as scorer:
+            game.play(match)
+        self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"새힌트"})
+        self.assertTrue(all(call.args[1] == "새힌트" for call in scorer.call_args_list))
+
+    def test_hint_embedding_failure_interrupts_without_invalid_or_numeric_event(self):
+        match = OutsideHints(PLAYERS, 4)
+        with patch.object(self.vectors, "hint_similarity", side_effect=RuntimeError("embedding unavailable")):
+            with self.assertRaisesRegex(RuntimeError, "embedding unavailable"):
+                game.play(match)
+        self.assertFalse(events(match, "word_hint"))
+        self.assertFalse(events(match, "word_similarity"))
+        self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
 
     def test_deadlines_are_cumulative_and_late_guesses_do_not_spend_pieces(self):
         class SlowMatch(WrongGuesses):
@@ -434,6 +500,34 @@ class HiddenWordTest(unittest.TestCase):
             self.assertEqual(after[:len(before) - 1], before[:-1])
             self.assertEqual(json.loads(after[-1])["type"], "result")
 
+    def test_saved_oov_scores_and_scripted_guesses_replay_without_embedding(self):
+        def interrupt(match):
+            # Match journals active model backends, even after their turn budget is exhausted.
+            match.backends = dict.fromkeys(PLAYERS, object())
+            record = match.on_event
+
+            def stop(event):
+                record(event)
+                if event.msg_type == "word_verdict":
+                    raise RuntimeError("test interruption")
+
+            match.on_event = stop
+            return game.play(match)
+
+        with (TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+              patch("games.match.Match", OutsideHints)):
+            path = Path(directory) / "events.jsonl"
+            with patch.object(self.vectors, "hint_similarity", return_value=100):
+                with self.assertRaisesRegex(RuntimeError, "test interruption"):
+                    run_cli(interrupt, title=DAY_FIVE_MAIN, seats=6, argv=["--output", str(path)])
+            before = path.read_text().splitlines()
+            with patch.object(self.vectors, "hint_similarity", side_effect=AssertionError("saved prefix must not embed")) as scorer:
+                with self.assertRaisesRegex(RuntimeError, "test interruption"):
+                    run_cli(interrupt, title=DAY_FIVE_MAIN, seats=6, argv=["--resume", "--output", str(path)])
+                scorer.assert_not_called()
+            after = path.read_text().splitlines()
+            self.assertEqual(after[:len(before) - 1], before[:-1])
+
     def test_old_private_hint_match_cannot_resume_as_public_game(self):
         def interrupt(match):
             record = match.on_event
@@ -495,23 +589,28 @@ class HiddenWordTest(unittest.TestCase):
     def test_cli_rejects_incompatible_saved_setup_without_changing_record(self):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             path = Path(directory) / "events.jsonl"
-            valid = {"version": 3, "hint_visibility": "public", "score_mode": "openai",
-                     "scorer": self.vectors.metadata, "deck_sha256": DECK_SHA256,
-                     "discussion": False, "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
-                     "hint_filter": "stdict_noun_membership_v1", "score_display": "nearest_noun_99_9", "score_ceiling": 99.9}
+            valid = {"version": 4, "hint_visibility": "public", "score_mode": "openai",
+                     "scorer": game.scorer_metadata(self.vectors), "deck_sha256": DECK_SHA256,
+                     "discussion": False, "relationship_reviews": False,
+                     "fallback": "vocabulary_nearest", "reveal_rule": "nearest_noun_ratio_v1",
+                     "hint_filter": "openai_text_embedding_v1", "score_display": "nearest_noun_99_9", "score_ceiling": 99.9}
             game.validate_saved_setup(valid, self.vectors)
             changes = (
                 ({"version": 1}, "이전 유사도"),
                 ({"version": 2, "score_mode": "fasttext", "hint_filter": "same_as_nearest"}, "이전 유사도"),
+                ({"version": 3, "hint_filter": "stdict_noun_membership_v1"}, "이전 유사도"),
                 ({"hint_visibility": "private"}, "비공개"),
                 ({"score_mode": "fasttext"}, "판정기가 변경"),
-                ({"scorer": {**self.vectors.metadata, "id": "fasttext-cc-ko-300"}}, "모델 정보·체크섬"),
-                ({"scorer": {**self.vectors.metadata, "sha256": "different"}}, "모델 정보·체크섬"),
+                ({"scorer": {**valid["scorer"], "id": "fasttext-cc-ko-300"}}, "모델 정보·체크섬"),
+                ({"scorer": {**valid["scorer"], "sha256": "different"}}, "모델 정보·체크섬"),
+                ({"scorer": {**valid["scorer"], "out_of_vocabulary": "reject"}}, "모델 정보·체크섬"),
                 ({"deck_sha256": "different"}, "단어 봉투"),
                 ({"discussion": True}, "대화 구간"),
+                ({"relationship_reviews": True}, "관계 평가"),
+                ({"relationship_reviews": None}, "관계 평가"),
                 ({"fallback": "submitted_highest"}, "힌트 공개 규칙"),
                 ({"reveal_rule": "raw_cosine"}, "힌트 공개 기준"),
-                ({"hint_filter": "same_as_nearest"}, "힌트 명사 판정"),
+                ({"hint_filter": "stdict_noun_membership_v1"}, "힌트 명사 판정"),
                 ({"score_display": "unknown"}, "점수 표시"),
                 ({"score_ceiling": 100}, "점수 표시"),
             )

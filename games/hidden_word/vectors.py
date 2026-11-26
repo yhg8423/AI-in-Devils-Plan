@@ -1,4 +1,4 @@
-"""Cache OpenAI embeddings for registered Korean dictionary nouns; score locally."""
+"""Load fixed noun vectors and cache submitted-text embeddings for cosine scoring."""
 
 import argparse
 import base64
@@ -12,6 +12,7 @@ from math import isfinite
 from pathlib import Path
 import shutil
 from tempfile import TemporaryDirectory
+import unicodedata
 
 import numpy as np
 
@@ -34,6 +35,31 @@ BLOCK_ROWS = 4096
 BATCH_ROWS = 512
 SCORE_CEILING = 99.9
 INPUT_PROTOCOL = "plain isolated dictionary headword; no prompt"
+HINT_INPUT_PROTOCOL = "plain submitted text; no prompt"
+
+
+def normalize_hint(text):
+    if not isinstance(text, str) or not (text := unicodedata.normalize("NFC", text.strip())):
+        raise ValueError("빈 문자열은 힌트로 사용할 수 없습니다.")
+    return text
+
+
+def scorer_metadata(vectors):
+    """Describe runtime hint scoring without changing the fixed reference cache."""
+    return {**vectors.metadata, "out_of_vocabulary": "embed_on_demand",
+            "hint_input_protocol": HINT_INPUT_PROTOCOL, "hint_text_normalization": "NFC+strip"}
+
+
+def _embedding_values(response, count, dimensions, *, model=MODEL_ID):
+    data = sorted(response.data, key=lambda row: row.index)
+    if response.model != model or [row.index for row in data] != list(range(count)):
+        raise ValueError("OpenAI 임베딩 응답의 모델·입력 순서가 다릅니다.")
+    values = np.asarray([np.frombuffer(base64.b64decode(row.embedding, validate=True), dtype="<f4")
+                         if isinstance(row.embedding, str) else row.embedding for row in data], dtype="<f4")
+    if (values.shape != (count, dimensions) or not np.isfinite(values).all()
+            or np.any(np.linalg.norm(values.astype(np.float64), axis=1) == 0)):
+        raise ValueError("임베딩 배치의 수량·차원·수치가 올바르지 않습니다.")
+    return values
 
 
 def _file_hash(path):
@@ -127,6 +153,8 @@ class WordVectors:
         self._vectors, self._norms, self._words = values, norms, words
         self._indices = {word: index for index, word in enumerate(words)}
         self._nearest = {}
+        self._hint_vectors = {}
+        self._hint_cache = None
         self._legacy = (metadata or {}).get("id") == "fasttext-cc-ko-300"
         self.metadata = {**(metadata or {"id": "custom-embeddings"}),
                          "sha256": digest.hexdigest(), "dimensions": values.shape[1],
@@ -137,13 +165,74 @@ class WordVectors:
         return isinstance(word, str) and word in self._indices
 
     def is_hint(self, word):
-        """The complete dictionary membership governs hints and nearest search."""
+        """Membership for the fixed reference and offline scripted hint examples."""
         return word in self and (not self._legacy or _legacy_common_noun(word))
 
     def similarity(self, first, second):
         left, right = self._indices[first], self._indices[second]
         cosine = np.dot(self._vectors[left].astype(np.float64), self._vectors[right].astype(np.float64))
         cosine /= self._norms[left] * self._norms[right]
+        return float(np.clip(cosine, -1, 1) * 100)
+
+    def hint_similarity(self, secret, hint, *, client=None, cache_dir=None):
+        """Score a submitted text; supplemental embeddings never join the reference."""
+        hint = normalize_hint(hint)
+        if hint in self:
+            return self.similarity(secret, hint)
+        target = self._indices[secret]
+        if hint not in self._hint_vectors:
+            manifest = {"version": 1, "base_sha256": self.metadata["sha256"],
+                "model": self.metadata.get("model", MODEL_ID), "dimensions": self._vectors.shape[1],
+                "input_protocol": HINT_INPUT_PROTOCOL, "normalization": "NFC+strip", "text": hint}
+            key = sha256(json.dumps(manifest, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
+            directory = Path(cache_dir or self._hint_cache or DEFAULT_PATH / "hints")
+            directory.mkdir(parents=True, exist_ok=True)
+            path = directory / f"{key}.json"
+            with path.with_suffix(".lock").open("a+b") as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                if path.exists():
+                    entry = json.loads(path.read_text(encoding="utf-8"))
+                    if not isinstance(entry, dict) or entry.get("key") != manifest:
+                        raise ValueError("힌트 임베딩 캐시의 모델·입력 정보가 다릅니다.")
+                    value = np.asarray(entry.get("vector"), dtype="<f4")
+                    if (value.shape != (manifest["dimensions"],) or not np.isfinite(value).all()
+                            or np.linalg.norm(value.astype(np.float64)) == 0
+                            or entry.get("vector_sha256") != sha256(value.tobytes()).hexdigest()):
+                        raise ValueError("힌트 임베딩 캐시의 수치·체크섬이 올바르지 않습니다.")
+                else:
+                    def request(provided):
+                        anchor = "우산" if "우산" in self else self._words[0]
+                        response = provided.embeddings.create(model=manifest["model"], input=[hint, anchor],
+                            dimensions=manifest["dimensions"], encoding_format="base64")
+                        values = _embedding_values(response, 2, manifest["dimensions"], model=manifest["model"])
+                        fresh = values[1].astype(np.float64)
+                        saved = self._vectors[self._indices[anchor]].astype(np.float64)
+                        agreement = float(fresh @ saved / (np.linalg.norm(fresh) * np.linalg.norm(saved)))
+                        if agreement <= .99999:
+                            raise ValueError("OpenAI 임베딩이 저장된 기준 모델과 달라 힌트를 판정할 수 없습니다.")
+                        return values[0]
+
+                    if client is None:
+                        if self.metadata.get("id") != SCORER_ID:
+                            raise RuntimeError("사전 밖 힌트를 판정하려면 OpenAI 기준 캐시가 필요합니다.")
+                        from openai import APIError, OpenAI
+                        from ..models import _openai_key
+
+                        try:
+                            with OpenAI(api_key=_openai_key(ROOT / ".env"), base_url="https://api.openai.com/v1",
+                                        timeout=180, max_retries=5) as provided:
+                                value = request(provided)
+                        except APIError:
+                            raise RuntimeError("힌트 임베딩 요청에 실패했습니다. OpenAI 키·사용 한도·연결을 확인한 뒤 재개하세요.") from None
+                    else:
+                        value = request(client)
+                    _write_json(path, {"key": manifest, "vector": value.tolist(),
+                                       "vector_sha256": sha256(value.tobytes()).hexdigest()})
+                value.flags.writeable = False
+                self._hint_vectors[hint] = value
+        value = self._hint_vectors[hint].astype(np.float64)
+        cosine = float(self._vectors[target].astype(np.float64) @ value)
+        cosine /= self._norms[target] * np.linalg.norm(value)
         return float(np.clip(cosine, -1, 1) * 100)
 
     def nearest(self, word):
@@ -198,6 +287,7 @@ def load_vectors(path=DEFAULT_PATH):
     if (vectors._words != words or vectors.metadata["dimensions"] != DIMENSIONS
             or any(vectors.metadata.get(key) != value for key, value in _scorer_metadata(dictionary).items())):
         raise ValueError("표준국어대사전 명사 목록 또는 OpenAI 임베딩 모델 설정이 다릅니다.")
+    vectors._hint_cache = Path(path) / "hints"
     return vectors
 
 
@@ -278,11 +368,7 @@ def _install_vectors(destination, *, source=None, client=None):
         else:
             response = client.embeddings.create(model=MODEL_ID, input=list(batch),
                 dimensions=DIMENSIONS, encoding_format="base64")
-            data = sorted(response.data, key=lambda row: row.index)
-            if response.model != MODEL_ID or [row.index for row in data] != list(range(len(batch))):
-                raise ValueError("OpenAI 임베딩 응답의 모델·입력 순서가 다릅니다.")
-            values = np.asarray([np.frombuffer(base64.b64decode(row.embedding, validate=True), dtype="<f4")
-                                 if isinstance(row.embedding, str) else row.embedding for row in data], dtype="<f4")
+            values = _embedding_values(response, len(batch), DIMENSIONS)
         if (values.shape != (len(batch), DIMENSIONS) or values.dtype != np.dtype("<f4")
                 or not np.isfinite(values).all() or np.any(np.linalg.norm(values.astype(np.float64), axis=1) == 0)):
             raise ValueError("임베딩 배치의 수량·차원·수치가 올바르지 않습니다.")
@@ -333,7 +419,7 @@ def main():
         parser.exit(1, f"{error}\n")
     except APIError:
         parser.exit(1, "OpenAI 임베딩 요청에 실패했습니다. 키·사용 한도·연결을 확인한 뒤 같은 명령으로 재개하세요.\n")
-    print(json.dumps({"path": str(DEFAULT_PATH), **vectors.metadata}, ensure_ascii=False, indent=2))
+    print(json.dumps({"path": str(DEFAULT_PATH), **scorer_metadata(vectors)}, ensure_ascii=False, indent=2))
 
 
 if __name__ == "__main__":
