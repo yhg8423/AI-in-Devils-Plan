@@ -35,6 +35,7 @@ DAY_THREE_MAIN = "3일차 메인 매치 · 보석 암시장"
 DAY_THREE_PRISON = "3일차 감옥 매치 · 돼지 저금통"
 DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
+DAY_FIVE_MAIN = "5일차 메인 매치 · 히든 워드"
 FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
 SECOND_EXILE = "유배지 매치 2 · 달라진 그림 찾기"
 THIRD_EXILE = "유배지 매치 3 · 비밀 코드"
@@ -57,6 +58,7 @@ RELATIONSHIP_EVIDENCE = {
     "gem_auction", "gem_swap", "gem_bonus", "gem_reveal", "gem_card", "gem_peek", "gem_final",
     "pig_deposit", "pig_claim", "pig_doubt", "pig_replace", "pig_reset", "pig_challenge", "pig_reset_vote",
     "bingo_shapes", "bingo_result", "bingo_reveal", "bingo_submission",
+    "word_similarity", "word_clue", "word_verdict", "word_final",
 }
 
 

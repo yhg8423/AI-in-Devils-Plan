@@ -1,0 +1,59 @@
+.hidden-word-stage { color: #e1e6e9; font-size: 13px; }
+.hidden-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.hidden-heading > span { border: 1px solid #8f7955; padding: 3px 6px; color: #ebcf98; background: #40392c; white-space: nowrap; }
+.hidden-score-method { font-size: 10px; color: #b2c1cd; margin-block: 3px 12px; }
+.hidden-discussion { border-left: 3px solid #bfa875; background: #2a3340; padding: 9px; color: #d9d8c5; }
+.hidden-setter { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-block: 10px; color: #b6c5d0; }
+.hidden-setter > strong { color: #edcf98; font-size: 20px; }
+.hidden-setter > span:last-child { margin-left: auto; }
+.hidden-secret { min-height: 105px; display: grid; place-items: center; gap: 6px; padding: 15px; text-align: center; border: 3px double #84959e; background: repeating-linear-gradient(135deg, #17212c 0 5px, #1a2631 5px 10px); }
+.hidden-secret small { color: #b6c6d2; }
+.hidden-secret > strong { font: 700 26px/1.45 var(--pixel-font); color: #f1d59e; letter-spacing: .08em; }
+.hidden-secret > span { color: #a9bac7; font-size: 11px; }
+.hidden-secret[data-revealed="true"] { border-color: #a9c7a2; background: #263c32; }
+.hidden-similarities { margin-block: 15px; }
+.hidden-similarity-heading { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+.hidden-similarity-heading h3 { margin: 0; font-size: 13px; }
+.hidden-similarity-heading > span { font-size: 10px; color: #b2c1cd; }
+.hidden-similarities ol { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+.hidden-similarities li { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(65px, 1.15fr) 55px; gap: 8px; align-items: center; font-size: 11px; }
+.hidden-candidate-name { overflow-wrap: anywhere; }
+.hidden-candidate-name strong { font-weight: normal; }
+.hidden-similarities li > strong { font-variant-numeric: tabular-nums; text-align: right; color: #d0e4e3; }
+.hidden-meter { position: relative; height: 9px; background: #101822; border: 1px solid #50616d; }
+.hidden-meter > span { display: block; height: 100%; background: #8db1c1; }
+.hidden-meter[data-signed="true"]::after { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: #a8b9c8; }
+.hidden-meter[data-signed="true"] > span { position: absolute; top: 0; }
+.hidden-meter[data-negative="true"] > span { background: #c296a2; }
+.hidden-similarities li[data-threshold="true"] .hidden-meter > span { background: #e8c88e; }
+.hidden-similarities li[data-threshold="true"] > strong { color: #edcf98; }
+.hidden-clue { display: grid; grid-template-columns: 1fr auto; gap: 5px 10px; padding: 11px; background: #39382d; border: 2px solid #b59a63; margin-block: 12px; }
+.hidden-clue small { grid-column: 1 / -1; color: #dfc28e; }
+.hidden-clue strong { font-size: 22px; color: #fff0ce; }
+.hidden-clue > span { align-self: center; font-size: 17px; color: #f1dbac; }
+.hidden-clue p { grid-column: 1 / -1; font-size: 10px; margin: 4px 0 0; color: #c7c4b1; }
+.hidden-verdict { margin-block: 13px; border: 1px solid #846f59; padding: 9px 12px; background: #3a3028; }
+.hidden-verdict[data-correct="true"] { border-color: #95ba93; background: #233e31; }
+.hidden-verdict h3 { margin: 0 0 6px; font: 700 15px/1.5 var(--pixel-font); color: #e8d39e; }
+.hidden-verdict p { margin: 4px 0; }
+.hidden-verdict .hidden-answer { font-size: 23px; color: #f0e8cb; }
+.hidden-envelope { border-top: 1px solid #536575; padding-top: 10px; margin-block: 14px; }
+.hidden-envelope h3 { font-size: 12px; color: #d3ba86; margin: 0 0 8px; }
+.hidden-envelope > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.hidden-envelope > div > span { border: 1px solid #967e59; background: #40382b; color: #eddfb9; padding: 5px 7px; }
+.hidden-envelope p { font-size: 10px; line-height: 1.6; color: #a8b9c8; margin-bottom: 0; }
+.hidden-pending-guesses { border: 1px dashed #7f91a6; background: #202b39; padding: 8px; margin-block: 12px; }
+.hidden-pending-guesses h3 { font-size: 12px; color: #c9c4e0; margin: 0 0 7px; }
+.hidden-opening { line-height: 1.8; }
+.hidden-envelope-art { display: grid; place-items: center; margin: 22px auto; width: 116px; height: 78px; border: 4px solid #c8aa73; box-shadow: 4px 4px #090e15; background: linear-gradient(145deg, transparent 45%, #bda16f 46% 49%, transparent 50%) 0 0 / 50% 100%, linear-gradient(215deg, transparent 45%, #bda16f 46% 49%, transparent 50%) 100% 0 / 50% 100%, #584832; background-repeat: no-repeat; }
+.hidden-envelope-art span { background: #b49763; color: #251e17; border: 2px solid #e2c68f; width: 24px; height: 24px; display: grid; place-items: center; font-weight: bold; }
+.hidden-word-info .match-info-games { margin-block: 12px 8px; }
+.hidden-history-entry { padding-block: 11px; border-bottom: 1px solid #485d6c; }
+.hidden-history-entry h3 { margin: 0 0 5px; font-size: 12px; }
+.hidden-history-entry > p { margin: 6px 0; font-size: 12px; line-height: 1.6; }
+.hidden-history-entry .match-table { font-size: 11px; }
+.hidden-history-entry .match-table td { white-space: normal; overflow-wrap: anywhere; }
+@media (max-width: 560px) {
+  .hidden-setter > span:last-child { margin-left: 0; }
+  .hidden-similarities li { grid-template-columns: minmax(90px, 1fr) minmax(50px, 1fr) 52px; gap: 5px; }
+}

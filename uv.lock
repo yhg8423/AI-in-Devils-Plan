@@ -191,6 +191,7 @@ dependencies = [
     { name = "chatarena" },
     { name = "chess" },
     { name = "gdm-concordia" },
+    { name = "kiwipiepy" },
     { name = "numpy" },
     { name = "openai" },
     { name = "pettingzoo" },
@@ -203,6 +204,7 @@ requires-dist = [
     { name = "chatarena", git = "https://github.com/Farama-Foundation/ChatArena.git?rev=a15802dd89c0d69165bb0b07e70c2bac5a7c4e36" },
     { name = "chess", specifier = ">=1.9.4" },
     { name = "gdm-concordia", specifier = "==2.4.0" },
+    { name = "kiwipiepy", specifier = "==0.25.1" },
     { name = "numpy", specifier = ">=1.26" },
     { name = "openai", specifier = ">=3.49.0" },
     { name = "pettingzoo", specifier = ">=1.24.1" },
@@ -512,6 +514,35 @@ wheels = [
     { url = "https://files.pythonhosted.org/packages/5d/56/9d34c6a580f010259c136a1354d0e51cbe1293aef4def5f6c42347c73727/jiter-0.19.0-graalpy313-graalpy253_313_native-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:42efe1a711c0745b6098b8bff931b0a2e7fff36098cbc2dc16b76497f1cbe834", size = 300134, upload-time = "2026-11-06T15:03:30.774Z" },
     { url = "https://files.pythonhosted.org/packages/e7/b7/dd4360ad780ea1455ff2607b43cd9fcd0fd785ae366c8a632785010e92ff/jiter-0.19.0-graalpy313-graalpy253_313_native-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:2c82005ee84b348cee72a8df6672b5d6c9fe9db4b81c98b84a28155d447d2348", size = 300943, upload-time = "2026-11-06T15:03:32.042Z" },
 ]
+
+[[package]]
+name = "kiwipiepy"
+version = "0.25.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "kiwipiepy-model" },
+    { name = "numpy" },
+    { name = "tqdm" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/52/fe/7e4296a69f649c037ffb8c12ccd647b099f75b0fa6d5804e209270fa88b7/kiwipiepy-0.25.1.tar.gz", hash = "sha256:d86609d4354737a9bb3c85222e2b5adb14f10d39366f12fd71b207d114fb069f", size = 2614917 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/77/f2/6c7696ffd15864355260047797f8b5815bcd361cb7fafada6af2937d5556/kiwipiepy-0.25.1-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:5ab1c43c12f9298f11c3b66664262b2ca6d6c218894bc8bd2ef70ba253a71c78", size = 15597997 },
+    { url = "https://files.pythonhosted.org/packages/b7/a9/5d0b5902a7048c54374dd12ce64ca131bf221111169b337d89aeb4a71538/kiwipiepy-0.25.1-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:caf540279f87218df6e52fff98715b9c1707d0752aebeb47dc47bde4665f4ed0", size = 6211049 },
+    { url = "https://files.pythonhosted.org/packages/3d/db/25c6a862c34cab5182a4bc951e23b6f7fcc385c6fb689990cdc178f3bba2/kiwipiepy-0.25.1-cp314-cp314t-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:d6a516e3909e75e49d12425ea1f0099e396a3e0cd996f2bb0641f69c532ef40f", size = 5410937 },
+    { url = "https://files.pythonhosted.org/packages/a3/16/c84c5b5a6ccb7c6fcfecdd4eb04821d8a7bfc21139b757b82e52d2233bd5/kiwipiepy-0.25.1-cp314-cp314t-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:7623c75b04fbc5fd9907596cb6c43305902f85fea20d0e76832186a493b33108", size = 11856750 },
+    { url = "https://files.pythonhosted.org/packages/ac/1c/c50761045b2c9d19917c5e82a6e67939ec1c03021fadc9d9f42faacd0801/kiwipiepy-0.25.1-cp314-cp314t-win_amd64.whl", hash = "sha256:4edc74cba3e80f879a66a384154b1d0bbd6771ec23aa3cb1908138ffe3618df5", size = 4045714 },
+    { url = "https://files.pythonhosted.org/packages/44/4f/7535ccf9dde81db4ff17021e462d113e51cb128d43b0bc0eab449a4f082c/kiwipiepy-0.25.1-cp39-abi3-macosx_10_14_x86_64.whl", hash = "sha256:6dcaaa9cce9252b8a9a5678a8809f047073279f741db5672480b92ab55501ff7", size = 15586714 },
+    { url = "https://files.pythonhosted.org/packages/7e/62/62dbc6cd3e78c3e5f9df51ec93f81e35f50f788afcef5d5fb11fd01be7c1/kiwipiepy-0.25.1-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:98e29d6a2cff85387a81d5eb4806f0c8f532b8cc3affd7607e29ba4b0c0f8dbc", size = 6199869 },
+    { url = "https://files.pythonhosted.org/packages/68/c1/3e8c970c5851d6f2343901c27c43f3f44417da131a9b375fdf335d412f69/kiwipiepy-0.25.1-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:de73aefea97f71504c7dd37c8e3d583150e9e1d11629cbc3056f39cbe5d80a40", size = 5408802 },
+    { url = "https://files.pythonhosted.org/packages/29/e2/5a69d9be4eddf86efe2c4cbed7ced33b864270bedd1dedb71e7a1282e231/kiwipiepy-0.25.1-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:393bfd8b13c4cd3efa2a982c0ab85d72ca7a46098d41471bedd613d2beb8d634", size = 11857393 },
+    { url = "https://files.pythonhosted.org/packages/ea/f9/e544465e4f281dd702d655e5861152d6687b07a17278c5da3b63937fd58f/kiwipiepy-0.25.1-cp39-abi3-win_amd64.whl", hash = "sha256:8649045f623db1531ffd1d3c083d030b0b2ecdee6a7cfbd9597fa15827cff478", size = 3935017 },
+]
+
+[[package]]
+name = "kiwipiepy-model"
+version = "0.25.0"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/59/f0/b6f20a1043b540dc4dca0e9555786788c7b7a9ae53a2150a264e15948ac7/kiwipiepy_model-0.25.0.tar.gz", hash = "sha256:a0636ca58dd1b058747dff5199f3e90e21c92822abb805cc0786895896e59bef", size = 87880618 }
 
 [[package]]
 name = "kiwisolver"
@@ -1324,6 +1355,18 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/46/79/cf31d7a93a8fdc6aa0fbb665be84426a8c5a557d9240b6239e9e11e35fc5/termcolor-3.3.0.tar.gz", hash = "sha256:348871ca648ec6a9a983a13ab626c0acce02f515b9e1983332b17af7979521c5", size = 14434, upload-time = "2025-12-29T12:55:21.882Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/33/d1/8bb87d21e9aeb323cc03034f5eaf2c8f69841e40e4853c2627edf8111ed3/termcolor-3.3.0-py3-none-any.whl", hash = "sha256:cf642efadaf0a8ebbbf4bc7a31cec2f9b5f21a9f726f4ccbb08192c9c26f43a5", size = 7734, upload-time = "2025-12-29T12:55:20.718Z" },
+]
+
+[[package]]
+name = "tqdm"
+version = "4.70.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "colorama", marker = "sys_platform == 'win32'" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0d/ea/b2a5bd54b28a324dae8211928b2d730b6547500342c7e6c6dea08bd0a485/tqdm-4.70.1.tar.gz", hash = "sha256:cefd0eca11b2a37a3aee776544d4f4ae913f02688135b5556b8788dfa474afc4", size = 171846 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a7/03/921a3d3c75785aca9ebfbfcabfbc3a1be12e2ab5265deb026d55a5a3f83e/tqdm-4.70.1-py3-none-any.whl", hash = "sha256:c293e525e6fef9c20e8728fd4612df02a0aa31bb5fe91ecd93e123b1b7bffa73", size = 80199 },
 ]
 
 [[package]]

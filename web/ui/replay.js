@@ -2,6 +2,12 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  word_preparation: tr("비공개 전략 준비", "Private preparation"), word_discussion: tr("히든 워드 대화", "Hidden Word discussion"),
+  word_talk: tr("히든 워드 대화", "Hidden Word discussion"), word_envelope: tr("봉투 선택", "Choose an envelope"),
+  word_secret: tr("출제 단어 선택", "Choose a hidden word"), word_hint: tr("힌트 입력", "Submit a hint"),
+  word_hint_preparation: tr("힌트 전략 수립", "Hint planning"), word_hint_draft: tr("힌트 초안 작성", "Draft a hint"),
+  word_hint_review: tr("힌트 재검토", "Review the hint"),
+  word_guess_preparation: tr("정답 제출 전 검토", "Review before answering"), word_guess: tr("정답 제출", "Submit an answer"),
   symmetry_arrange: tr("세 색 조립", "Arrange all three colors"),
   fence_draw: tr("울타리 그리기", "Draw the loop"),
   secret_think: tr("비밀 코드 추리", "Secret Code deduction"),
@@ -93,6 +99,11 @@ const relationshipCheckpoints = {
 
 export function checkpointLabel(checkpoint, translated) {
   if (!en || !checkpoint) return checkpoint;
+  if (checkpoint === "히든 워드 매치 종료") return "End of match · Hidden Word";
+  const wordTalk = checkpoint.match(/^히든 워드 (\d+)라운드 (opening|before_setter) 대화 종료$/);
+  if (wordTalk) return `${wordTalk[2] === "opening" ? "End of opening discussion" : `End of pre-setter discussion · Round ${wordTalk[1]}`} · Hidden Word`;
+  const wordVerdict = checkpoint.match(/^히든 워드 (\d+)라운드 (.+) (\d+)차 판정$/);
+  if (wordVerdict) return `Answer verdict · Round ${wordVerdict[1]} · ${wordVerdict[2]} · Phase ${wordVerdict[3]} · Hidden Word`;
   if (checkpoint === "경매 빙고 획득 도형·빙고판 공개") return "Acquired shapes and bingo cards revealed · Auction Bingo";
   if (checkpoint === "경매 빙고 연맹의 징표 사용") return "Alliance Token used · Auction Bingo";
   const bingo = checkpoint.match(/^경매 빙고 (\d+)라운드 (.+)$/);

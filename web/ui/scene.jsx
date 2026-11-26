@@ -67,7 +67,7 @@ function walk(button, points, width, height) {
   animation.oncancel = settle;
 }
 
-export function RoomScene({state, players, row, frame, following, selected, onChoose, playerDetails, label, standalone, drawMap = drawSet, getPoint = setPoint, getWhisperPoints, dealerVisits = [], dealerPhase}) {
+export function RoomScene({state, players, row, frame, following, selected, onChoose, playerDetails, label, standalone, showConversation = true, drawMap = drawSet, getPoint = setPoint, getWhisperPoints, dealerVisits = [], dealerPhase}) {
   const floor = useRef(null);
   const map = useRef(null);
   const previous = useRef({frame: -1, locations: {}, points: {}, pair: [], dealerPhase});
@@ -164,7 +164,7 @@ export function RoomScene({state, players, row, frame, following, selected, onCh
         </div>
       </div>
     </section>
-    <ArenaSpeech speech={showSpeech ? speech : null} recipients={recipients} />
+    {showConversation && <ArenaSpeech speech={showSpeech ? speech : null} recipients={recipients} />}
   </div>;
 }
 

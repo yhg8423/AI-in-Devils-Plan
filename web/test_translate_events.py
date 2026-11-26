@@ -8,10 +8,29 @@ import unittest
 from games.mystery_stock_market.game import STOCK_RULES, stock_hint
 
 from .spectator import read_match
-from .translate_events import convert_text, translate_logs
+from .translate_events import convert_text, translate_logs, translation_rows
 
 
 class TranslateEventsTests(unittest.TestCase):
+    def test_hidden_word_preserves_korean_puzzle_data_but_translates_strategy(self):
+        events = [
+            ("word_envelope", {"words": ["기억", "음악"]}),
+            ("word_clue", {"word": "추억", "similarity": 96}),
+            ("word_verdict", {"word": "기억", "guesses": {"P02": ["기억"]}}),
+            ("action", {"phase": "word_guess", "action": '{"answers":["기억"],"spend":false}'}),
+            ("decision_note", {"phase": "word_guess", "note": "단서를 비교한다"}),
+        ]
+        snapshot = "".join(json.dumps({"type": "event", "msg_type": kind, "content": json.dumps(data, ensure_ascii=False), "turn": turn}, ensure_ascii=False) + "\n"
+                           for turn, (kind, data) in enumerate(events)).encode()
+        requests = []
+        def translate(text):
+            requests.append(text)
+            return "Compare the clues"
+        self.assertEqual(list(translation_rows(snapshot, translate)), [
+            {"turn": 4, "fields": {"note": "Compare the clues"}},
+        ])
+        self.assertEqual(requests, ["단서를 비교한다"])
+
     def test_market_clue_translation_preserves_public_and_private_reveals(self):
         huja_rule = STOCK_RULES[-1]
         steel_rule = STOCK_RULES[2]

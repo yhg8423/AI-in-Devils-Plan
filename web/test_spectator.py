@@ -1,8 +1,12 @@
 import json
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
+from unittest.mock import Mock, patch
 
+from . import spectator
 from .spectator import case_catalog, find_matches, match_catalog, model_counts, next_match, read_match
 
 
@@ -226,3 +230,122 @@ class SpectatorLogTest(unittest.TestCase):
                                                         '{"turn":2,"text":"Conversation"}\n')
             shown = read_match(log, language="en")["steps"][0]["events"]
         self.assertEqual([event["translation"]["text"] for event in shown], ["Strategy", "Conversation"])
+
+
+class HiddenWordDisplayProjectionTest(unittest.TestCase):
+    def setUp(self):
+        self.directory = TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.log = Path(self.directory.name) / "events.jsonl"
+        self.metadata = {"id": "fasttext-cc-ko-300", "sha256": "recorded-model-hash",
+                         "nearest_filter": "recorded-noun-filter", "score": "cosine*100"}
+        self.vectors = SimpleNamespace(metadata=self.metadata, nearest=Mock(side_effect=lambda word: {
+            "word": "비공개최근접명사", "similarity": {"학교": 60, "병원": 80}[word]}))
+        self.header = {"type": "match", "game": "5일차 메인 매치 · 히든 워드", "seed": 1,
+                       "players": ["P01", "P02"]}
+        self.rows = [self.header]
+
+        def event(kind, data, *, private=False):
+            row = {"type": "event", "turn": len(self.rows) - 1, "msg_type": kind, "agent_name": "System",
+                   "content": data if isinstance(data, str) else json.dumps(data, ensure_ascii=False),
+                   "visible_to": ["P01"] if private else "all"}
+            self.rows.append(row)
+
+        event("rules", "최근접 일반명사 유사도의 95%를 초과하면 공개합니다.\n"
+              "fastText 코사인 유사도 × 100을 적용합니다. 음수도 그대로 표시하며 원시 점수를 변환하지 않습니다.")
+        event("word_setup", {"version": 2, "score_mode": "fasttext", "scorer": self.metadata,
+              "reveal_rule": "nearest_noun_ratio_v1", "hint_filter": "same_as_nearest", "threshold": 95})
+        event("word_secret", {"round": 1, "setter": "P01", "word": "학교"}, private=True)
+        event("word_secret", {"round": 2, "setter": "P01", "word": "병원"}, private=True)
+        event("word_hint", {"round": 1, "setter": "P01", "phase": 1, "index": 1,
+              "word": "병원", "similarity": 57, "qualifies": False}, private=True)
+        event("word_similarity", {"round": 1, "setter": "P01", "phase": 1, "index": 1,
+              "similarity": 57, "qualifies": False})
+        event("word_similarity", {"round": 2, "setter": "P01", "phase": 1, "index": 1,
+              "similarity": 57, "qualifies": False})
+        event("word_similarity", {"round": 1, "setter": "P01", "phase": 1, "index": 2,
+              "similarity": -30, "qualifies": False})
+        event("word_similarity", {"round": 1, "setter": "P01", "phase": 1, "index": 3,
+              "similarity": None, "valid": False, "reason": "not_common_noun", "qualifies": False})
+        event("word_clue", {"round": 1, "setter": "P01", "phase": 1, "word": "공개명사",
+              "similarity": 60, "forced": True, "source": "fasttext_nearest"})
+        event("decision_note", {"phase": "word_guess_preparation", "note": "내 전략"}, private=True)
+        self.write_rows()
+
+    def write_rows(self):
+        self.log.write_text("".join(json.dumps(row, ensure_ascii=False) + "\n" for row in self.rows), encoding="utf-8")
+
+    def payloads(self, replay):
+        return [event for step in replay["steps"] for event in step["events"]]
+
+    def test_normalizes_existing_scores_without_changing_decisions_private_visibility_or_log(self):
+        original = self.log.read_bytes()
+        sidecar = self.log.with_name("events.en.jsonl")
+        sidecar.write_text("".join(json.dumps({"turn": row["turn"], "text": "stale raw57",
+            "fields": {"similarity": "raw57"}}) + "\n" for row in self.rows[1:] if row["msg_type"] != "decision_note") +
+            json.dumps({"turn": self.rows[-1]["turn"], "fields": {"note": "My strategy"}}) + "\n")
+        sidecar_before = sidecar.read_bytes()
+        with patch.object(spectator, "_hidden_word_display_vectors", return_value=self.vectors):
+            for language in ("ko", "en"):
+                replay = read_match(self.log, language=language)
+                shown = self.payloads(replay)
+                setup = json.loads(shown[1]["content"])
+                self.assertEqual(setup["score_display"], "nearest_noun_99_9")
+                self.assertEqual(setup["score_ceiling"], 99.9)
+                self.assertEqual(setup["display_projection"], "raw_cosine_v1")
+                self.assertEqual(setup["reveal_rule"], "nearest_noun_ratio_v1")
+                self.assertIn("정답을 제외한 최근접 일반명사를 99.9점으로 놓고 보정합니다.", shown[0]["content"])
+                self.assertNotIn("원시 점수를 변환하지 않습니다", shown[0]["content"])
+                self.assertEqual(shown[2]["visible_to"], ["P01"])
+                self.assertEqual(shown[4]["visible_to"], ["P01"])
+                score_events = [event for event in shown if event["msg_type"] in {"word_hint", "word_similarity", "word_clue"}]
+                scores = [json.loads(event["content"]) for event in score_events]
+                self.assertEqual([score["similarity"] for score in scores], [95, 95, 71.25, 0, None, 99.9])
+                self.assertTrue(all(score["score_display"] == "nearest_noun_99_9" for score in scores))
+                self.assertTrue(all(score["qualifies"] is False for score in scores[:-1]))
+                self.assertTrue(scores[-1]["forced"])
+                self.assertEqual(scores[-1]["source"], "fasttext_nearest")
+                self.assertNotIn("word", scores[1])
+                self.assertNotIn("비공개최근접명사", json.dumps(replay, ensure_ascii=False))
+                for score in scores:
+                    self.assertTrue(set(score).isdisjoint({"raw_similarity", "maximum", "cutoff", "nearest"}))
+                if language == "en":
+                    self.assertTrue(all("translation" not in event for event in [shown[0], shown[1], *score_events]))
+                    self.assertEqual(shown[-1]["translation"], {"fields": {"note": "My strategy"}})
+        self.assertEqual(self.log.read_bytes(), original)
+        self.assertEqual(sidecar.read_bytes(), sidecar_before)
+
+    def test_unavailable_or_mismatched_models_and_already_normalized_logs_are_unchanged(self):
+        for unavailable in (FileNotFoundError("not installed"), ValueError("invalid model")):
+            with self.subTest(error=unavailable), patch.object(spectator, "_hidden_word_display_vectors", side_effect=unavailable):
+                self.assertEqual([event["content"] for event in self.payloads(read_match(self.log))],
+                                 [row["content"] for row in self.rows[1:]])
+        with patch.object(spectator, "_hidden_word_display_vectors", return_value=SimpleNamespace(metadata={})):
+            self.assertEqual([event["content"] for event in self.payloads(read_match(self.log))],
+                             [row["content"] for row in self.rows[1:]])
+        setup = json.loads(self.rows[2]["content"])
+        for update in ({"score_display": "nearest_noun_99_9"}, {"reveal_rule": "old_rule"},
+                       {"scorer": {"id": "kyubyong-ko-word2vec-2016"}}):
+            self.rows[2]["content"] = json.dumps({**setup, **update})
+            self.write_rows()
+            with self.subTest(update=update), patch.object(spectator, "_hidden_word_display_vectors", side_effect=AssertionError("must not load")):
+                self.assertEqual([event["content"] for event in self.payloads(read_match(self.log))],
+                                 [row["content"] for row in self.rows[1:]])
+        self.rows[0]["game"] = "4일차 메인 매치 · 경매 빙고"
+        self.rows[2]["content"] = json.dumps(setup)
+        self.write_rows()
+        with patch.object(spectator, "_hidden_word_display_vectors", side_effect=AssertionError("must not load")):
+            self.assertEqual([event["content"] for event in self.payloads(read_match(self.log))],
+                             [row["content"] for row in self.rows[1:]])
+
+    def test_concurrent_refreshes_share_one_model_load_and_never_double_normalize(self):
+        spectator._hidden_word_display_vectors.cache_clear()
+        self.addCleanup(spectator._hidden_word_display_vectors.cache_clear)
+        with patch("games.hidden_word.vectors.load_legacy_vectors", return_value=self.vectors) as loader:
+            with ThreadPoolExecutor(max_workers=2) as executor:
+                first, second = executor.map(read_match, (self.log, self.log))
+            self.assertEqual(first, second)
+            self.assertEqual(read_match(self.log), first)
+            loader.assert_called_once_with()
+        self.assertEqual(json.loads(self.payloads(first)[5]["content"])["similarity"], 95)
+        self.assertEqual(json.loads(self.rows[6]["content"])["similarity"], 57)
