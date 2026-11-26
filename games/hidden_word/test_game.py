@@ -32,7 +32,7 @@ class WrongGuesses(Match):
 
 
 class OutsideHints(WrongGuesses):
-    hint = "없는낱말"
+    hint = "미등재용어"
 
     def decide_together(self, phase, decisions, **kwargs):
         if phase == "word_hint":
@@ -345,8 +345,8 @@ class HiddenWordTest(unittest.TestCase):
                 corrected = vectors.similarity("학교", "병원") / vectors.nearest(secret)["similarity"] * 100
                 self.assertAlmostEqual(record["similarity"], corrected, places=5)
 
-    def test_registered_dictionary_nouns_have_no_extra_common_noun_or_hangul_filter(self):
-        registered = ("학교의", "강", "바다", "봄", "별", "쾨펜", "ㄱ")
+    def test_registered_korean_dictionary_nouns_are_accepted(self):
+        registered = ("명사", "강", "바다", "봄", "별", "쾨펜", "ㄱ")
         vocabulary = [*self.vectors._words, *(word for word in registered if word not in self.vectors)]
         vectors = WordVectors(vocabulary, [[1, 0] for _ in vocabulary])
         for word in registered:
@@ -363,7 +363,7 @@ class HiddenWordTest(unittest.TestCase):
                 return super().decide_together(phase, decisions, **kwargs)
 
         self_test = self
-        for hint in ("학교의", "쾨펜", "ㄱ"):
+        for hint in ("명사", "쾨펜", "ㄱ"):
             with self.subTest(submitted_hint=hint):
                 match = DictionaryHints(PLAYERS, 4)
                 game.play(match, vectors=vectors)
@@ -377,10 +377,10 @@ class HiddenWordTest(unittest.TestCase):
         with (patch.object(self.vectors, "is_hint", side_effect=AssertionError("must not gate submitted hints")),
               patch.object(self.vectors, "hint_similarity", return_value=98) as scorer):
             cache = {}
-            judgement = game._judge(self.vectors, "학교", "없는낱말", cache)
+            judgement = game._judge(self.vectors, "학교", "미등재용어", cache)
             self.assertEqual(judgement, {"similarity": 98, "valid": True, "mode": "openai"})
-            self.assertEqual(game._judge(self.vectors, "학교", "없는낱말", cache), judgement)
-            scorer.assert_called_once_with("학교", "없는낱말")
+            self.assertEqual(game._judge(self.vectors, "학교", "미등재용어", cache), judgement)
+            scorer.assert_called_once_with("학교", "미등재용어")
 
         original_metadata = self.vectors.metadata.copy()
         match = OutsideHints(PLAYERS, 4)
@@ -388,13 +388,13 @@ class HiddenWordTest(unittest.TestCase):
               patch.object(self.vectors, "nearest", return_value={"word": "대양", "similarity": 60})):
             game.play(match)
         clues = events(match, "word_clue")
-        self.assertTrue(all(clue["word"] == "없는낱말" and clue["source"] == "submitted_hint" and not clue["forced"] for clue in clues))
+        self.assertTrue(all(clue["word"] == "미등재용어" and clue["source"] == "submitted_hint" and not clue["forced"] for clue in clues))
         self.assertEqual(len(events(match, "word_hint")), len(clues))
         self.assertTrue(all(record["similarity"] == 99.9 and record["valid"] and record["qualifies"]
                             and "reason" not in record for record in events(match, "word_similarity")))
-        self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"없는낱말"})
-        self.assertEqual({record["word"] for record in events(match, "word_similarity")}, {"없는낱말"})
-        self.assertNotIn("없는낱말", self.vectors)
+        self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"미등재용어"})
+        self.assertEqual({record["word"] for record in events(match, "word_similarity")}, {"미등재용어"})
+        self.assertNotIn("미등재용어", self.vectors)
         self.assertEqual(self.vectors.metadata, original_metadata)
         self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
 
@@ -414,11 +414,11 @@ class HiddenWordTest(unittest.TestCase):
                 return super().decide_together(phase, decisions, **kwargs)
 
         match = NormalizedHints(PLAYERS, 4)
-        match.hint = "  " + normalize("NFD", "새힌트") + "  "
+        match.hint = "  " + normalize("NFD", "명사표현") + "  "
         with patch.object(self.vectors, "hint_similarity", return_value=100) as scorer:
             game.play(match)
-        self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"새힌트"})
-        self.assertTrue(all(call.args[1] == "새힌트" for call in scorer.call_args_list))
+        self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"명사표현"})
+        self.assertTrue(all(call.args[1] == "명사표현" for call in scorer.call_args_list))
 
     def test_hint_embedding_failure_interrupts_without_invalid_or_numeric_event(self):
         match = OutsideHints(PLAYERS, 4)

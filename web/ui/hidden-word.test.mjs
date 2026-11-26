@@ -491,7 +491,19 @@ test("saved v3 OpenAI rules keep their historical noun-list restriction and cach
   assert.match(summary, /unregistered words use one attempt without a score/);
   assert.match(summary, /no embedding API calls during play/);
   assert.match(summary, /Relationship reviews follow verdicts/);
-  assert.doesNotMatch(summary, /need not appear in the dictionary|On first use|OPENAI_API_KEY|Before every hint|All four response times/);
+  assert.doesNotMatch(summary, /need not appear in the dictionary|On first use|OPENAI_API_KEY|Before every hint|All four response times|written only in Hangul|Latin letters/);
+});
+
+test("Hangul noun-form hints are translated only when the saved rules require them", () => {
+  const heading = "히든 워드 · 참가자 5~6명 · 2라운드";
+  const previous = "표준국어대사전 명사 213,810개와 OpenAI text-embedding-3-large 임베딩을 사용합니다.\n제출 힌트는 사전 등재 여부와 관계없이 임베딩으로 채점합니다.";
+  assert.doesNotMatch(rulesSummary(heading, previous), /written only in Hangul|Latin letters/);
+  const current = rulesSummary(heading, previous + "\n힌트는 한글로만 쓴 명사나 명사형 용어 한 개여야 하며, 영문자·숫자·기호를 섞을 수 없습니다.");
+  assert.match(current, /single Korean noun or nominal term written only in Hangul/);
+  assert.match(current, /Latin letters, digits and symbols cannot be mixed in/);
+  assert.match(current, /Noun-form validation rejects inflected verbs, adjectives and sentences without requiring dictionary membership/);
+  assert.match(current, /Submitted nouns or terms need not appear in the dictionary/);
+  assert.doesNotMatch(current, /unregistered words use one attempt without a score/);
 });
 
 test("actual engine RULES translate on-demand hints independently of the fixed dictionary reference", () => {
@@ -502,6 +514,7 @@ test("actual engine RULES translate on-demand hints independently of the fixed d
   assert.match(rules, /힌트는 사전 등재 여부와 관계없이/);
   assert.match(rules, /이 매치에서는 친밀도·신뢰도 관계 평가를 갱신하지 않습니다/);
   assert.match(rules, /힌트마다 비공개 전략 수립, 초안 작성, 재검토/);
+  assert.match(rules, /힌트는 한글로만 쓴 명사나 명사형 용어 한 개여야 하며/);
   const summary = rulesSummary(rules.split("\n")[0], rules);
   assert.match(summary, /Every candidate word and its normalized score are immediately visible to all players/);
   assert.match(summary, /Hint submission ends as soon as a score exceeds 95 points/);
@@ -519,6 +532,8 @@ test("actual engine RULES translate on-demand hints independently of the fixed d
   assert.match(summary, /Before every hint, the setter separately plans, drafts, and reviews privately/);
   assert.match(summary, /only the final submitted candidate is scored and published/);
   assert.match(summary, /All four response times count toward the hint timer/);
+  assert.match(summary, /single Korean noun or nominal term written only in Hangul/);
+  assert.match(summary, /Noun-form validation rejects inflected verbs, adjectives and sentences/);
   assert.doesNotMatch(summary, /Relationship reviews follow verdicts/);
   assert.doesNotMatch(summary, /private hints per phase|only similarity scores appear|isolated AI|fastText|Word2Vec|Kiwi|NNG|common noun|unregistered words use one attempt|no embedding API calls during play/);
 });

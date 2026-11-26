@@ -16,6 +16,8 @@ HINT_SECONDS = 15 * 60
 GUESS_SECONDS = 5 * 60
 THRESHOLD = 95
 HINT_PREPARATION = "strategy_draft_review_v1"
+HINT_LANGUAGE = "ko_noun_v1"
+HINT_LANGUAGE_RULE = "힌트는 한글로만 쓴 명사나 명사형 용어 한 개여야 하며, 영문자·숫자·기호를 섞을 수 없습니다."
 
 RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 
@@ -46,6 +48,7 @@ RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 방송의 봉투와 다른 새 보통명사 묶음을 사용합니다. 최근접 공개와 보정 기준은 2026년 6월 5일자 사전 스냅샷입니다.
 표준국어대사전 명사 213,810개와 OpenAI text-embedding-3-large 임베딩을 사용합니다.
 제출 힌트는 사전 등재 여부와 관계없이 임베딩으로 채점합니다.
+힌트는 한글로만 쓴 명사나 명사형 용어 한 개여야 하며, 영문자·숫자·기호를 섞을 수 없습니다.
 명사나 용어 한 개를 제출하세요. 사전에 없는 힌트는 처음 제출할 때 같은 OpenAI 모델로 임베딩을 요청해 캐시합니다.
 이 캐시는 힌트 판정에만 쓰며, 최근접 공개와 99.9점 보정 기준은 고정 사전 213,810개에서만 구합니다.
 모든 참가자에게 같은 모델과 기준 사전을 적용하며 코사인 유사도는 로컬에서 계산합니다.
@@ -67,7 +70,8 @@ RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 완전 동점은 처음 공개한 추첨 순서로 판정합니다. 잘못된 형식이나 호출 상한 뒤에는 시연 행동을 사용합니다.
 """
 
-LEGACY_RULES = RULES.replace(
+LEGACY_PREPARED_RULES = RULES.replace(HINT_LANGUAGE_RULE + "\n", "")
+LEGACY_RULES = LEGACY_PREPARED_RULES.replace(
     "힌트마다 비공개 전략 수립, 초안 작성, 재검토를 거친 뒤 최종 힌트와 판단 요약을 제출합니다.\n"
     "네 단계는 각각 별도의 모델 호출이며, 초안은 채점하거나 다른 참가자에게 공개하지 않습니다.\n", "",
 ).replace(
@@ -96,6 +100,13 @@ def _valid_guesses(text, pieces, spent):
     except (ValueError, TypeError, RecursionError):
         return False
     return True
+
+
+def _valid_hint(value, secret, *, vectors=None):
+    if not isinstance(value, str) or not value.strip():
+        return False
+    word = normalize_hint(value)
+    return word != secret and (vectors is None or vectors.is_korean_noun_hint(word))
 
 
 def validate_vectors(vectors):
@@ -132,6 +143,8 @@ def validate_saved_setup(setup, vectors):
         raise ValueError("관계 평가가 있는 이전 진행 방식의 경기는 재개할 수 없습니다. 새 경기를 시작하세요.")
     if "hint_preparation" in setup and setup["hint_preparation"] != HINT_PREPARATION:
         raise ValueError("저장된 경기의 힌트 준비 방식을 지원하지 않습니다. 새 경기를 시작하세요.")
+    if "hint_language" in setup and setup["hint_language"] != HINT_LANGUAGE:
+        raise ValueError("저장된 경기의 힌트 언어·명사형 규칙을 지원하지 않습니다. 새 경기를 시작하세요.")
     if setup.get("fallback") != "vocabulary_nearest":
         raise ValueError("힌트 공개 규칙이 변경되었습니다. 새 경기를 시작하세요.")
     if setup.get("reveal_rule") != "nearest_noun_ratio_v1":
@@ -208,13 +221,14 @@ def play(match: Match, *, vectors=None):
                       if event["msg_type"] == "word_setup"), None)
         validate_saved_setup(saved_setup, vectors)
     prepared_hints = saved_setup is None or saved_setup.get("hint_preparation") == HINT_PREPARATION
+    korean_hints = saved_setup is None or saved_setup.get("hint_language") == HINT_LANGUAGE
     match.relationship_reviews_enabled = False
     demo_hints = {word: tuple(hint for hint in ASSOCIATIONS[word] if vectors.is_hint(hint)) for word in WORDS}
     order = match.rng.sample(list(players), len(players))
     scores = dict.fromkeys(players, 0)
     similarity_cache = {}
     envelopes, used = {}, {}
-    match.event("rules", RULES if prepared_hints else LEGACY_RULES)
+    match.event("rules", RULES if korean_hints else LEGACY_PREPARED_RULES if prepared_hints else LEGACY_RULES)
     setup = {"version": 4, "players": players, "rounds": ROUNDS,
         "order": order, "envelopes": len(ENVELOPES), "threshold": THRESHOLD,
         "max_hints": MAX_HINTS, "hint_seconds": HINT_SECONDS, "guess_seconds": GUESS_SECONDS,
@@ -225,6 +239,8 @@ def play(match: Match, *, vectors=None):
         "score_display": "nearest_noun_99_9", "score_ceiling": 99.9, "hint_visibility": "public"}
     if prepared_hints:
         setup["hint_preparation"] = HINT_PREPARATION
+    if korean_hints:
+        setup["hint_language"] = HINT_LANGUAGE
     match.event("word_setup", setup)
     _strategy(match, "word_preparation", "게임 시작 전 자신의 출제·추측 계획을 정리하세요.", players)
     remaining = list(range(1, len(ENVELOPES) + 1))
@@ -272,8 +288,9 @@ def play(match: Match, *, vectors=None):
                         "제출한 후보 단어와 보정 점수는 즉시 모든 참가자에게 공개됩니다. "
                         f"{history}"
                         "사전 등재 여부와 관계없이 힌트를 제출할 수 있습니다. "
+                        + (HINT_LANGUAGE_RULE + " " if korean_hints else "") +
                         "정답 자체와 설명을 제외하고 명사나 용어 한 개만 그대로 출력하세요.", default,
-                        valid=lambda value: isinstance(value, str) and bool(value.strip()) and normalize_hint(value) != secret,
+                        valid=lambda value: _valid_hint(value, secret, vectors=vectors if korean_hints else None),
                     )
                     if prepared_hints:
                         hint, duration = _prepared_hint(match, setter, decision, HINT_SECONDS * 1_000_000_000 - elapsed)

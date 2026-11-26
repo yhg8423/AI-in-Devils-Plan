@@ -10,6 +10,7 @@ from hashlib import file_digest, sha256
 import json
 from math import isfinite
 from pathlib import Path
+import re
 import shutil
 from tempfile import TemporaryDirectory
 import unicodedata
@@ -36,6 +37,7 @@ BATCH_ROWS = 512
 SCORE_CEILING = 99.9
 INPUT_PROTOCOL = "plain isolated dictionary headword; no prompt"
 HINT_INPUT_PROTOCOL = "plain submitted text; no prompt"
+HANGUL_HINT = re.compile(r"[가-힣ㄱ-ㅣ]+")
 
 
 def normalize_hint(text):
@@ -130,6 +132,15 @@ def _legacy_common_noun(word):
     return bool(tokens) and all(token.tag == "NNG" and not token.oov for token in tokens) and "".join(token.form for token in tokens) == word
 
 
+@lru_cache(maxsize=32768)
+def _inferred_noun_hint(word):
+    tokens = _noun_analyzer().tokenize(word)
+    nouns = {"NNG", "NNP", "NNB"}
+    return (any(token.tag in nouns for token in tokens)
+            and all(token.tag in nouns | {"XPN", "XSN"} for token in tokens)
+            and "".join(token.form for token in tokens) == word)
+
+
 class WordVectors:
     def __init__(self, words, values, metadata=None):
         words = tuple(words)
@@ -167,6 +178,12 @@ class WordVectors:
     def is_hint(self, word):
         """Membership for the fixed reference and offline scripted hint examples."""
         return word in self and (not self._legacy or _legacy_common_noun(word))
+
+    def is_korean_noun_hint(self, word):
+        """Accept Hangul nouns and noun compounds, including inferred new terms."""
+        if not isinstance(word, str) or HANGUL_HINT.fullmatch(word) is None:
+            return False
+        return word in self or _inferred_noun_hint(word)
 
     def similarity(self, first, second):
         left, right = self._indices[first], self._indices[second]
