@@ -189,7 +189,7 @@ class ExileCatalogTest(unittest.TestCase):
             {"model": "gpt-6.1-sol", "effort": "low", "count": 1},
         ])
         self.assertEqual({path: path.read_bytes() for path in snapshots}, snapshots)
-        self.assertEqual(len(CASE_STAGES), 10)
+        self.assertEqual(len(CASE_STAGES), 11)
         runs = find_matches(self.root)
         self.assertEqual(next_match(self.root, runs, "matches/example/day1-main")["id"],
                          "matches/example/day1-prison")
