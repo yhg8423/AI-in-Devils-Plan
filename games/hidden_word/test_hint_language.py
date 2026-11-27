@@ -120,6 +120,7 @@ class HintLanguageTest(unittest.TestCase):
                 elif row.get("msg_type") == "word_setup":
                     setup = json.loads(row["content"])
                     del setup["hint_language"]
+                    setup.pop("prison_seats", None)
                     row["content"] = encode(setup)
             path.write_text("\n".join(map(encode, rows)) + "\n")
             before = path.read_text().splitlines()

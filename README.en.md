@@ -161,7 +161,7 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/openai-smoke/day1-main/events.jsonl
 ```
 
-## Continue from the Day 1 main match through the Day 5 main match
+## Continue from the Day 1 main match through the Day 5 prison match
 
 Once Either/Or finishes, run the remaining matches in order and keep their logs in the same run directory. If the web server is running, open a new terminal at the project root. This example picks up the log from **Run locally**.
 
@@ -203,6 +203,10 @@ uv run --locked --python 3.12 python -m games.hidden_word \
   --from-main "$run_dir/day4-main/events.jsonl" \
   --from-prison "$run_dir/day4-prison/events.jsonl" \
   --output "$run_dir/day5-main/events.jsonl"
+
+uv run --locked --python 3.12 python -m games.equation_tower \
+  --from-main "$run_dir/day5-main/events.jsonl" \
+  --output "$run_dir/day5-prison/events.jsonl"
 ```
 
 `--from-main` and `--from-prison` connect each match to the earlier result files it needs. To continue a match you ran with an LLM, set `run_dir` to that run’s folder. Pass the same model options to each match command to keep the same model lineup.
@@ -252,7 +256,8 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 3 prison match | Piggy Bank | 4 | Play without discussion or relationship assessments, deciding reset requests in seat order. Each model updates its memories of three banks and may change which banks it retains at every update. Mistaken memories are not corrected from the true contents. Score by calling doubt or recalling all banks before a reset. The main match ends at five points or after at most 100 turns. Last-place ties play extra rounds: losing points eliminates a player, gaining points secures safety, and the last remaining tied player is eliminated. |
 | Day 4 main match | Auction Bingo | 7 regular + 1 guest | Choose shapes and bid privately over seven rounds. Won shapes are automatically arranged at the end; rank by bingo lines, filled spaces, then the total value of unused coins. |
 | Day 4 prison match | Wall Go II | 3 | Move counters and build walls to claim territory without discussion. The three-player winner survives; the other two play a duel to determine elimination. Complete ties replay with only tied players and reversed turn order. |
-| Day 5 main match | Hidden Word | 5–6 | Set words over two rounds and deduce opponents’ words from embedding similarity scores and revealed clues. The top two enter the living quarters, last place is eliminated, and the rest go to prison. |
+| Day 5 main match | Hidden Word | 5–6 | Set words over two rounds and deduce opponents’ words from embedding similarity scores and revealed clues. The top player (top two with six players) enters the living quarters, the next three go to prison, and last place is eliminated. |
+| Day 5 prison match | Tower of Equations | 2–3 | Bid a lower move count and rearrange blocks to reach the target height and value. Play to seven points; last place is eliminated, with overtime for tied last-place players. |
 | Exile match 1 | Piece Puzzle | 4 | Assemble eight slotted pieces into a lattice by matching notch directions and depths. Players build privately; the first three to finish survive. |
 | Exile match 2 | Spot the Difference | 4 | Memorize the original picture, then mark five changed areas. The top two survive after three rounds; only ties at the survival boundary play overtime. |
 | Exile match 3 | Secret Code | 4 | Find a four-letter code from illustrated cards and clues. The first correct answer each round secures survival; the last remaining player is eliminated. |
@@ -260,6 +265,8 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Exile match 5 | Symmetrical Puzzle | 3–4 | Assemble the blue, red and green pieces into reflection-symmetric shapes without flipping them. Complete all three puzzles to survive; the last player is eliminated. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
+
+Tower of Equations follows the bidding, demonstration and scoring in the [published rules summary](https://namu.moe/w/데블스%20플랜:%20데드%20어게인/5일차#s-5.1). Public sources do not establish the complete broadcast inventory, so the simulator uses an original fixed set of twenty blocks across four stacks and generates reachable targets. There is no discussion or relationship assessment; model response times determine bidding and demonstration deadlines.
 
 Hidden Word continues with five survivors from existing records; standalone play defaults to six. Players prepare private strategies, set words and submit guesses without discussions. In new matches, each hint goes through separate calls for private planning, drafting, review and final submission. Inherited affinity and trust ratings remain static; this match does not update them during play or at its end. Similarity uses 3,072-dimensional OpenAI `text-embedding-3-large` vectors. The 213,810 nouns from the June 5, 2026 [Standard Korean Language Dictionary](https://stdict.korean.go.kr/) snapshot define the nearest-word reference and automatic clue pool. Submitted hints must be a single Korean noun or nominal term written in Hangul and are scored whether or not they appear in that dictionary. A hint missing from the cache is embedded through the OpenAI API on first use, then stored and reused. Scoring is independent of players’ providers and models and makes no LLM similarity judgments.
 
@@ -345,7 +352,7 @@ Use **KO / EN** at the top to switch the website’s language. The Python game e
 
 ### Export play logs for the website
 
-The website reads only replays exported to `play_results/`. A published run can contain the main and prison matches from Days 1–4, followed by the Day 5 main match. Each match directory contains the original log and its English translation.
+The website reads only replays exported to `play_results/`. A published run can contain the main and prison matches from Days 1–5. Each match directory contains the original log and its English translation.
 
 ```text
 play_results/matches/<run>/<stage>/events.jsonl

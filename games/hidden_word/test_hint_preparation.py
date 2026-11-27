@@ -168,6 +168,7 @@ class HintPreparationTest(unittest.TestCase):
                     elif row["msg_type"] == "word_setup":
                         setup = json.loads(row["content"])
                         del setup["hint_preparation"], setup["hint_language"]
+                        setup.pop("prison_seats", None)
                         row["content"] = encode(setup)
                     elif row["msg_type"] in {"action", "decision_note"} and json.loads(row["content"])["phase"] in PHASES[:3]:
                         continue

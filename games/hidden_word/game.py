@@ -18,6 +18,8 @@ THRESHOLD = 95
 HINT_PREPARATION = "strategy_draft_review_v1"
 HINT_LANGUAGE = "ko_noun_v1"
 HINT_LANGUAGE_RULE = "힌트는 한글로만 쓴 명사나 명사형 용어 한 개여야 하며, 영문자·숫자·기호를 섞을 수 없습니다."
+LEGACY_ASSIGNMENTS = "2라운드 종료 후 승점 상위 2명은 생활동, 최하위 한 명은 탈락하며 나머지는 감옥동으로 갑니다."
+ASSIGNMENTS = "2라운드 종료 후 감옥동은 3명, 최하위 한 명은 탈락합니다. 나머지 상위 참가자가 생활동으로 갑니다(5인 경기 1명, 6인 경기 2명)."
 
 RULES = """히든 워드 · 참가자 5~6명 · 2라운드
 
@@ -222,13 +224,16 @@ def play(match: Match, *, vectors=None):
         validate_saved_setup(saved_setup, vectors)
     prepared_hints = saved_setup is None or saved_setup.get("hint_preparation") == HINT_PREPARATION
     korean_hints = saved_setup is None or saved_setup.get("hint_language") == HINT_LANGUAGE
+    fixed_prison = saved_setup is None or saved_setup.get("prison_seats") == 3
+    living_seats = len(players) - 4 if fixed_prison else 2
     match.relationship_reviews_enabled = False
     demo_hints = {word: tuple(hint for hint in ASSOCIATIONS[word] if vectors.is_hint(hint)) for word in WORDS}
     order = match.rng.sample(list(players), len(players))
     scores = dict.fromkeys(players, 0)
     similarity_cache = {}
     envelopes, used = {}, {}
-    match.event("rules", RULES if korean_hints else LEGACY_PREPARED_RULES if prepared_hints else LEGACY_RULES)
+    rules = RULES if korean_hints else LEGACY_PREPARED_RULES if prepared_hints else LEGACY_RULES
+    match.event("rules", rules.replace(LEGACY_ASSIGNMENTS, ASSIGNMENTS) if fixed_prison else rules)
     setup = {"version": 4, "players": players, "rounds": ROUNDS,
         "order": order, "envelopes": len(ENVELOPES), "threshold": THRESHOLD,
         "max_hints": MAX_HINTS, "hint_seconds": HINT_SECONDS, "guess_seconds": GUESS_SECONDS,
@@ -241,6 +246,8 @@ def play(match: Match, *, vectors=None):
         setup["hint_preparation"] = HINT_PREPARATION
     if korean_hints:
         setup["hint_language"] = HINT_LANGUAGE
+    if fixed_prison:
+        setup["prison_seats"] = 3
     match.event("word_setup", setup)
     _strategy(match, "word_preparation", "게임 시작 전 자신의 출제·추측 계획을 정리하세요.", players)
     remaining = list(range(1, len(ENVELOPES) + 1))
@@ -364,7 +371,7 @@ def play(match: Match, *, vectors=None):
     ranking = sorted(players, key=lambda name: (-scores[name], order.index(name)))
     match.pieces[ranking[0]] += 4
     result = {"ranking": ranking, "scores": scores, "pieces": match.pieces.copy(),
-              "living": ranking[:2], "prison": ranking[2:-1], "eliminated": ranking[-1:],
+              "living": ranking[:living_seats], "prison": ranking[living_seats:-1], "eliminated": ranking[-1:],
               "pieces_awarded": {ranking[0]: 4}, "tie_order": order}
     match.event("word_final", result)
     return result

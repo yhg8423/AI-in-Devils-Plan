@@ -11,7 +11,7 @@ from .spectator import CASE_STAGES, EVENT_FIELDS, EXILE_GAMES, exile_sources, so
 from .translate_events import translation_rows
 
 
-STAGES = ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main", "day3-prison", "day4-main", "day4-prison", "day5-main")
+STAGES = ("day1-main", "day1-prison", "day2-main", "day2-prison", "day3-main", "day3-prison", "day4-main", "day4-prison", "day5-main", "day5-prison")
 PREDECESSORS = (
     {},
     {"from_main": 0},
@@ -22,6 +22,7 @@ PREDECESSORS = (
     {"from_main": 4, "from_prison": 5},
     {"from_main": 6},
     {"from_main": 6, "from_prison": 7},
+    {"from_main": 8},
 )
 HEADER_FIELDS = (
     "type", "game", "players", "seed", "pieces", "model", "effort", "provider",
