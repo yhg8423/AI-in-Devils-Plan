@@ -161,7 +161,7 @@ uv run --locked --python 3.12 python -m games.either_or.full_match \
   --output runs/matches/openai-smoke/day1-main/events.jsonl
 ```
 
-## Continue from the Day 1 main match through the Day 6 main match
+## Continue from the Day 1 main match through the Day 6 prison match
 
 Once Either/Or finishes, run the remaining matches in order and keep their logs in the same run directory. If the web server is running, open a new terminal at the project root. This example picks up the log from **Run locally**.
 
@@ -214,6 +214,10 @@ uv run --locked --python 3.12 python -m games.hit_stay \
   --from-prison "$run_dir/day5-prison/events.jsonl" \
   --returnee RETURNING_PLAYER --returnee-pieces 1 \
   --output "$run_dir/day6-main/events.jsonl"
+
+uv run --locked --python 3.12 python -m games.gradation \
+  --from-main "$run_dir/day6-main/events.jsonl" \
+  --output "$run_dir/day6-prison/events.jsonl"
 ```
 
 `--from-main` and `--from-prison` connect each match to the earlier result files it needs. To continue a match you ran with an LLM, set `run_dir` to that run’s folder. Pass the same model options to each match command to keep the same model lineup.
@@ -266,6 +270,7 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Day 5 main match | Hidden Word | 5–6 | Set words over two rounds and deduce opponents’ words from embedding similarity scores and revealed clues. The top player (top two with six players) enters the living quarters, the next three go to prison, and last place is eliminated. |
 | Day 5 prison match | Tower of Equations | 2–3 | Bid a lower move count and rearrange blocks to reach the target height and value. Play to seven points; last place is eliminated, with overtime for tied last-place players. |
 | Day 6 main match | HIT, STAY | 4–5 | Convert Pieces to chips, then draw and bet to approach the limit. The first player to lose all chips is eliminated; the last chip holder advances to the final, and the remaining players enter prison. |
+| Day 6 prison match | Gradation | 2–3 | Deduce the numbers in concealed cups over seven rounds. With three players, the winner stays until someone wins two consecutive duels; the two-player route advances one decisive duel winner. |
 | Exile match 1 | Piece Puzzle | 4 | Assemble eight slotted pieces into a lattice by matching notch directions and depths. Players build privately; the first three to finish survive. |
 | Exile match 2 | Spot the Difference | 4 | Memorize the original picture, then mark five changed areas. The top two survive after three rounds; only ties at the survival boundary play overtime. |
 | Exile match 3 | Secret Code | 4 | Find a four-letter code from illustrated cards and clues. The first correct answer each round secures survival; the last remaining player is eliminated. |
@@ -277,6 +282,8 @@ Each match can run on its own or continue with the previous matches’ survivors
 Tower of Equations follows the bidding, demonstration and scoring in the [published rules summary](https://namu.moe/w/데블스%20플랜:%20데드%20어게인/5일차#s-5.1). Public sources do not establish the complete broadcast inventory, so the simulator uses an original fixed set of twenty blocks across four stacks and generates reachable targets. There is no discussion or relationship assessment; model response times determine bidding and demonstration deadlines.
 
 HIT, STAY follows the [Day 6 rules](https://namu.moe/w/데블스%20플랜:%20데드%20어게인/6일차#s-3.1). In the five-player Hidden Word route, three Day 5 survivors join one exile returnee for a four-player match. The final exile contest is not implemented yet, so explicitly designate its survivor and starting Pieces with `--returnee` and `--returnee-pieces`; the simulator does not choose that player automatically.
+
+Gradation follows the [published rules](https://namu.moe/w/데블스%20플랜:%20데드%20어게인/6일차#s-5.1), concealing both numbers and original cup positions. The two-player single-duel route is a simulator variation for current campaign sizes; tied duels use fresh layouts and replay. There is no discussion or relationship assessment.
 
 Hidden Word continues with five survivors from existing records; standalone play defaults to six. Players prepare private strategies, set words and submit guesses without discussions. In new matches, each hint goes through separate calls for private planning, drafting, review and final submission. Inherited affinity and trust ratings remain static; this match does not update them during play or at its end. Similarity uses 3,072-dimensional OpenAI `text-embedding-3-large` vectors. The 213,810 nouns from the June 5, 2026 [Standard Korean Language Dictionary](https://stdict.korean.go.kr/) snapshot define the nearest-word reference and automatic clue pool. Submitted hints must be a single Korean noun or nominal term written in Hangul and are scored whether or not they appear in that dictionary. A hint missing from the cache is embedded through the OpenAI API on first use, then stored and reused. Scoring is independent of players’ providers and models and makes no LLM similarity judgments.
 
@@ -362,7 +369,7 @@ Use **KO / EN** at the top to switch the website’s language. The Python game e
 
 ### Export play logs for the website
 
-The website reads only replays exported to `play_results/`. A published run can contain the main and prison matches from Days 1–5, followed by the Day 6 main match. Each match directory contains the original log and its English translation.
+The website reads only replays exported to `play_results/`. A published run can contain the main and prison matches from Days 1–6. Each match directory contains the original log and its English translation.
 
 ```text
 play_results/matches/<run>/<stage>/events.jsonl

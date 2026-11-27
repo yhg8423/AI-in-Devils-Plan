@@ -2,6 +2,7 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  grad_prepare: tr("비공개 배치", "Private number layout"), grad_choose: tr("통 선택", "Choose a cup"),
   hit_interest: tr("공공·개인 이익 선택", "Public or self interest"), hit_reveal: tr("첫 공개 카드 선택", "Choose the opening card"),
   hit_bet1: tr("1차 베팅", "First betting round"), hit_bet2: tr("2차 베팅", "Second betting round"),
   hit_draw: tr("HIT / STAY 선택", "Choose HIT or STAY"), hit_discussion: tr("시작 전 대화", "Opening discussion"),
