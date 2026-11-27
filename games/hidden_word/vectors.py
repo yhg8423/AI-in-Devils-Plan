@@ -259,8 +259,9 @@ class WordVectors:
         cosine /= self._norms[target] * np.linalg.norm(value)
         return float(np.clip(cosine, -1, 1) * 100)
 
-    def nearest(self, word):
-        if word not in self._nearest:
+    def nearest(self, word, *, exclude=()):
+        excluded = set(exclude)
+        if word not in self._nearest or self._nearest[word]["word"] in excluded:
             target = self._indices[word]
             query = self._vectors[target].astype(np.float64) / self._norms[target]
             scores = np.empty(len(self._words), dtype=np.float64)
@@ -269,9 +270,11 @@ class WordVectors:
                 scores[start:start + len(block)] = (block @ query) / self._norms[start:start + len(block)]
             for index in np.argsort(-scores, kind="stable"):
                 candidate = self._words[index]
-                if candidate != word and self.is_hint(candidate):
-                    self._nearest[word] = {"word": candidate, "similarity": self.similarity(word, candidate)}
-                    break
+                if candidate != word and candidate not in excluded and self.is_hint(candidate):
+                    result = {"word": candidate, "similarity": self.similarity(word, candidate)}
+                    if not excluded:
+                        self._nearest[word] = result
+                    return result.copy()
             else:
                 raise ValueError(f"{word!r}와 비교할 수 있는 다른 명사가 사전에 없습니다.")
         return self._nearest[word].copy()

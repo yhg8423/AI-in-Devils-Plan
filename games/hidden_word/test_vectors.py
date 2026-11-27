@@ -123,6 +123,17 @@ class WordVectorsTest(unittest.TestCase):
             with tiny_dictionary(), self.assertRaises(ValueError):
                 vectors.load_vectors(path)
 
+    def test_nearest_exclusions_do_not_change_fixed_normalization_reference(self):
+        model = vectors.WordVectors(["바다", "해양", "물결", "파도"], [[1, 0], [1, 0], [3, 4], [3, 4]])
+        reference = model.nearest("바다")
+        self.assertEqual(reference, {"word": "해양", "similarity": 100})
+        self.assertEqual(model.nearest("바다", exclude={"해양"}), {"word": "물결", "similarity": 60})
+        self.assertEqual(model.nearest("바다", exclude={"해양", "물결"})["word"], "파도")
+        self.assertEqual(model.nearest("바다"), reference)
+        self.assertEqual(vectors.normalized_score(60, reference["similarity"]), 60)
+        with self.assertRaisesRegex(ValueError, "다른 명사"):
+            model.nearest("바다", exclude={"해양", "물결", "파도"})
+
     def test_source_adoption_is_offline_and_independent_of_source_files(self):
         client = fake_client(lambda **_: self.fail("API must not be called"))
         with TemporaryDirectory() as directory, tiny_dictionary():

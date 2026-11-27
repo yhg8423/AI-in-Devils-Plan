@@ -527,6 +527,18 @@ test("Hangul noun-form hints are translated only when the saved rules require th
   assert.doesNotMatch(current, /unregistered words use one attempt without a score/);
 });
 
+test("duplicate hint prohibition is translated only when the saved rules require it", () => {
+  const heading = "히든 워드 · 참가자 5~6명 · 2라운드";
+  const previous = "표준국어대사전 명사 213,810개와 Cohere embed-v5.0-pro 임베딩을 사용합니다.";
+  assert.doesNotMatch(rulesSummary(heading, previous), /cannot be submitted again/);
+  assert.match(rulesSummary(heading, previous), /excluding the answer itself, regardless of submitted candidates/);
+  const current = rulesSummary(heading, previous + "\n같은 히든 워드의 1·2·3차 전체에서 이미 공개된 힌트 후보나 최종 힌트는 다시 제출할 수 없습니다.");
+  assert.match(current, /Within the same hidden word, a previously public hint candidate or final clue cannot be submitted again in any of the three phases/);
+  assert.match(current, /excluding the answer itself and all previously public words/);
+  assert.match(current, /Automatic clues use the same normalized scoring/);
+  assert.doesNotMatch(current, /regardless of submitted candidates/);
+});
+
 test("actual engine RULES translate on-demand hints independently of the fixed dictionary reference", () => {
   const source = readFileSync(new URL("../../games/hidden_word/game.py", import.meta.url), "utf8");
   const rules = source.match(/RULES = """([\s\S]*?)"""/)?.[1];

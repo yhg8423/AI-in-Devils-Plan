@@ -36,7 +36,8 @@ class OutsideHints(WrongGuesses):
 
     def decide_together(self, phase, decisions, **kwargs):
         if phase == "word_hint":
-            decisions = {name: replace(decision, default=self.hint) for name, decision in decisions.items()}
+            decisions = {name: replace(decision, default=self.hint) if decision.accepts(self.hint) else decision
+                         for name, decision in decisions.items()}
         return super().decide_together(phase, decisions, **kwargs)
 
 
@@ -309,9 +310,14 @@ class HiddenWordTest(unittest.TestCase):
         self.assertEqual(events(match, "word_setup")[0]["hint_visibility"], "public")
 
     def test_threshold_is_strict_and_fallback_searches_full_vocabulary(self):
+        def nearest(word, *, exclude=()):
+            candidate = next(candidate for candidate in ("대양", *self.vectors._words)
+                             if candidate != word and candidate not in exclude)
+            return {"word": candidate, "similarity": 60}
+
         for score, expected_count, forced in ((57, 10, True), (57.01, 1, False), (58, 1, False)):
             match = WrongGuesses(PLAYERS, 3)
-            with (patch.object(self.vectors, "nearest", return_value={"word": "대양", "similarity": 60}),
+            with (patch.object(self.vectors, "nearest", side_effect=nearest),
                   patch.object(game, "_judge", return_value={"similarity": score, "valid": True, "mode": "cohere"})):
                 game.play(match)
             clues = events(match, "word_clue")
@@ -320,7 +326,8 @@ class HiddenWordTest(unittest.TestCase):
             for clue in clues:
                 current = [hint for hint in hints if all(hint[key] == clue[key] for key in ("round", "setter", "phase"))]
                 if forced:
-                    self.assertEqual(clue["word"], "대양")
+                    if clue["phase"] == 1:
+                        self.assertEqual(clue["word"], "대양")
                     self.assertNotIn(clue["word"], [hint["word"] for hint in current])
                     self.assertEqual(clue["source"], "cohere_stdict_nearest")
                 else:
@@ -342,7 +349,7 @@ class HiddenWordTest(unittest.TestCase):
             self.assertEqual(events(match, "word_setup")[0]["score_display"], "nearest_noun_99_9")
             self.assertEqual(events(match, "word_setup")[0]["score_ceiling"], 99.9)
             self.assertIn("정답을 제외한 최근접 사전 명사를 99.9점으로 놓고 보정합니다.", game.RULES)
-            self.assertIn("기준을 넘지 못하면 제출한 힌트와 관계없이 표준국어대사전 명사 전체에서", game.RULES)
+            self.assertIn("기준을 넘지 못하면 표준국어대사전 명사 전체에서 정답과 이미 공개된 단어를 제외하고", game.RULES)
             self.assertIn("표준국어대사전 명사 213,810개와 Cohere embed-v5.0-pro 임베딩을 사용합니다.", game.RULES)
 
     def test_same_raw_pair_has_target_specific_corrected_score(self):
@@ -364,7 +371,8 @@ class HiddenWordTest(unittest.TestCase):
                                   if record["round"] == stage["round"] and record["setter"] == stage["setter"])
                     if secret in ("학교", "병원"):
                         hint = "병원" if secret == "학교" else "학교"
-                        decisions = {name: replace(decision, default=hint) for name, decision in decisions.items()}
+                        decisions = {name: replace(decision, default=hint) if decision.accepts(hint) else decision
+                                     for name, decision in decisions.items()}
                 return super().decide_together(phase, decisions, **kwargs)
 
         match = PairHints(PLAYERS, 4)
@@ -372,7 +380,10 @@ class HiddenWordTest(unittest.TestCase):
         for secret, expected in (("학교", True), ("병원", False)):
             owner = next(record["setter"] for record in events(match, "word_secret")
                          if record["round"] == 1 and record["word"] == secret)
-            records = [record for record in events(match, "word_similarity") if record["round"] == 1 and record["setter"] == owner]
+            paired_hint = "병원" if secret == "학교" else "학교"
+            records = [record for record in events(match, "word_similarity")
+                       if record["round"] == 1 and record["setter"] == owner and record["word"] == paired_hint]
+            self.assertEqual(len(records), 1)
             self.assertEqual({record["qualifies"] for record in records}, {expected})
             for record in records:
                 corrected = vectors.similarity("학교", "병원") / vectors.nearest(secret)["similarity"] * 100
@@ -390,9 +401,11 @@ class HiddenWordTest(unittest.TestCase):
             def decide_together(self, phase, decisions, **kwargs):
                 if phase == "word_hint":
                     for decision in decisions.values():
-                        self_test.assertTrue(decision.accepts(hint))
+                        if events(self, "word_phase")[-1]["phase"] == 1:
+                            self_test.assertTrue(decision.accepts(hint))
                         self_test.assertNotIn("고유명사, 정답 자체와 설명을 제외", decision.prompt)
-                    decisions = {name: replace(decision, default=hint) for name, decision in decisions.items()}
+                    decisions = {name: replace(decision, default=hint) if decision.accepts(hint) else decision
+                                 for name, decision in decisions.items()}
                 return super().decide_together(phase, decisions, **kwargs)
 
         self_test = self
@@ -401,7 +414,7 @@ class HiddenWordTest(unittest.TestCase):
                 match = DictionaryHints(PLAYERS, 4)
                 game.play(match, vectors=vectors)
                 records = events(match, "word_similarity")
-                self.assertEqual({record["word"] for record in records}, {hint})
+                self.assertEqual({record["word"] for record in records if record["phase"] == 1}, {hint})
                 self.assertTrue(all(record["valid"] and record["qualifies"] for record in records))
                 self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
         self.assertIn("제출 힌트는 사전 등재 여부와 관계없이 임베딩으로 채점합니다.", game.RULES)
@@ -421,12 +434,13 @@ class HiddenWordTest(unittest.TestCase):
               patch.object(self.vectors, "nearest", return_value={"word": "대양", "similarity": 60})):
             game.play(match)
         clues = events(match, "word_clue")
-        self.assertTrue(all(clue["word"] == "미등재용어" and clue["source"] == "submitted_hint" and not clue["forced"] for clue in clues))
+        self.assertTrue(all(clue["word"] == "미등재용어" for clue in clues if clue["phase"] == 1))
+        self.assertTrue(all(clue["source"] == "submitted_hint" and not clue["forced"] for clue in clues))
         self.assertEqual(len(events(match, "word_hint")), len(clues))
         self.assertTrue(all(record["similarity"] == 99.9 and record["valid"] and record["qualifies"]
                             and "reason" not in record for record in events(match, "word_similarity")))
-        self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"미등재용어"})
-        self.assertEqual({record["word"] for record in events(match, "word_similarity")}, {"미등재용어"})
+        self.assertEqual({record["word"] for record in events(match, "word_hint") if record["phase"] == 1}, {"미등재용어"})
+        self.assertEqual({record["word"] for record in events(match, "word_similarity") if record["phase"] == 1}, {"미등재용어"})
         self.assertNotIn("미등재용어", self.vectors)
         self.assertEqual(self.vectors.metadata, original_metadata)
         self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
@@ -450,8 +464,9 @@ class HiddenWordTest(unittest.TestCase):
         match.hint = "  " + normalize("NFD", "명사표현") + "  "
         with patch.object(self.vectors, "hint_similarity", return_value=100) as scorer:
             game.play(match)
-        self.assertEqual({record["word"] for record in events(match, "word_hint")}, {"명사표현"})
-        self.assertTrue(all(call.args[1] == "명사표현" for call in scorer.call_args_list))
+        self.assertEqual({record["word"] for record in events(match, "word_hint") if record["phase"] == 1}, {"명사표현"})
+        self.assertTrue(any(call.args[1] == "명사표현" for call in scorer.call_args_list))
+        self.assertTrue(all(call.args[1] == normalize("NFC", call.args[1].strip()) for call in scorer.call_args_list))
 
     def test_hint_embedding_failure_interrupts_without_invalid_or_numeric_event(self):
         match = OutsideHints(PLAYERS, 4)
@@ -481,7 +496,7 @@ class HiddenWordTest(unittest.TestCase):
             with patch.object(game, "_judge", return_value={"similarity": 50, "valid": True, "mode": "cohere"}):
                 result = game.play(match)
             self.assertEqual(len(events(match, "word_hint")), expected_hints)
-            self.assertEqual({clue["word"] for clue in events(match, "word_clue")}, {"대양"})
+            self.assertEqual({clue["word"] for clue in events(match, "word_clue") if clue["phase"] == 1}, {"대양"})
             self.assertTrue(all(record["answers"] == [] and record["spent"] == 0 for record in events(match, "word_guess")))
             for name, balance in result["pieces"].items():
                 self.assertEqual(balance, 2 + result["pieces_awarded"].get(name, 0))
