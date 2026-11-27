@@ -401,7 +401,7 @@ class AnthropicLanguageModel(ActionLanguageModel):
 
 def _api_key(env_path: Path, variable: str) -> str:
     names = (variable, variable.lower())
-    service = "OpenAI" if variable == "OPENAI_API_KEY" else "Claude"
+    service = {"OPENAI_API_KEY": "OpenAI", "COHERE_API_KEY": "Cohere"}.get(variable, "Claude")
     for name in names:
         value = os.getenv(name, "").strip()
         if value:

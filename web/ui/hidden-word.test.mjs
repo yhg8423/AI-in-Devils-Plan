@@ -111,7 +111,28 @@ for (const language of ["ko", "en"]) {
     }
     assert.match(api[language].hiddenEventText("word_setup", current.data), /OpenAI · text-embedding-3-large/);
   });
-  test(`${language}: current v4 scores an out-of-dictionary hint while keeping private words sealed`, () => {
+  test(`${language}: Cohere v5 labels scored hints and dictionary clues without leaking private words`, () => {
+    const current = record("word_setup", {...setup.data, version: 5, score_mode: "cohere", discussion: false,
+      scorer: {id: "cohere-embed-v5.0-pro-stdict-20260605", model: "embed-v5.0-pro", provider: "cohere", dimensions: 2048, input_type: "clustering"},
+      hint_filter: "cohere_text_embedding_v1", reveal_rule: "nearest_noun_ratio_v1", score_display: "nearest_noun_99_9", hint_visibility: "public"});
+    const candidate = {...similarity.data, word: "새로만든게임명사", similarity: 94.7, qualifies: false, valid: true};
+    const nearest = record("word_clue", {...clue.data, word: "도서실", similarity: 99.9, forced: true, source: "cohere_stdict_nearest"});
+    const events = [current, ...base.slice(1, 5), record("word_hint", candidate, "P01"), record("word_similarity", candidate), nearest, guess];
+    for (const view of ["public", "operator", ...players]) {
+      const html = renderMatch(events, view, language);
+      assert.match(html, /Cohere · embed-v5\.0-pro/);
+      assert.match(html, /새로만든게임명사/);
+      assert.match(html, language === "ko" ? /94\.7점/ : /94\.7 points/);
+      assert.match(html, language === "ko" ? /최근접 기준: 표준국어대사전 명사/ : /Nearest-word reference: Standard Korean Language Dictionary nouns/);
+      assert.match(html, language === "ko" ? /표준국어대사전 명사 중 정답과 가장 가까운 단어/ : /closest noun to the answer among Standard Korean Language Dictionary entries/);
+      assert.doesNotMatch(html, /OpenAI|text-embedding-3-large|fastText|Word2Vec|94\.7%/);
+      if (!["operator", "P01"].includes(view)) assert.doesNotMatch(html, /보름달|조약돌/);
+      if (!["operator", "P02"].includes(view)) assert.doesNotMatch(html, /달빛|달님/);
+    }
+    assert.match(api[language].hiddenEventText("word_setup", current.data), /Cohere · embed-v5\.0-pro/);
+    assert.equal(stateFor(events, "public", language).wordHints.length, 1);
+  });
+  test(`${language}: archived v4 scores an out-of-dictionary hint while keeping private words sealed`, () => {
     const current = record("word_setup", {...setup.data, version: 4, score_mode: "openai", discussion: false,
       scorer: {id: "openai-text-embedding-3-large-stdict-20260605", model: "text-embedding-3-large", provider: "openai", dimensions: 3072},
       hint_filter: "openai_text_embedding_v1", reveal_rule: "nearest_noun_ratio_v1", score_display: "nearest_noun_99_9", hint_visibility: "public"});
@@ -519,12 +540,12 @@ test("actual engine RULES translate on-demand hints independently of the fixed d
   assert.match(summary, /Every candidate word and its normalized score are immediately visible to all players/);
   assert.match(summary, /Hint submission ends as soon as a score exceeds 95 points/);
   assert.match(summary, /213,810 registered nouns/);
-  assert.match(summary, /3,072-dimensional OpenAI text-embedding-3-large/);
+  assert.match(summary, /2,048-dimensional Cohere embed-v5\.0-pro \(clustering input mode\)/);
   assert.match(summary, /Submitted nouns or terms need not appear in the dictionary/);
   assert.match(summary, /fixed nearest-word reference and automatic clue pool/);
   assert.match(summary, /cached hint vectors never expand that reference pool/);
   assert.match(summary, /nearest eligible dictionary noun cosine similarity, limited to 0–99\.9 points/);
-  assert.match(summary, /On first use.*same OpenAI model.*OPENAI_API_KEY and embedding API usage/);
+  assert.match(summary, /On first use.*same Cohere model in clustering input mode.*COHERE_API_KEY \(or cohere_api_key\) and embedding API usage/);
   assert.match(summary, /stored and reused/);
   assert.match(summary, /independent of player models and makes no LLM similarity judgments/);
   assert.match(summary, /Inherited affinity and trust ratings remain static context/);
@@ -535,5 +556,5 @@ test("actual engine RULES translate on-demand hints independently of the fixed d
   assert.match(summary, /single Korean noun or nominal term written only in Hangul/);
   assert.match(summary, /Noun-form validation rejects inflected verbs, adjectives and sentences/);
   assert.doesNotMatch(summary, /Relationship reviews follow verdicts/);
-  assert.doesNotMatch(summary, /private hints per phase|only similarity scores appear|isolated AI|fastText|Word2Vec|Kiwi|NNG|common noun|unregistered words use one attempt|no embedding API calls during play/);
+  assert.doesNotMatch(summary, /OpenAI|OPENAI_API_KEY|3,072|private hints per phase|only similarity scores appear|isolated AI|fastText|Word2Vec|Kiwi|NNG|common noun|unregistered words use one attempt|no embedding API calls during play/);
 });

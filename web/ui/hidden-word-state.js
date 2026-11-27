@@ -4,9 +4,10 @@ const keyFor = ({round, setter}) => `${round}:${setter}`;
 const hintKey = ({round, setter, phase, index}) => `${round}:${setter}:${phase}:${index}`;
 const number = new Intl.NumberFormat("en", {maximumFractionDigits: 2});
 export const normalizedHiddenScores = (setup) => setup?.score_display === "nearest_noun_99_9";
-export const standardDictionaryScorer = (setup) => setup?.score_mode === "openai" || setup?.scorer?.id === "openai-text-embedding-3-large-stdict-20260605";
+export const standardDictionaryScorer = (setup) => ["openai", "cohere"].includes(setup?.score_mode) || ["openai-text-embedding-3-large-stdict-20260605", "cohere-embed-v5.0-pro-stdict-20260605"].includes(setup?.scorer?.id);
 export function hiddenScorerLabel(setup) {
-  if (standardDictionaryScorer(setup)) return "OpenAI · text-embedding-3-large";
+  if (setup?.score_mode === "cohere" || setup?.scorer?.id === "cohere-embed-v5.0-pro-stdict-20260605") return "Cohere · embed-v5.0-pro";
+  if (setup?.score_mode === "openai" || setup?.scorer?.id === "openai-text-embedding-3-large-stdict-20260605") return "OpenAI · text-embedding-3-large";
   if (setup?.score_mode === "fasttext" || setup?.scorer?.id === "fasttext-cc-ko-300") return "fastText · cc.ko.300";
   return setup?.score_mode === "word2vec" ? "Word2Vec" : "";
 }

@@ -8,7 +8,8 @@ import sys
 
 from ..match import DAY_FIVE_MAIN, DAY_FOUR_MAIN, run_cli
 from .game import play, validate_saved_setup, validate_vectors
-from .vectors import load_vectors
+from .cohere import load_vectors
+from .vectors import load_vectors as load_openai_vectors
 
 
 def main(argv=None):
@@ -33,9 +34,10 @@ def main(argv=None):
                     if row.get("msg_type") == "word_setup":
                         setup = json.loads(row["content"])
                         break
-            if not isinstance(setup, dict) or setup.get("version") != 4:
+            if not isinstance(setup, dict) or setup.get("version") not in (4, 5):
                 validate_saved_setup(setup, None)
-        vectors = validate_vectors(load_vectors())
+        loader = load_openai_vectors if args.resume and setup.get("version") == 4 else load_vectors
+        vectors = validate_vectors(loader())
         if args.resume:
             validate_saved_setup(setup, vectors)
     except (OSError, ValueError, RuntimeError) as error:
