@@ -123,7 +123,7 @@ export function HiddenWordStage({state, replay}) {
         </div>
         <SimilarityTrail state={state} replay={replay} />
         {clues.map((clue) => <section key={clue.phase} className="hidden-clue"><small>{setup?.hint_visibility === "public" ? tr(`${clue.phase}차 선정 힌트`, `Phase ${clue.phase} selected clue`) : tr(`${clue.phase}차 공개 힌트`, `Phase ${clue.phase} public clue`)}</small><strong lang={clue.word ? "ko" : undefined}>{clue.word || tr("힌트 없음", "No clue")}</strong><span>{similarityLabel(clue.similarity, setup)}</span>
-          {clue.word && clue.forced ? <p>{clue.source === "openai_stdict_nearest" ?
+          {clue.word && clue.forced ? <p>{["openai_stdict_nearest", "cohere_stdict_nearest"].includes(clue.source) ?
             tr("표준국어대사전 명사 중 정답과 가장 가까운 단어입니다.", "The closest noun to the answer among Standard Korean Language Dictionary entries.") : clue.source === "fasttext_nearest" ?
             tr("fastText 사전에서 정답과 가장 가까운 일반명사입니다.", "The closest common noun to the answer in the fastText vocabulary.") : clue.source === "word2vec_nearest" ?
             tr("Word2Vec 사전에서 정답과 가장 가까운 단어입니다.", "The closest word to the answer in the Word2Vec vocabulary.") :

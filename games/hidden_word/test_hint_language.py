@@ -74,7 +74,7 @@ class HintLanguageTest(unittest.TestCase):
                 self.assertFalse(any(event.msg_type == "invalid_action" for event in match.events))
                 setup = next(json.loads(event.content) for event in match.events if event.msg_type == "word_setup")
                 self.assertEqual(setup["hint_language"], "ko_noun_v1")
-                self.assertEqual(setup["hint_filter"], "openai_text_embedding_v1")
+                self.assertEqual(setup["hint_filter"], "cohere_text_embedding_v1")
 
     def test_unknown_language_is_rejected_before_modifying_saved_log(self):
         match = Match(PLAYERS, 11)
@@ -106,6 +106,7 @@ class HintLanguageTest(unittest.TestCase):
             # Generate the former permissive response sequence with the real journal.
             validate = game._valid_hint
             with (patch.dict(OUTPUTS, {"word_hint_draft": "courage", "word_hint": "courage"}),
+                  patch.object(game, "VERSION", 4),
                   patch.object(game, "_valid_hint", side_effect=lambda value, secret, **_: validate(value, secret)),
                   patch.object(self.vectors, "hint_similarity", return_value=100), MatchLog(path) as log):
                 log.write(header)

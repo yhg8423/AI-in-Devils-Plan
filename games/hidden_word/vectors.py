@@ -198,9 +198,12 @@ class WordVectors:
             return self.similarity(secret, hint)
         target = self._indices[secret]
         if hint not in self._hint_vectors:
+            cohere = self.metadata.get("provider") == "cohere"
             manifest = {"version": 1, "base_sha256": self.metadata["sha256"],
                 "model": self.metadata.get("model", MODEL_ID), "dimensions": self._vectors.shape[1],
                 "input_protocol": HINT_INPUT_PROTOCOL, "normalization": "NFC+strip", "text": hint}
+            if cohere:
+                manifest.update(provider="cohere", input_type=self.metadata["input_type"])
             key = sha256(json.dumps(manifest, ensure_ascii=False, sort_keys=True).encode()).hexdigest()
             directory = Path(cache_dir or self._hint_cache or DEFAULT_PATH / "hints")
             directory.mkdir(parents=True, exist_ok=True)
@@ -229,7 +232,11 @@ class WordVectors:
                             raise ValueError("OpenAI 임베딩이 저장된 기준 모델과 달라 힌트를 판정할 수 없습니다.")
                         return values[0]
 
-                    if client is None:
+                    if cohere:
+                        from .cohere import hint_vector
+
+                        value = hint_vector(self, hint, client=client)
+                    elif client is None:
                         if self.metadata.get("id") != SCORER_ID:
                             raise RuntimeError("사전 밖 힌트를 판정하려면 OpenAI 기준 캐시가 필요합니다.")
                         from openai import APIError, OpenAI
@@ -252,8 +259,9 @@ class WordVectors:
         cosine /= self._norms[target] * np.linalg.norm(value)
         return float(np.clip(cosine, -1, 1) * 100)
 
-    def nearest(self, word):
-        if word not in self._nearest:
+    def nearest(self, word, *, exclude=()):
+        excluded = set(exclude)
+        if word not in self._nearest or self._nearest[word]["word"] in excluded:
             target = self._indices[word]
             query = self._vectors[target].astype(np.float64) / self._norms[target]
             scores = np.empty(len(self._words), dtype=np.float64)
@@ -262,9 +270,11 @@ class WordVectors:
                 scores[start:start + len(block)] = (block @ query) / self._norms[start:start + len(block)]
             for index in np.argsort(-scores, kind="stable"):
                 candidate = self._words[index]
-                if candidate != word and self.is_hint(candidate):
-                    self._nearest[word] = {"word": candidate, "similarity": self.similarity(word, candidate)}
-                    break
+                if candidate != word and candidate not in excluded and self.is_hint(candidate):
+                    result = {"word": candidate, "similarity": self.similarity(word, candidate)}
+                    if not excluded:
+                        self._nearest[word] = result
+                    return result.copy()
             else:
                 raise ValueError(f"{word!r}와 비교할 수 있는 다른 명사가 사전에 없습니다.")
         return self._nearest[word].copy()
@@ -316,21 +326,21 @@ def load_legacy_vectors(path=LEGACY_PATH):
     return vectors
 
 
-def _publish(matrix_path, destination, words, dictionary):
+def _publish(matrix_path, destination, words, dictionary, *, metadata=None, dimensions=None, loader=None):
     destination.parent.mkdir(parents=True, exist_ok=True)
     with TemporaryDirectory(prefix=".openai-", dir=destination.parent) as staging:
         cache = Path(staging) / "model"
         cache.mkdir()
         shutil.copyfile(matrix_path, cache / "vectors.npy")
         matrix = np.load(cache / "vectors.npy", mmap_mode="r", allow_pickle=False)
-        if matrix.shape != (len(words), DIMENSIONS) or matrix.dtype != np.dtype("<f4"):
-            raise ValueError("OpenAI 임베딩 캐시의 단어 수·차원·형식이 다릅니다.")
-        vectors = WordVectors(words, matrix, {**_scorer_metadata(dictionary),
+        if matrix.shape != (len(words), DIMENSIONS if dimensions is None else dimensions) or matrix.dtype != np.dtype("<f4"):
+            raise ValueError("임베딩 캐시의 단어 수·차원·형식이 다릅니다.")
+        vectors = WordVectors(words, matrix, {**(_scorer_metadata(dictionary) if metadata is None else metadata),
             "vectors_sha256": _file_hash(cache / "vectors.npy")})
         _write_json(cache / "words.json", words)
         _write_json(cache / "metadata.json", vectors.metadata)
         cache.rename(destination)
-    return load_vectors(destination)
+    return (loader or load_vectors)(destination)
 
 
 def install_vectors(destination=DEFAULT_PATH, *, source=None, client=None):
@@ -423,19 +433,18 @@ def _install_vectors(destination, *, source=None, client=None):
 
 
 def main():
+    # The OpenAI loader remains available for resumes; setup now prepares Cohere.
+    from .cohere import DEFAULT_PATH, install_vectors, load_vectors
+
     parser = argparse.ArgumentParser(description=__doc__)
     install = parser.add_mutually_exclusive_group()
-    install.add_argument("--download", action="store_true", help="OpenAI API로 전체 명사 임베딩을 한 번 준비합니다.")
+    install.add_argument("--download", action="store_true", help="Cohere API로 전체 명사 임베딩을 한 번 준비합니다.")
     install.add_argument("--from-cache", type=Path, help="검증된 동일 사전·모델 캐시를 가져옵니다.")
     args = parser.parse_args()
-    from openai import APIError
-
     try:
         vectors = install_vectors(source=args.from_cache) if args.download or args.from_cache else load_vectors()
-    except (OSError, ValueError) as error:
+    except (OSError, ValueError, RuntimeError) as error:
         parser.exit(1, f"{error}\n")
-    except APIError:
-        parser.exit(1, "OpenAI 임베딩 요청에 실패했습니다. 키·사용 한도·연결을 확인한 뒤 같은 명령으로 재개하세요.\n")
     print(json.dumps({"path": str(DEFAULT_PATH), **scorer_metadata(vectors)}, ensure_ascii=False, indent=2))
 
 

@@ -68,7 +68,7 @@ class HintPreparationTest(unittest.TestCase):
 
     def test_four_calls_share_private_context_but_only_final_hint_is_scored(self):
         match = LiveMatch()
-        with patch.object(game, "_judge", return_value={"similarity": 100, "valid": True, "mode": "openai"}) as judge:
+        with patch.object(game, "_judge", return_value={"similarity": 100, "valid": True, "mode": "cohere"}) as judge:
             self.play_to_first_clue(match)
         calls = [query for query in match.queries if query["phase"] in PHASES]
         self.assertEqual([query["phase"] for query in calls], list(PHASES))
@@ -104,7 +104,7 @@ class HintPreparationTest(unittest.TestCase):
 
     def test_deadline_accumulates_across_stages_and_hint_attempts(self):
         match = LiveMatch(durations=dict.fromkeys(PHASES, 200 * SECOND))
-        with patch.object(game, "_judge", return_value={"similarity": 50, "valid": True, "mode": "openai"}) as judge:
+        with patch.object(game, "_judge", return_value={"similarity": 50, "valid": True, "mode": "cohere"}) as judge:
             self.play_to_first_clue(match)
         self.assertEqual([query["phase"] for query in match.queries if query["phase"] in PHASES],
                          [*PHASES, PHASES[0]])
@@ -156,7 +156,8 @@ class HintPreparationTest(unittest.TestCase):
             return game.play(match)
 
         with (TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()),
-              patch.object(game, "load_vectors", return_value=self.vectors)):
+              patch.object(game, "load_openai_vectors", return_value=self.vectors),
+              patch.object(game, "VERSION", 4)):
             path = Path(directory) / "events.jsonl"
             with self.assertRaises(Interrupted):
                 run_cli(interrupt, title=DAY_FIVE_MAIN, seats=5, argv=["--output", str(path)])
