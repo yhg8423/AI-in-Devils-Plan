@@ -1,0 +1,47 @@
+.tower-arena { min-width: 0; overflow: hidden; align-self: start; background: #171d28; }
+.tower-arena svg { display: block; width: 100%; height: auto; max-height: 65vh; }
+.tower-room-title, .tower-target-label, .tower-target-value, .tower-stack-label, .tower-player-label, .tower-bottom-label, .tower-move-cue text { text-anchor: middle; font-family: var(--pixel-font); }
+.tower-room-title { fill: #ead6ad; font-size: 11px; font-weight: 700; }
+.tower-target-label { fill: #c3b899; font-size: 9px; }
+.tower-target-value { fill: #ffe4a0; font-size: 13px; font-weight: 700; }
+.tower-stack-label { fill: #cdbb99; font-size: 11px; }
+.tower-block rect { fill: #ccb98d; stroke: #63553c; stroke-width: 1.5px; }
+.tower-block text { fill: #242b34; text-anchor: middle; font-family: var(--pixel-font); font-weight: 700; }
+.tower-moved-block rect { fill: #ffe7a1; stroke: #f5ca56; stroke-width: 2px; }
+.tower-move-cue path { fill: none; stroke: #e8cd79; stroke-width: 2px; }
+.tower-move-cue text { fill: #f3d998; font-size: 9px; }
+.tower-player { cursor: pointer; }
+.tower-player:focus-visible { outline: none; filter: drop-shadow(0 0 4px #ffe4a0); }
+.tower-player[aria-pressed="true"] { filter: drop-shadow(0 0 3px #ffe4a0); }
+.tower-player-label { fill: #efe6d3; font-size: 10px; }
+.tower-bottom-label { fill: #c3b899; font-size: 8px; }
+.tower-scene-status { margin: 0; padding: 9px 12px; border-top: 2px solid #424b58; color: #e7d5b3; font-size: 12px; overflow-wrap: anywhere; }
+.tower-stage, .tower-information { min-width: 0; overflow-wrap: anywhere; }
+.tower-information.caption { display: block; }
+.tower-stage h2 { margin-top: 0; }
+.tower-stage h3, .tower-information h3 { margin: 10px 0 7px; font-size: 13px; }
+.tower-phase { color: #f3d598; font-weight: 700; }
+.tower-objective { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; padding: 10px; margin-block: 12px; border: 2px solid #816f4c; background: #2c2e2c; color: #f1d79b; }
+.tower-objective span { width: 100%; font-size: 11px; }
+.tower-stage .match-table, .tower-information .match-table { font-size: 12px; }
+.tower-stage .match-table :is(th, td), .tower-information .match-table :is(th, td) { padding: 6px; }
+.tower-bid-window, .tower-challenge { padding: 10px; border-left: 3px solid #dbb65f; background: #2c3037; }
+.tower-challenge h3 { margin-top: 0; }
+.tower-challenge p { margin: 6px 0; }
+.tower-last-move { padding: 9px; border-left: 3px solid #a5b8c5; background: #252e3a; }
+.tower-verdict { padding: 9px 11px; border: 1px solid currentColor; }
+.tower-verdict h3 { margin-top: 0; }
+.tower-success { color: #b5e8b4; background: #21382d; }
+.tower-failure { color: #ffc0ac; background: #3b292c; }
+.tower-expression { font-family: var(--pixel-font); font-weight: 700; overflow-wrap: anywhere; }
+.tower-rules p { white-space: pre-wrap; line-height: 1.65; }
+.tower-round-result { padding: 10px 0; border-bottom: 1px solid #3d4651; }
+.tower-round-result h3 button, .tower-move-log button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.tower-round-result h3 button:focus-visible, .tower-move-log button:focus-visible { outline: 2px solid #edcf8f; outline-offset: 3px; }
+.tower-move-log { padding-left: 20px; }
+.tower-move-log li { padding: 8px 0; border-bottom: 1px solid #343e4b; overflow-wrap: anywhere; }
+@media (max-width: 600px) {
+  .tower-arena svg { max-height: none; }
+  .tower-scene-status { padding: 8px; font-size: 11px; }
+  .tower-stage .match-table :is(th, td), .tower-information .match-table :is(th, td) { padding: 5px; }
+}

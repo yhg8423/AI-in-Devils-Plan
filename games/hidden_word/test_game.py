@@ -220,12 +220,41 @@ class HiddenWordTest(unittest.TestCase):
         match = WrongGuesses(PLAYERS[:5], 8)
         result = game.play(match)
         self.assertEqual(set(result["ranking"]), set(PLAYERS[:5]))
-        self.assertEqual(len(result["living"]), 2)
-        self.assertEqual(len(result["prison"]), 2)
+        self.assertEqual(result["living"], result["ranking"][:1])
+        self.assertEqual(result["prison"], result["ranking"][1:4])
         self.assertEqual(len(result["eliminated"]), 1)
         self.assertEqual(len(events(match, "word_envelope")), 5)
         self.assertEqual(len(events(match, "word_secret")), 10)
         self.assertEqual(result["scores"], dict.fromkeys(PLAYERS[:5], 18))
+
+    def test_legacy_five_player_resume_preserves_two_prisoners(self):
+        def interrupt(match):
+            record = match.on_event
+            def stop(event):
+                record(event)
+                if event.msg_type == "word_setup":
+                    raise RuntimeError("test interruption")
+            match.on_event = stop
+            return game.play(match)
+
+        with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            path = Path(directory) / "events.jsonl"
+            with self.assertRaisesRegex(RuntimeError, "interruption"):
+                run_cli(interrupt, title=DAY_FIVE_MAIN, seats=(6, 5),
+                        argv=["--players", *PLAYERS[:5], "--output", str(path)])
+            rows = [json.loads(line) for line in path.read_text().splitlines()]
+            for row in rows:
+                if row.get("msg_type") == "rules":
+                    row["content"] = row["content"].replace(game.ASSIGNMENTS, game.LEGACY_ASSIGNMENTS)
+                if row.get("msg_type") == "word_setup":
+                    setup = json.loads(row["content"])
+                    del setup["prison_seats"]
+                    row["content"] = encode(setup)
+            path.write_text("".join(encode(row) + "\n" for row in rows))
+            run_cli(game.play, title=DAY_FIVE_MAIN, seats=(6, 5), argv=["--resume", "--output", str(path)])
+            result = json.loads(path.read_text().splitlines()[-1])
+            self.assertEqual(len(result["living"]), 2)
+            self.assertEqual(len(result["prison"]), 2)
 
     def test_cli_records_five_or_six_player_match(self):
         with TemporaryDirectory() as directory, redirect_stdout(StringIO()), redirect_stderr(StringIO()):

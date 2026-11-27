@@ -2,6 +2,8 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  tower_opening_bid: tr("최초 이동 입찰", "Opening move-count bid"), tower_counter_bid: tr("추가 이동 입찰", "Counterbid"),
+  tower_execute: tr("수식 실연", "Demonstrate the equation"),
   word_preparation: tr("비공개 전략 준비", "Private preparation"), word_discussion: tr("히든 워드 대화", "Hidden Word discussion"),
   word_talk: tr("히든 워드 대화", "Hidden Word discussion"), word_envelope: tr("봉투 선택", "Choose an envelope"),
   word_secret: tr("출제 단어 선택", "Choose a hidden word"), word_hint: tr("힌트 입력", "Submit a hint"),
