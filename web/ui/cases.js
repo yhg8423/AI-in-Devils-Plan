@@ -1,5 +1,12 @@
 import {tr} from "./locale.js";
 
+export const gameOrder = [
+  "1일차 메인 매치", "1일차 감옥 매치", "유배지 매치 1", "2일차 메인 매치", "유배지 매치 2",
+  "2일차 감옥 매치", "유배지 매치 3", "3일차 메인 매치", "유배지 매치 4", "3일차 감옥 매치",
+  "4일차 메인 매치", "유배지 매치 5", "4일차 감옥 매치", "5일차 메인 매치", "유배지 매치 6",
+  "5일차 감옥 매치", "유배지 매치 7", "유배지 매치 8", "6일차 메인 매치", "6일차 감옥 매치",
+];
+
 export function caseMatches({matches, exile_matches: exileMatches = []}) {
   const stageOrder = new Map(matches.map(({id}, index) => [id, index]));
   const position = ({id, after}) => stageOrder.get(id) ?? ((stageOrder.get(after) ?? matches.length) + 0.5);

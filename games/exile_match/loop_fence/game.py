@@ -20,12 +20,12 @@ RULES = """울타리 치기 · 4인 개인전
 X는 선을 긋지 않겠다는 개인 메모이며 고리의 일부가 아닙니다.
 
 답안은 자신만 볼 수 있습니다. 완성했다고 판단하면 버저를 눌러 현재 답안을 검사받습니다.
-먼저 올바른 고리를 제출한 3명은 순서대로 생존을 확정하고, 남은 1명은 탈락합니다.
+먼저 올바른 고리를 제출한 2명은 순서대로 생존을 확정하고, 남은 2명은 탈락합니다.
 한 문제를 끝까지 함께 풀며 별도 라운드나 전체 시간 제한은 없습니다.
 검사에 실패해도 답안을 지우거나 고쳐 다시 제출할 수 있습니다. 이는 이 시뮬레이션의 재시도 정책입니다.
 같은 생각 구간의 버저는 저장된 응답 시간이 짧은 순서로 처리하며, 동률은 시작 시 공개한
-시드 기반 우선순위를 따릅니다. 세 번째 생존자가 정해지면 이후 버저는 처리하지 않습니다.
-생존자의 답안과 정답 고리는 경기가 끝나 3명이 생존한 뒤에만 모두 공개합니다.
+시드 기반 우선순위를 따릅니다. 두 번째 생존자가 정해지면 이후 버저는 처리하지 않습니다.
+생존자의 답안과 정답 고리는 경기가 끝나 2명이 생존한 뒤에만 모두 공개합니다.
 
 매번 전체 답안을 교체하는 JSON 행동을 제출하세요.
 {"type":"draw","edges":[["H",0,0]],"crosses":[["V",0,0]],"submit":false}
@@ -37,6 +37,25 @@ submit:true이면 이 답안을 그린 직후 버저를 눌러 제출하고, fal
 {"type":"wait"}는 현재 답안을 그대로 둡니다. 형식 오류도 현재 답안을 유지하며 정답으로 보정하지 않습니다.
 대화·협상·관계 평가는 없습니다. 호출 상한이 끝나면 스크립트 시연 행동으로 이어갑니다.
 """
+
+LEGACY_RULES = RULES.replace(
+    "먼저 올바른 고리를 제출한 2명은 순서대로 생존을 확정하고, 남은 2명은 탈락합니다.",
+    "먼저 올바른 고리를 제출한 3명은 순서대로 생존을 확정하고, 남은 1명은 탈락합니다.",
+).replace("두 번째 생존자", "세 번째 생존자").replace("끝나 2명이 생존한 뒤", "끝나 3명이 생존한 뒤")
+
+
+def _survivor_count(match):
+    log = match.resume_log
+    if log is not None and log.resume:
+        setup = next((json.loads(event["content"]) for event in log.events if event["msg_type"] == "fence_setup"), None)
+        if setup is not None:
+            slots = setup.get("survivors")
+            if type(slots) is not int or slots not in (2, 3):
+                raise ValueError("저장된 울타리 치기의 생존 인원이 올바르지 않습니다.")
+            return slots
+        if any(event["msg_type"] == "rules" and event["content"] == LEGACY_RULES for event in log.events):
+            return 3
+    return 2
 
 
 def parse_action(text, size=SIZE):
@@ -80,6 +99,7 @@ def play(match: Match):
     players = list(match.players)
     if len(players) != 4 or len(set(players)) != 4:
         raise ValueError("울타리 치기에는 서로 다른 참가자 4명이 필요합니다.")
+    slots = _survivor_count(match)
     match.relationship_reviews_enabled = False
     # Explicit current-state prompts and own PNGs prevent private boards surviving in another history.
     match.model_observations = lambda name, events: [event for event in events if event.msg_type == "rules"]
@@ -90,11 +110,11 @@ def play(match: Match):
     states = {name: {"edges": [], "crosses": [], "board": public_board} for name in players}
     attempts, last_verdict = dict.fromkeys(players, 0), dict.fromkeys(players, None)
     finishes, winners, window = [], [], 0
-    match.event("rules", RULES)
+    match.event("rules", LEGACY_RULES if slots == 3 else RULES)
     match.event("fence_setup", {"version": 1, "players": players, "priority": priority,
-                                "size": SIZE, "survivors": 3})
+                                "size": SIZE, "survivors": slots})
     match.event("fence_puzzle", {"puzzle": {"id": puzzle_id, "size": SIZE, "board": public_board}})
-    while len(winners) < 3:
+    while len(winners) < slots:
         window += 1
         active = [name for name in players if name not in winners]
         match.event("fence_window", {"window": window, "active": active})
@@ -147,11 +167,11 @@ def play(match: Match):
                 finish = {**common, "rank": len(winners)}
                 finishes.append(finish)
                 match.event("fence_finish", finish)
-                if len(winners) == 3:
+                if len(winners) == slots:
                     break
     match.event("fence_reveal", {"boards": deepcopy(states), "solution": puzzle["solution"], "puzzle_id": puzzle_id})
     ranking = winners + [name for name in players if name not in winners]
-    return {"ranking": ranking, "ranking_groups": [[name] for name in ranking], "survivors": winners,
-            "eliminated": ranking[3:], "scores": {name: int(name in winners) for name in players},
+    return {"ranking": ranking, "ranking_groups": [[name] for name in winners] + [ranking[slots:]], "survivors": winners,
+            "eliminated": ranking[slots:], "scores": {name: int(name in winners) for name in players},
             "finish_turns": {finish["player"]: finish["window"] for finish in finishes},
             "finishes": finishes, "turns": window, "attempts": attempts, "pieces": match.pieces.copy()}

@@ -341,52 +341,52 @@ class ExileRosterTest(unittest.TestCase):
             logs.append(prison)
         return first, second, third, fourth, logs
 
-    def test_fifth_keeps_all_three_saved_survivors_and_next_arrival_without_writes(self):
+    def test_legacy_fifth_keeps_all_three_saved_survivors_and_next_arrival_without_writes(self):
         first, second, third, fourth, logs = self.fifth_sources()
         originals = {path: path.read_bytes() for path in [first, second, third, fourth, *logs]}
-        self.assertEqual(collect_fifth_exile_players(fourth, logs), ["P05", "P07", "P06", "P04"])
+        self.assertEqual(collect_fifth_exile_players(fourth, logs, legacy=True), ["P05", "P07", "P06", "P04"])
         self.assertEqual({path: path.read_bytes() for path in originals}, originals)
 
-    def test_fifth_accepts_queued_arrival_with_same_prefix_and_preserves_batch_order(self):
+    def test_legacy_fifth_accepts_queued_arrival_with_same_prefix_and_preserves_batch_order(self):
         _, _, _, fourth, logs = self.fifth_sources(queued=True)
         self.assertEqual(len(json.loads(fourth.read_text().splitlines()[0])["from_matches"]), len(logs))
-        self.assertEqual(collect_fifth_exile_players(fourth, logs), ["P05", "P07", "P06", "P04"])
+        self.assertEqual(collect_fifth_exile_players(fourth, logs, legacy=True), ["P05", "P07", "P06", "P04"])
         _, _, _, fourth, logs = self.fifth_sources(new_eliminated=["P04", "P03"])
-        self.assertEqual(collect_fifth_exile_players(fourth, logs), ["P05", "P07", "P06", "P04"])
+        self.assertEqual(collect_fifth_exile_players(fourth, logs, legacy=True), ["P05", "P07", "P06", "P04"])
 
-    def test_fifth_requires_the_shortest_source_prefix_with_nine_arrivals(self):
+    def test_legacy_fifth_requires_the_shortest_source_prefix_with_nine_arrivals(self):
         _, _, _, fourth, logs = self.fifth_sources()
-        with self.assertRaisesRegex(ValueError, "새 탈락자가 합류"):
-            collect_fifth_exile_players(fourth, logs[:-1])
+        with self.assertRaisesRegex(ValueError, "새 탈락자 1명"):
+            collect_fifth_exile_players(fourth, logs[:-1], legacy=True)
         _, _, _, fourth, logs = self.fifth_sources(queued=True)
         prison = self.write("a", "day3-prison", DAY_THREE_PRISON,
                             [name for name in PLAYERS if name not in {"P13", "P12", "P09", "P14", "P08", "P07", "P06", "P05", "P04"}],
                             ["P03"], from_main=str(logs[-1]))
         with self.assertRaisesRegex(ValueError, "첫 경기"):
-            collect_fifth_exile_players(fourth, [*logs, prison])
+            collect_fifth_exile_players(fourth, [*logs, prison], legacy=True)
 
-    def test_fifth_recursively_validates_earlier_outcomes_and_campaign_sources(self):
+    def test_legacy_fifth_recursively_validates_earlier_outcomes_and_campaign_sources(self):
         first, _, _, fourth, logs = self.fifth_sources()
         self.rewrite(first, result={"survivors": ["P13", "P13", "P09"]})
         with self.assertRaisesRegex(ValueError, "첫 유배지 매치의 생존자"):
-            collect_fifth_exile_players(fourth, logs)
+            collect_fifth_exile_players(fourth, logs, legacy=True)
         _, second, _, fourth, logs = self.fifth_sources()
         self.rewrite(second, result={"survivors": ["P08", "P08"]})
         with self.assertRaisesRegex(ValueError, "두 번째 유배지 매치의 생존자"):
-            collect_fifth_exile_players(fourth, logs)
+            collect_fifth_exile_players(fourth, logs, legacy=True)
         _, _, _, fourth, logs = self.fifth_sources()
         other = self.first_day("b")
         self.rewrite(fourth, header={"from_matches": [str(path) for path in [*other, *logs[2:5]]]})
         with self.assertRaisesRegex(ValueError, "같은 캠페인"):
-            collect_fifth_exile_players(fourth, logs)
+            collect_fifth_exile_players(fourth, logs, legacy=True)
 
-    def test_fifth_rejects_wrong_predecessor_and_missing_or_invalid_survivors(self):
+    def test_legacy_fifth_rejects_wrong_predecessor_and_missing_or_invalid_survivors(self):
         _, _, third, fourth, logs = self.fifth_sources()
         with self.assertRaisesRegex(ValueError, FOURTH_EXILE):
-            collect_fifth_exile_players(third, logs)
+            collect_fifth_exile_players(third, logs, legacy=True)
         self.rewrite(fourth, header={"from_exile": "missing-exile3.jsonl"})
         with self.assertRaisesRegex(ValueError, "세 번째 유배지 매치의 기록"):
-            collect_fifth_exile_players(fourth, logs)
+            collect_fifth_exile_players(fourth, logs, legacy=True)
         for updates in (
             {"header": {"players": ["P07", "P08", "P06", "P04"]}},
             {"result": {"survivors": ["P05", "P07"]}},
@@ -398,9 +398,9 @@ class ExileRosterTest(unittest.TestCase):
                 _, _, _, fourth, logs = self.fifth_sources()
                 self.rewrite(fourth, **updates)
                 with self.assertRaisesRegex(ValueError, "네 번째 유배지 매치의 생존자"):
-                    collect_fifth_exile_players(fourth, logs)
+                    collect_fifth_exile_players(fourth, logs, legacy=True)
 
-    def test_fifth_resolves_the_entire_portable_exported_exile_chain(self):
+    def test_legacy_fifth_resolves_the_entire_portable_exported_exile_chain(self):
         first, second, third, fourth, logs = self.fifth_sources()
         for path in [first, second, third, fourth]:
             header = json.loads(path.read_text().splitlines()[0])
@@ -408,7 +408,7 @@ class ExileRosterTest(unittest.TestCase):
             if "from_exile" in header:
                 updates["from_exile"] = str(Path(header["from_exile"]).relative_to(self.root))
             self.rewrite(path, header=updates)
-        self.assertEqual(collect_fifth_exile_players(fourth, logs), ["P05", "P07", "P06", "P04"])
+        self.assertEqual(collect_fifth_exile_players(fourth, logs, legacy=True), ["P05", "P07", "P06", "P04"])
 
 
 if __name__ == "__main__":

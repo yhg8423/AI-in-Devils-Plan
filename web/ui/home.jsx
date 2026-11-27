@@ -1,5 +1,5 @@
 import React, {useEffect, useLayoutEffect, useRef, useState} from "react";
-import {caseTitle} from "./cases.js";
+import {caseTitle, gameOrder} from "./cases.js";
 import {drawSet, setHeight, setPoint, setWidth} from "./floor.js";
 import {fetchCases} from "./replay.js";
 import {Sprite} from "./scene.jsx";
@@ -23,9 +23,12 @@ const games = [
   {session: "유배지 매치 1", name: "피스 퍼즐", description: tr("홈의 방향과 깊이를 살펴 8개의 피스로 격자를 완성한다.", "Match notch directions and depths to assemble eight pieces into a lattice.")},
   {session: "유배지 매치 2", name: "달라진 그림 찾기", description: tr("원본을 기억하고 달라진 다섯 곳을 찾아 두 명의 생존자를 가린다.", "Remember the original and find five changes to secure one of two survival places.")},
   {session: "유배지 매치 3", name: "비밀 코드", description: tr("26장 카드의 단서로 네 글자 코드를 추리하고 버저로 생존을 확정한다.", "Deduce a four-letter code from 26 cards and their clues, then buzz to secure survival.")},
-  {session: "유배지 매치 4", name: "울타리 치기", description: tr("같은 숫자 퍼즐에 하나의 고리를 그려 먼저 완성한 세 명이 생존한다.", "Draw one closed loop on the shared number puzzle; the first three finishers survive.")},
-  {session: "유배지 매치 5", name: "대칭 퍼즐", description: tr("파랑·빨강·초록 조각으로 세 대칭 도형을 완성해 마지막 탈락을 피한다.", "Complete symmetric shapes from blue, red and green pieces to avoid finishing last.")},
-];
+  {session: "유배지 매치 4", name: "울타리 치기", description: tr("같은 숫자 퍼즐에 하나의 고리를 그려 먼저 완성한 두 명이 생존한다.", "Draw one closed loop on the shared number puzzle; the first two finishers survive.")},
+  {session: "유배지 매치 5", name: "대칭 퍼즐", description: tr("파랑·빨강·초록 조각으로 세 대칭 도형을 완성한 두 명이 생존한다.", "The first two players to complete the blue, red and green symmetric shapes survive.")},
+  {session: "유배지 매치 6", name: "만국기", description: tr("네 명이 국기를 기억하고 본 국기 다섯 개를 골라 세 명이 생존한다.", "Four players identify five previously shown flags; the top three survive.")},
+  {session: "유배지 매치 7", name: "네모 세기", description: tr("숫자의 합이 목표인 직사각형을 세고 버저로 생존을 확정한다.", "Count rectangles whose cells sum to the target and buzz to secure survival.")},
+  {session: "유배지 매치 8", name: "포인트 오목", description: tr("세 교점에 비공개 입찰해 오목을 완성하고 본선 복귀권을 얻는다.", "Bid secretly for three intersections and make five in a row to return to the main match.")},
+].sort((a, b) => gameOrder.indexOf(a.session) - gameOrder.indexOf(b.session));
 
 export function runHref(id = "", caseId) {
   const params = new URLSearchParams({run: id});

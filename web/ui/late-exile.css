@@ -1,0 +1,52 @@
+.late-arena { align-self: start; }
+.late-cover { fill: #e8d2a8; text-anchor: middle; font: 700 13px var(--pixel-font); }
+.late-picture { display: block; width: 100%; height: auto; max-height: 100%; }
+.flag-choice circle { fill: none; stroke: #ff3ba7; stroke-width: 9px; filter: drop-shadow(0 0 2px #fff); }
+.flag-check rect { fill: none; stroke: #13b873; stroke-width: 7px; stroke-dasharray: 13 7; }
+.flag-check path { fill: none; stroke: #13b873; stroke-width: 9px; stroke-linejoin: round; filter: drop-shadow(0 0 2px #fff); }
+.late-controls { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 9px; padding: 10px 12px; border-top: 2px solid #414852; color: #c5cdd5; font: 11px/1.6 var(--pixel-font); }
+.late-zoom, .late-zoom-dialog button { border: 1px solid #b49763; background: #363126; color: #ffe0a2; padding: 6px 10px; font: 700 12px var(--pixel-font); cursor: pointer; }
+.late-zoom:disabled { opacity: .5; cursor: default; }
+.late-zoom-dialog { width: min(1200px, 94vw); max-width: 94vw; max-height: 94vh; overflow: auto; padding: 12px; border: 2px solid #8a795d; background: #151c24; color: #e2e4e6; }
+.late-zoom-dialog::backdrop { background: #060b12dc; }
+.late-zoom-dialog header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+.late-zoom-dialog h2 { margin: 0; font: 700 16px var(--pixel-font); }
+.late-stage { min-width: 0; }
+.late-stage h2 { margin-top: 0; }
+.late-stage p { font-size: 12px; line-height: 1.75; overflow-wrap: anywhere; }
+.late-stage .late-phase { color: #eac88e; font-weight: 700; }
+.late-timing { display: flex; flex-wrap: wrap; gap: 9px; color: #d4c4a3; }
+.late-timing span { border: 1px solid #5a574d; background: #25282a; padding: 4px 7px; }
+.late-stage .late-sealed { border: 1px dashed #6b7380; padding: 9px; color: #b8c5d0; }
+.late-selection strong { color: #ffb5df; }
+.late-memory { padding: 9px; border: 1px solid #59687a; background: #172330; }
+.late-memory h3 { margin: 0 0 6px; font: 700 12px var(--pixel-font); color: #c3d6e9; }
+.late-memory p { white-space: pre-wrap; margin: 0; }
+.late-target { display: flex; align-items: center; gap: 12px; color: #c4cbd2; }
+.late-target strong { color: #ffe0a1; font: 700 30px var(--pixel-font); }
+.late-feedback rect { fill: #302e27; stroke: #d9b975; stroke-width: 2px; }
+.late-feedback text { fill: #ffe1a3; text-anchor: middle; font: 700 12px var(--pixel-font); }
+.late-feedback[data-correct="true"] rect { fill: #20382c; stroke: #94cc9c; }
+.late-feedback[data-correct="false"] rect { fill: #3d292c; stroke: #bc7d72; }
+.late-feedback-text { color: #ffb2a4; }
+.late-feedback-text[data-correct="true"] { color: #d4f5c4; }
+.late-stage .match-table, .late-information .match-table { font-size: 12px; }
+.late-stage .match-table :is(th, td), .late-information .match-table :is(th, td) { padding: 6px; }
+.late-information.caption { display: block; min-width: 0; }
+.late-information [role="tablist"] { max-width: 100%; overflow-x: auto; margin-bottom: 14px; }
+.late-history { padding: 0; margin: 0; list-style: none; }
+.late-history li { padding: 10px 0; border-bottom: 1px solid #3a4552; }
+.late-history button { display: grid; gap: 6px; width: 100%; padding: 0; border: 0; background: none; color: #e0d4b8; text-align: left; font: inherit; cursor: pointer; overflow-wrap: anywhere; }
+.late-history strong { font-size: 13px; line-height: 1.7; }
+.late-history span { font-size: 12px; line-height: 1.6; color: #b7c6d3; }
+.gomoku-board { display: block; width: 100%; height: auto; }
+.gomoku-board text { font: 700 14px var(--pixel-font); fill: #392717; }
+.gomoku-board .gomoku-point-label { fill: #ffffff; stroke: #4f113b; stroke-width: 5px; paint-order: stroke; font-size: 19px; }
+.gomoku-legend { justify-content: center; gap: 24px; }
+.gomoku-legend span { display: flex; align-items: center; gap: 8px; }
+.gomoku-legend i { display: block; width: 18px; height: 18px; border-radius: 50%; border: 2px solid #ffe4a1; background: #19202b; }
+.gomoku-legend i[data-color="white"] { background: #fff6dd; border-color: #53657c; }
+.gomoku-returnee { display: grid; gap: 8px; padding: 14px; border: 2px solid #ceb374; background: #302d24; color: #f4ddb0; }
+.gomoku-returnee strong { font: 700 28px var(--pixel-font); }
+.gomoku-returnee span { font-size: 13px; }
+@media (max-width: 540px) { .late-feedback text { font-size: 10px; } .late-controls { padding: 9px; } .late-stage .match-table { font-size: 11px; } }

@@ -17,8 +17,12 @@ from games.either_or.lay_the_grass.board import PARK_ROWS
 from games.exile_match.roster import (
     collect_exile_players, collect_second_exile_players, collect_third_exile_players, collect_fourth_exile_players,
     collect_fifth_exile_players,
+    collect_sixth_exile_players, collect_seventh_exile_players, collect_eighth_exile_players,
 )
-from games.match import DAY_FIVE_MAIN, FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE, canonical_game_title
+from games.match import (
+    DAY_FIVE_MAIN, DAY_SIX_MAIN, FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE,
+    SIXTH_EXILE, SEVENTH_EXILE, EIGHTH_EXILE, canonical_game_title,
+)
 
 
 UI = Path(__file__).with_name("ui")
@@ -38,7 +42,8 @@ EVENT_TYPES = {
 }
 EVENT_FIELDS = ("msg_type", "agent_name", "content", "visible_to")
 CASE_STAGES = ("1일차 메인 매치", "1일차 감옥 매치", "2일차 메인 매치", "2일차 감옥 매치", "3일차 메인 매치", "3일차 감옥 매치", "4일차 메인 매치", "4일차 감옥 매치", "5일차 메인 매치", "5일차 감옥 매치", "6일차 메인 매치", "6일차 감옥 매치")
-EXILE_GAMES = (FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE)
+EXILE_GAMES = (FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE,
+               SIXTH_EXILE, SEVENTH_EXILE, EIGHTH_EXILE)
 
 
 def find_matches(root: Path) -> dict[str, Path]:
@@ -138,8 +143,13 @@ def exile_sources(root: Path, header: dict, logs, *, previous_exile: Path | None
         if (previous_exile is None or previous_exile.resolve() not in source_paths(root, header.get("from_exile"))):
             raise ValueError("The exile match must point to this campaign's preceding exile match.")
         collectors = {SECOND_EXILE: collect_second_exile_players, THIRD_EXILE: collect_third_exile_players,
-                      FOURTH_EXILE: collect_fourth_exile_players, FIFTH_EXILE: collect_fifth_exile_players}
-        players = collectors[game](previous_exile, sources)
+                      FOURTH_EXILE: collect_fourth_exile_players, FIFTH_EXILE: collect_fifth_exile_players,
+                      SIXTH_EXILE: collect_sixth_exile_players, SEVENTH_EXILE: collect_seventh_exile_players,
+                      EIGHTH_EXILE: collect_eighth_exile_players}
+        if game == FIFTH_EXILE and not header.get("exile_schedule"):
+            players = collect_fifth_exile_players(previous_exile, sources, legacy=True)
+        else:
+            players = collectors[game](previous_exile, sources)
     if header.get("players") != players:
         raise ValueError("The exile roster must match the campaign's entrants and survivors in source order.")
     return sources
@@ -272,6 +282,11 @@ def next_match(root: Path, logs: dict[str, Path], run_id: str) -> dict | None:
     if current_header and current_header["game"] in EXILE_GAMES:
         stage = EXILE_GAMES.index(current_header["game"])
         if stage + 1 == len(EXILE_GAMES):
+            for candidate, log in logs.items():
+                header = read_match_header(log)
+                if (header and header["game"] == DAY_SIX_MAIN
+                        and current in source_paths(root, header.get("from_returnee"))):
+                    return {"id": candidate, "game": header["game"]}
             return None
         for candidate, log in logs.items():
             header = read_match_header(log)

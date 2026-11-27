@@ -7,7 +7,7 @@ from tempfile import TemporaryDirectory
 import unittest
 
 from ..match import (
-    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, DAY_THREE_MAIN, DAY_THREE_PRISON,
+    DAY_ONE_MAIN, DAY_ONE_PRISON, DAY_TWO_MAIN, DAY_TWO_PRISON, DAY_THREE_MAIN, DAY_THREE_PRISON, DAY_FOUR_MAIN,
     FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE, run_cli,
 )
 
@@ -255,58 +255,52 @@ class ExileCliTest(unittest.TestCase):
 
     def fifth_cli(self, play, *args):
         with redirect_stdout(StringIO()), redirect_stderr(StringIO()):
-            run_cli(play, title=FIFTH_EXILE, seats=(3, 4), exile_roster=True,
+            run_cli(play, title=FIFTH_EXILE, seats=4, exile_roster=True,
                     previous_exile=FOURTH_EXILE, argv=list(args))
 
-    def prepare_fifth(self, *, queued=False):
+    def prepare_fifth(self):
         third, sources, fourth = self.prepare_fourth()
-        if queued:
-            rows = [json.loads(line) for line in sources[-1].read_text().splitlines()]
-            rows[-1]["eliminated"].append("P04")
-            sources[-1].write_text("".join(json.dumps(row) + '\n' for row in rows))
-        self.fourth_cli(self.play, "--from-exile", str(third), "--from-matches", *map(str, sources),
+        def finish_two(match):
+            ranking = list(match.players)
+            return {"ranking": ranking, "survivors": ranking[:2], "eliminated": ranking[2:]}
+        self.fourth_cli(finish_two, "--from-exile", str(third), "--from-matches", *map(str, sources),
                         "--output", str(fourth))
-        if not queued:
-            prison = self.root / "day3-prison.jsonl"
-            header = {"type": "match", "game": DAY_THREE_PRISON, "players": [f"P{i:02}" for i in range(1, 5)],
-                      "from_main": str(sources[-1])}
-            prison.write_text(json.dumps(header) + '\n' + json.dumps({"type": "result", "eliminated": ["P04"]}) + '\n')
-            sources.append(prison)
+        for title, stage, eliminated in ((DAY_THREE_PRISON, "day3-prison", "P04"),
+                                          (DAY_FOUR_MAIN, "day4-main", "P03")):
+            path = self.root / f"{stage}.jsonl"
+            links = {"from_main": str(sources[-1] if title == DAY_THREE_PRISON else sources[-2])}
+            if title == DAY_FOUR_MAIN:
+                links["from_prison"] = str(sources[-1])
+            header = {"type": "match", "game": title, "players": ["P01", "P02", "P03", *(["P04"] if title == DAY_THREE_PRISON else [])], **links}
+            path.write_text(json.dumps(header) + '\n' + json.dumps({"type": "result", "eliminated": [eliminated]}) + '\n')
+            sources.append(path)
         return fourth, sources, self.root / "exile5/events.jsonl"
 
-    def test_fifth_import_preserves_all_three_survivors_in_a_four_player_roster(self):
+    def test_fifth_import_combines_two_survivors_with_two_arrivals_after_day_four_main(self):
         fourth, sources, target = self.prepare_fifth()
         originals = {path: path.read_bytes() for path in [fourth, *sources]}
         self.fifth_cli(self.play, "--from-exile", str(fourth), "--from-matches", *map(str, sources),
                        "--output", str(target))
         rows = [json.loads(line) for line in target.read_text().splitlines()]
-        self.assertEqual(rows[0]["players"], ["P08", "P14", "P07", "P04"])
+        self.assertEqual(rows[0]["players"], ["P08", "P14", "P04", "P03"])
         self.assertEqual(rows[0]["pieces"], dict.fromkeys(rows[0]["players"], 0))
         self.assertEqual(rows[0]["from_exile"], str(fourth))
         self.assertEqual(rows[0]["from_matches"], list(map(str, sources)))
         self.assertEqual({path: path.read_bytes() for path in originals}, originals)
 
-    def test_fifth_can_import_a_queued_arrival_with_the_same_prefix(self):
-        fourth, sources, target = self.prepare_fifth(queued=True)
-        self.fifth_cli(self.play, "--from-exile", str(fourth), "--from-matches", *map(str, sources),
-                       "--output", str(target))
+    def test_fifth_rejects_starting_after_day_three_prison(self):
+        fourth, sources, target = self.prepare_fifth()
+        with self.assertRaises(SystemExit):
+            self.fifth_cli(self.play, "--from-exile", str(fourth), "--from-matches", *map(str, sources[:-1]),
+                           "--output", str(target))
+        self.assertFalse(target.exists())
+
+    def test_fifth_standalone_accepts_four_players_and_records_schedule(self):
+        target = self.root / "standalone.jsonl"
+        self.fifth_cli(self.play, "--output", str(target))
         header = json.loads(target.read_text().splitlines()[0])
-        self.assertEqual(header["players"], ["P08", "P14", "P07", "P04"])
-        self.assertEqual(header["from_matches"], json.loads(fourth.read_text().splitlines()[0])["from_matches"])
-
-    def test_fifth_standalone_accepts_three_or_four_players(self):
-        def play(match):
-            ranking = list(match.players)
-            return {"ranking": ranking, "survivors": ranking[:-1], "eliminated": ranking[-1:]}
-
-        for count in (3, 4):
-            with self.subTest(count=count):
-                players = [f"P{i:02}" for i in range(1, count + 1)]
-                target = self.root / f"standalone-{count}.jsonl"
-                self.fifth_cli(play, "--players", *players, "--output", str(target))
-                rows = [json.loads(line) for line in target.read_text().splitlines()]
-                self.assertEqual(rows[0]["players"], players)
-                self.assertEqual(rows[-1]["survivors"], players[:-1])
+        self.assertEqual(len(header["players"]), 4)
+        self.assertEqual(header["exile_schedule"], "four_player_v1")
 
     def test_fifth_requires_both_flags_and_restores_unchanged_sources_on_resume(self):
         fourth, sources, target = self.prepare_fifth()
@@ -338,6 +332,37 @@ class ExileCliTest(unittest.TestCase):
         self.assertEqual(rows[0]["from_matches"], list(map(str, sources)))
         self.assertEqual(rows[-1]["type"], "result")
         self.assertEqual(sum(row.get("msg_type") == "rules" for row in rows), 1)
+
+    def test_old_symmetry_resume_retains_its_original_sources_and_roster(self):
+        from . import test_roster as fixtures
+        from .roster import collect_fifth_exile_players
+
+        fixture = fixtures.ExileRosterTest()
+        fixture.root = self.root / "legacy"
+        *_, fourth, sources = fixture.fifth_sources()
+        players = collect_fifth_exile_players(fourth, sources, legacy=True)
+        target = self.root / "legacy-symmetry.jsonl"
+
+        def stopped(match):
+            match.event("rules", "old symmetry")
+            raise KeyboardInterrupt
+
+        with self.assertRaises(KeyboardInterrupt):
+            self.fifth_cli(stopped, "--players", *players, "--pieces", "0", "0", "0", "0", "--output", str(target))
+        rows = [json.loads(line) for line in target.read_text().splitlines()]
+        rows[0].pop("exile_schedule")
+        rows[0].update(from_exile=str(fourth), from_matches=list(map(str, sources)))
+        target.write_text("".join(json.dumps(row) + '\n' for row in rows))
+        prefix = target.read_bytes().splitlines()[:-1]
+
+        def resumed(match):
+            match.event("rules", "old symmetry")
+            return {"survivors": list(match.players[:3]), "eliminated": list(match.players[3:])}
+
+        self.fifth_cli(resumed, "--resume", "--output", str(target))
+        self.assertEqual(target.read_bytes().splitlines()[:len(prefix)], prefix)
+        result = json.loads(target.read_text().splitlines()[-1])
+        self.assertEqual(result["survivors"], players[:3])
 
 
 if __name__ == "__main__":

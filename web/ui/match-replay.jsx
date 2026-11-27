@@ -26,6 +26,7 @@ import {applyPictureEvent, pictureActionText, pictureEventText, SpotScene, SpotS
 import {applyCodeEvent, codeActionText, codeEventText, SecretCodeScene, SecretCodeStage, SecretCodeInformation} from "./secret-code.jsx";
 import {applyFenceEvent, fenceActionText, fenceEventText, LoopFenceScene, LoopFenceStage, LoopFenceInformation} from "./loop-fence.jsx";
 import {applySymmetryEvent, symmetryActionText, symmetryEventText, SymmetryScene, SymmetryStage, SymmetryInformation} from "./symmetry.jsx";
+import {applyFlagEvent, applyRectEvent, applyGomokuEvent, lateExileActionText, lateExileEventText, FlagsScene, FlagsStage, FlagsInformation, RectangleExileScene, RectangleExileStage, RectangleExileInformation, PointGomokuScene, PointGomokuStage, PointGomokuInformation} from "./late-exile.jsx";
 import {isStrategy, MatchFeed, Participant, Standings, Table} from "./records.jsx";
 import {BoardScene, RoomScene} from "./scene.jsx";
 import {checkpointLabel, decisionNoteLabel, eventFields, eventText, grassBonusText, phaseNames, roomRecordText, scoreText, snapshot} from "./replay.js";
@@ -33,6 +34,9 @@ import {canonicalGameTitle, en, gameTitle, tr} from "./locale.js";
 import {rulesSummary} from "./rule-summaries.js";
 
 const labels = {
+  flag_setup: tr("만국기 준비", "Flags setup"), flag_phase: tr("국기 관찰·답안", "Flag study and answers"), flag_frame: tr("국기 관찰", "Study a flag"), flag_memory: tr("비공개 기억 메모", "Private memory note"), flag_marks: tr("국기 선택", "Flag choices"), flag_result: tr("라운드 점수", "Round scores"), flag_tiebreak: tr("동률 재경기", "Tiebreak"),
+  rect_setup: tr("유배지 네모 세기 준비", "Exile Rectangle Counting setup"), rect_question: tr("네모 문제 공개", "Rectangle puzzle revealed"), rect_window: tr("네모 세기 생각 시간", "Rectangle Counting thinking window"), rect_buzz: tr("버저", "Buzzer"), rect_attempt: tr("정답 판정", "Answer verdict"), rect_round_result: tr("생존 확정", "Survival secured"), rect_question_end: tr("문제 종료", "Question ended"), rect_timeout: tr("제한 시간 초과", "Time limit exceeded"),
+  gomoku_setup: tr("포인트 오목 준비", "Point Gomoku setup"), gomoku_game: tr("오목 대결 시작", "Gomoku game begins"), gomoku_round: tr("교점 선택 라운드", "Intersection selection round"), gomoku_select: tr("세 교점 공개", "Three intersections revealed"), gomoku_wallet: tr("비공개 포인트", "Private points"), gomoku_bid: tr("비공개 입찰", "Sealed bids"), gomoku_placement: tr("돌 배치 공개", "Stone placements revealed"), gomoku_game_result: tr("오목 대결 결과", "Gomoku game result"), gomoku_finish: tr("최종 본선 복귀", "Final returnee"), gomoku_selection_timeout: tr("교점 선택 시간 초과", "Intersection selection timed out"),
   grad_setup: tr("그라데이션 준비", "Gradation setup"), grad_match: tr("대결 시작", "Duel begins"),
   grad_layout: tr("비공개 숫자 배치", "Private number layout"), grad_ready: tr("숫자 배치 완료", "Layout submitted"),
   grad_round: tr("통 제출 라운드", "Cup submission round"), grad_offer: tr("통 제출", "Cup offered"),
@@ -190,7 +194,7 @@ const dialogueTypes = new Set(["public", "room", "whisper", "room_invite", "room
 const rouletteObservations = new Set(["inspection", "shift", "swap"]);
 const rouletteStartingCredits = 16;
 const pokerPhases = {nominate: tr("대결 상대 지목", "Choose an opponent"), memorize: tr("카드 암기 중", "Memorizing cards"), memory_poker: tr("카드 선택 중", "Selecting cards")};
-const matchVenues = {"무거운 13": PrisonScene, "러시안 룰렛": RouletteScene, "돼지 저금통": PiggyScene, "벽바둑 2": WallGoScene, "수식의 탑": EquationTowerScene, "HIT, STAY": HitStayScene, "그라데이션": GradationScene, "피스 퍼즐": ExileScene, "달라진 그림 찾기": SpotScene, "비밀 코드": SecretCodeScene, "울타리 치기": LoopFenceScene, "대칭 퍼즐": SymmetryScene};
+const matchVenues = {"만국기": FlagsScene, "네모 세기": RectangleExileScene, "포인트 오목": PointGomokuScene, "무거운 13": PrisonScene, "러시안 룰렛": RouletteScene, "돼지 저금통": PiggyScene, "벽바둑 2": WallGoScene, "수식의 탑": EquationTowerScene, "HIT, STAY": HitStayScene, "그라데이션": GradationScene, "피스 퍼즐": ExileScene, "달라진 그림 찾기": SpotScene, "비밀 코드": SecretCodeScene, "울타리 치기": LoopFenceScene, "대칭 퍼즐": SymmetryScene};
 const marketActions = {trade: tr("주문", "Order"), speak: tr("발언", "Speak"), move: tr("이동", "Move"), move_room: tr("이동", "Move"), pass: tr("패스", "Pass"),
   respond_invite: tr("초대 응답", "Invitation response"), piece: tr("피스 사용", "Spend a Piece"), secret: tr("시크릿 예약", "Schedule Secret")};
 const marketStartingCash = 100_000;
@@ -327,6 +331,7 @@ function record(event, step) {
       .replace("기금은 초과분까지", "조작에 쓴 크레딧은 초과분까지").replace("납부 금액", "사용한 크레딧 수") : ruleText(content),
     action: () => {
       if (credit) return credit.text;
+      if (["flag_", "rect_", "gomoku_"].some((prefix) => data.phase.startsWith(prefix))) return lateExileActionText(data.phase, data.action);
       if (data.phase === "symmetry_arrange") return symmetryActionText(data.action);
       if (data.phase === "fence_draw") return fenceActionText(data.action);
       if (data.phase === "secret_think") return codeActionText(data.action);
@@ -444,7 +449,7 @@ function record(event, step) {
   }[type];
   const actor = ["inspection", "shift", "swap", "pass"].includes(type) ? data.player :
     type === "trade_fill" ? event.visible_to[0] : event.agent_name;
-  const fallback = text ? text() : gradEventText(type, data) ?? hitEventText(type, data) ?? towerEventText(type, data) ?? hiddenEventText(type, data) ?? symmetryEventText(type, data) ?? fenceEventText(type, data) ?? codeEventText(type, data) ?? pictureEventText(type, displayData) ?? exileEventText(type, data) ?? wallEventText(type, data) ?? bingoEventText(type, data) ?? pigEventText(type, data) ?? gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
+  const fallback = text ? text() : lateExileEventText(type, data) ?? gradEventText(type, data) ?? hitEventText(type, data) ?? towerEventText(type, data) ?? hiddenEventText(type, data) ?? symmetryEventText(type, data) ?? fenceEventText(type, data) ?? codeEventText(type, data) ?? pictureEventText(type, displayData) ?? exileEventText(type, data) ?? wallEventText(type, data) ?? bingoEventText(type, data) ?? pigEventText(type, data) ?? gemEventText(type, data) ?? (typeof data === "string" ? content : readable(displayData));
   return {...event, agent_name: actor, step, label, creditCost: credit?.cost,
     text: type === "grass_phase" && fallback !== content ? fallback : eventText(event, fallback)};
 }
@@ -493,6 +498,9 @@ function matchState(events, match, frame, perspective, isMarket, isGemExchange, 
     if (isGemExchange) applyGemEvent(state, type, data, event);
     if (isBingo) applyBingoEvent(state, type, data, state.feed.at(-1));
     if (isHiddenWord) applyHiddenEvent(state, type, data, state.feed.at(-1));
+    if (type.startsWith("flag_")) applyFlagEvent(state, type, data, state.feed.at(-1));
+    if (type.startsWith("rect_")) applyRectEvent(state, type, data, state.feed.at(-1));
+    if (type.startsWith("gomoku_")) applyGomokuEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("sym_")) applySymmetryEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("fence_")) applyFenceEvent(state, type, data, state.feed.at(-1));
     if (type.startsWith("code_")) applyCodeEvent(state, type, data, state.feed.at(-1));
@@ -1145,6 +1153,9 @@ function RouletteInformation({state, replay}) {
 }
 
 function Stage({state, replay, choiceResult, gemExchange}) {
+  if (replay.match.game.endsWith(" · 만국기")) return <FlagsStage state={state} replay={replay} />;
+  if (replay.match.game.endsWith(" · 네모 세기")) return <RectangleExileStage state={state} replay={replay} />;
+  if (replay.match.game.endsWith(" · 포인트 오목")) return <PointGomokuStage state={state} replay={replay} />;
   if (replay.match.game.endsWith(" · 그라데이션")) return <GradationStage state={state} players={replay.match.players} />;
   if (replay.match.game.endsWith(" · HIT, STAY")) return <HitStayStage state={state} players={replay.match.players} />;
   if (replay.match.game.endsWith(" · 수식의 탑")) return <EquationTowerStage state={state} players={replay.match.players} />;
@@ -1282,6 +1293,7 @@ export function MatchReplay({replay, transport, caseName}) {
   const isCode = name === "비밀 코드";
   const isFence = name === "울타리 치기";
   const isSymmetry = name === "대칭 퍼즐";
+  const isFlags = name === "만국기", isRect = name === "네모 세기", isGomoku = name === "포인트 오목";
   const [tab, setTab] = useState("all");
   const events = useMemo(() => match.steps.map(({events: [event]}) => {
     const data = parse(event.content);
@@ -1299,7 +1311,8 @@ export function MatchReplay({replay, transport, caseName}) {
   const choices = useMemo(() => match.board ? choiceResults(state, match.players, view) : [], [state, match, view]);
   const choiceResult = choices.find(({value}) => value === state.choice?.number);
   const chapterOptions = events.flatMap(({msg_type: type, data}, index) => {
-    const label = (type === "rules" ? (index === 0 ? tr("게임 규칙", "Game rules") : ruleHeading(ruleText(data.split("\n", 1)[0]))) : chapters[type]) ??
+    const lateChapter = ["flag_setup", "flag_phase", "flag_result", "flag_tiebreak", "rect_setup", "rect_question", "rect_round_result", "rect_question_end", "gomoku_setup", "gomoku_game", "gomoku_round", "gomoku_placement", "gomoku_game_result", "gomoku_finish"].includes(type) ? lateExileEventText(type, data) : null;
+    const label = lateChapter ?? (type === "rules" ? (index === 0 ? tr("게임 규칙", "Game rules") : ruleHeading(ruleText(data.split("\n", 1)[0]))) : chapters[type]) ??
       (["round", "market", "gem_round"].includes(type) ? roundLabel(data.round) : null) ??
       (type === "gem_preparation" ? gemEventText(type, data) : null) ??
       (type === "gem_discussion" ? gemDiscussionLabel(data) : null) ??
@@ -1331,7 +1344,7 @@ export function MatchReplay({replay, transport, caseName}) {
     ...match.players.map((name) => ({value: name, label: tr(`${name} 시점`, `${name}’s view`)}))];
   const Venue = matchVenues[name];
   const dialogueTabs = !silentHiddenWord && (state.scene || isRoulette || isPiggyBank || isHitStay);
-  const logTabs = dialogueTabs || isGradation || isTower || isHiddenWord || isExile || isSpot || isCode || isFence || isSymmetry;
+  const logTabs = dialogueTabs || isGradation || isTower || isHiddenWord || isExile || isSpot || isCode || isFence || isSymmetry || isFlags || isRect || isGomoku;
   const ranking = isMarket || isGemExchange || isBingo || isHiddenWord ? state.result?.ranking ?? state.market?.ranking ?? state.bingoReveal?.ranking : null;
   const playerDetails = ranking ? new Map(ranking.map((player, index) => [player, {
     rank: tr(`${index + 1}위`, `Rank ${index + 1}`), status: state.result?.eliminated.includes(player) ? "탈락" :
@@ -1372,7 +1385,7 @@ export function MatchReplay({replay, transport, caseName}) {
         {nextMatch ?
           <Button label={`${tr("다음 매치 보기", "Watch next match")} · ${gameTitle(nextMatch.game)}`}
             href={runHref(nextMatch.id, caseRecord?.id)} variant="primary" size="sm" /> :
-          state.result && caseRecord && <p className="muted">{isSymmetry ?
+          state.result && caseRecord && <p className="muted">{isFlags || isRect || isGomoku ? tr("유배지 매치를 마쳤어요.", "The exile match is complete.") : isSymmetry ?
             tr("다섯 번째 유배지 매치를 마쳤어요.", "End of the fifth exile match.") : isFence ?
             tr("네 번째 유배지 매치를 마쳤어요.", "End of the fourth exile match.") : isCode ?
             tr("세 번째 유배지 매치를 마쳤어요.", "End of the third exile match.") : isSpot ?
@@ -1417,7 +1430,7 @@ export function MatchReplay({replay, transport, caseName}) {
         <Selector label={tr("관전 시점", "Viewpoint")} isLabelHidden value={view} size="sm" options={views} onChange={replay.chooseView} />
       </div>
     </div>
-    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange || isPiggyBank || isBingo || isHiddenWord || isWallGo || isTower || isHitStay || isGradation || isExile || isSpot || isCode || isFence || isSymmetry ? <div className="match-details">
+    {match.board || isMarket || isRoulette || isHeavy13 || isGemExchange || isPiggyBank || isBingo || isHiddenWord || isWallGo || isTower || isHitStay || isGradation || isExile || isSpot || isCode || isFence || isSymmetry || isFlags || isRect || isGomoku ? <div className="match-details">
       {records}
       {isMarket && <MarketInformation key={replay.id} state={state} replay={replay} />}
       {isRoulette && <RouletteInformation key={replay.id} state={state} replay={replay} />}
@@ -1433,6 +1446,9 @@ export function MatchReplay({replay, transport, caseName}) {
       {isSpot && <SpotInformation key={replay.id} state={state} replay={replay} />}
       {isCode && <SecretCodeInformation key={replay.id} state={state} replay={replay} />}
       {isFence && <LoopFenceInformation key={replay.id} state={state} replay={replay} />}
+      {isFlags && <FlagsInformation key={replay.id} state={state} replay={replay} />}
+      {isRect && <RectangleExileInformation key={replay.id} state={state} replay={replay} />}
+      {isGomoku && <PointGomokuInformation key={replay.id} state={state} replay={replay} />}
       {isSymmetry && <SymmetryInformation key={replay.id} state={state} replay={replay} />}
       {isExile && <ExileInformation key={replay.id} state={state} replay={replay} />}
       {match.board && <MatchInformation key={replay.id} state={state} replay={replay} choices={choices} />}

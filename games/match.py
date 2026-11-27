@@ -44,6 +44,9 @@ SECOND_EXILE = "유배지 매치 2 · 달라진 그림 찾기"
 THIRD_EXILE = "유배지 매치 3 · 비밀 코드"
 FOURTH_EXILE = "유배지 매치 4 · 울타리 치기"
 FIFTH_EXILE = "유배지 매치 5 · 대칭 퍼즐"
+SIXTH_EXILE = "유배지 매치 6 · 만국기"
+SEVENTH_EXILE = "유배지 매치 7 · 네모 세기"
+EIGHTH_EXILE = "유배지 매치 8 · 포인트 오목"
 
 
 def canonical_game_title(title: str) -> str:
@@ -530,6 +533,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
     if returnee:
         parser.add_argument("--returnee", metavar="ID", help="유배지 최종 생존자 ID를 지정하여 합류")
         parser.add_argument("--returnee-pieces", type=int, metavar="N", help="복귀자의 시작 피스 (기본값 1)")
+        parser.add_argument("--from-returnee", type=Path, help="완료된 포인트 오목 결과에서 복귀자와 피스 5개를 이어받습니다.")
     if previous_main:
         parser.add_argument("--from-main", type=Path, help=f"완료된 {previous_main}의 events.jsonl")
     if after_prison:
@@ -598,12 +602,18 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
                 from .exile_match.roster import (
                     collect_exile_players, collect_second_exile_players,
                     collect_third_exile_players, collect_fourth_exile_players, collect_fifth_exile_players,
+                    collect_sixth_exile_players, collect_seventh_exile_players, collect_eighth_exile_players,
                 )
 
                 collectors = {FIRST_EXILE: collect_second_exile_players, SECOND_EXILE: collect_third_exile_players,
-                              THIRD_EXILE: collect_fourth_exile_players, FOURTH_EXILE: collect_fifth_exile_players}
-                players = (collectors[previous_exile](exile_path, source_matches) if exile_path else
-                           collect_exile_players(source_matches))
+                              THIRD_EXILE: collect_fourth_exile_players, FOURTH_EXILE: collect_fifth_exile_players,
+                              FIFTH_EXILE: collect_sixth_exile_players, SIXTH_EXILE: collect_seventh_exile_players,
+                              SEVENTH_EXILE: collect_eighth_exile_players}
+                if previous_exile == FOURTH_EXILE and saved is not None and not saved.get("exile_schedule"):
+                    players = collect_fifth_exile_players(exile_path, source_matches, legacy=True)
+                else:
+                    players = (collectors[previous_exile](exile_path, source_matches) if exile_path else
+                               collect_exile_players(source_matches))
                 pieces = [0] * len(players)
             except (OSError, ValueError, KeyError, TypeError) as error:
                 parser.error(f"유배지 참가자를 읽을 수 없습니다. {error}")
@@ -621,6 +631,19 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             pieces = args.pieces
         returning = getattr(args, "returnee", None)
         returning_pieces = getattr(args, "returnee_pieces", None)
+        returning_path = getattr(args, "from_returnee", None)
+        if returning_path:
+            if saved is None and (returning is not None or returning_pieces is not None):
+                parser.error("--from-returnee와 --returnee·--returnee-pieces를 함께 지정할 수 없습니다.")
+            try:
+                from .exile_match.roster import read_exile_returnee
+
+                resolved_player, resolved_pieces = read_exile_returnee(returning_path, main_path, prison_path)
+                if returning is not None and (returning, returning_pieces) != (resolved_player, resolved_pieces):
+                    raise ValueError("저장된 복귀자와 포인트 오목 결과가 다릅니다.")
+                returning, returning_pieces = resolved_player, resolved_pieces
+            except (OSError, ValueError, KeyError, TypeError) as error:
+                parser.error(f"유배지 복귀자를 읽을 수 없습니다. {error}")
         if returning_pieces is not None and not returning:
             parser.error("--returnee-pieces에는 --returnee가 필요합니다.")
         if returning:
@@ -767,8 +790,15 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             header["from_matches"] = [str(path) for path in source_matches]
         if exile_path:
             header["from_exile"] = str(exile_path)
+        if exile_roster and title in (FOURTH_EXILE, FIFTH_EXILE, SIXTH_EXILE, SEVENTH_EXILE, EIGHTH_EXILE):
+            if saved is None:
+                header["exile_schedule"] = "four_player_v1"
+            elif "exile_schedule" in saved:
+                header["exile_schedule"] = saved["exile_schedule"]
         if returning:
             header.update(returnee=returning, returnee_pieces=returning_pieces)
+        if returning_path:
+            header["from_returnee"] = str(returning_path)
         try:
             if log is not None:
                 log.write(header)
@@ -823,7 +853,7 @@ def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
             raise ValueError(f"--{option.replace('_', '-')} 값이 저장된 설정과 일치하지 않습니다.")
         setattr(args, option, value)
 
-    for option in ("from_main", "from_prison", "from_exile"):
+    for option in ("from_main", "from_prison", "from_exile", "from_returnee"):
         provided = getattr(args, option, None)
         path = Path(saved[option]) if option in saved else None
         if provided is not None and (path is None or path.resolve() != provided.resolve()):

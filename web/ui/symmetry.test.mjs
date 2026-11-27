@@ -58,6 +58,20 @@ function render(players, steps, {language = "ko", view = "public", selected = ""
 }
 
 for (const language of ["ko", "en"]) {
+  test(`${language}: recorded survivor slots preserve historical outcomes while new four-player races save two`, () => {
+    const players = ["P01", "P02", "P03", "P04"];
+    for (const slots of [2, 3]) {
+      const prefix = [event("sym_setup", {...setupData(players), survivors: slots}), puzzles, window(players)];
+      const html = render(players, prefix, {language});
+      assert.equal((html.match(/data-filled="false"/g) ?? []).length, slots);
+      assert.match(html, language === "ko" ? new RegExp(`먼저 세 색을 모두 완성한 ${slots}명이 생존하고 나머지 ${4 - slots}명`) : new RegExp(`first ${slots} players to finish all three colors survive; the other ${4 - slots}`));
+      const ended = render(players, [...prefix, ...players.slice(0, slots).map((p, i) => finish(p, i + 1)),
+        event("sym_reveal", revealData(players)), event("match_result", {ranking: players, survivors: players.slice(0, slots), eliminated: players.slice(slots)})], {language});
+      assert.equal((ended.match(/data-status="safe"/g) ?? []).length, slots);
+      assert.equal((ended.match(/data-status="eliminated"/g) ?? []).length, 4 - slots);
+      assert.match(ended, /data-board-id="P01-FINISHED-blue"/);
+    }
+  });
   test(`${language}: v5 workbench tab follows private ownership while the arena retains the original board`, () => {
     const players = ["P01", "P02", "P03"];
     const prefix = [event("sym_setup", {...setupData(players), version: 5, focus_mode: "one_color", focus_start_window: 1}),

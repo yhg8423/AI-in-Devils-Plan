@@ -209,7 +209,7 @@ export function SymmetryScene({state, players, selected, onChoose}) {
 
 export function SymmetryStage({state, replay}) {
   const {owner, working} = symmetryBoardFor(state, replay.match.players, replay.selected, "blue", replay.view);
-  const finishes = state.symFinishes ?? [], slots = state.symSetup?.survivors ?? replay.match.players.length - 1;
+  const finishes = state.symFinishes ?? [], slots = state.symSetup?.survivors ?? 2;
   const cue = state.symVerdict ?? state.symBuzz;
   const focusMode = state.symSetup?.version >= 4 && state.symSetup.focus_mode === "one_color";
   const focus = focusMode && symmetryColors.includes(state.symWindow?.focus_color) && state.symWindow.window >= (state.symSetup.focus_start_window ?? 1) ? state.symWindow.focus_color : null;
@@ -237,7 +237,7 @@ export function SymmetryStage({state, replay}) {
     <p className="sym-instructions">{tr("각 색의 조각을 빠짐없이 사용해 겹치지 않고 변으로 이어진 하나의 도형을 만드세요. 전체 도형과 그 안의 빈 공간이 하나 이상의 대칭축을 기준으로 일치해야 합니다. 조각 사이의 경계는 대칭일 필요가 없습니다.", "Use every piece of each color to build one shape, joined along edges without overlaps. The whole shape, including its empty spaces, must have at least one reflection axis. Piece boundaries do not need to be symmetric.")}</p>
     {state.symSetup?.puzzle_pack === "original" && <p className="sym-instructions">{tr("초록은 G1의 가장 긴 변과 45도를 이루는 대칭축이 필요합니다. 배치 전체를 돌려도 이 각도 차이는 같습니다.", "Green needs a reflection axis at 45° to G1's longest edge. Rotating the whole assembly preserves that angle difference.")}</p>}
     <p className="sym-instructions">{tr("길이가 다른 변이나 변의 일부끼리 맞닿아도 됩니다. 꼭짓점만 닿으면 연결로 인정하지 않습니다. 버저 판정은 세 색 전체의 정답 여부만 알리며, 색별 정답 여부나 정답 대칭축은 알려주지 않습니다.", "Edges may have different lengths and touch along only part of an edge. Point-only contact does not connect pieces. The buzzer reports only whether all three colors are correct, without color-specific feedback or solution axes.")}</p>
-    <p className="sym-instructions">{tr(`먼저 세 색을 모두 완성한 ${slots}명이 생존하고 마지막 한 명이 탈락합니다. 생존자의 완성판도 경기 종료 전에는 공개되지 않습니다. 이 시뮬레이션에서는 오답을 수정해 재제출할 수 있습니다.`, `The first ${slots} players to finish all three colors survive; the last player is eliminated. Finished assemblies stay private until the race ends. In this simulation, incorrect submissions may be revised and resubmitted.`)}</p>
+    <p className="sym-instructions">{tr(`먼저 세 색을 모두 완성한 ${slots}명이 생존하고 나머지 ${replay.match.players.length - slots}명은 탈락합니다. 생존자의 완성판도 경기 종료 전에는 공개되지 않습니다. 이 시뮬레이션에서는 오답을 수정해 재제출할 수 있습니다.`, `The first ${slots} players to finish all three colors survive; the other ${replay.match.players.length - slots} players are eliminated. Finished assemblies stay private until the race ends. In this simulation, incorrect submissions may be revised and resubmitted.`)}</p>
     {state.symSetup?.version >= 3 && <p className="sym-instructions">{tr(`자신의 메모와 최근 실패 기록은 다음 생각 차례에도 유지됩니다. 비공개 전략 검토는 차례마다 최대 ${state.symSetup.thinking_passes ?? 3}번이며, 준비되면 그 전에 배치를 확정할 수 있습니다.`, `Your own memo and recent failed attempts carry into the next thinking window. Each window allows up to ${state.symSetup.thinking_passes ?? 3} private strategy passes; you may finalize the arrangement earlier.`)}</p>}
     {state.symTutorial?.board && <section className="sym-tutorial" aria-label={tr("별도 조각 조립 연습", "Separate practice-piece assembly")}>
       <h3>{tr("조립 연습 예시", "Worked assembly example")}</h3>

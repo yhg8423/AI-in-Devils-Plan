@@ -83,16 +83,17 @@ class LoopFenceTest(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 game.parse_action(encode(value))
 
-    def test_same_single_puzzle_race_uses_saved_response_time_then_stops_after_three(self):
+    def test_same_single_puzzle_race_uses_saved_response_time_then_stops_after_two(self):
         with puzzles():
             match = LiveMatch(times={"P01": 90, "P02": 60, "P03": 30, "P04": 120})
             result = game.play(match)
         self.assertEqual(result["ranking"], ["P03", "P02", "P01", "P04"])
-        self.assertEqual(result["survivors"], result["ranking"][:3])
-        self.assertEqual(result["eliminated"], ["P04"])
-        self.assertEqual(result["ranking_groups"], [[name] for name in result["ranking"]])
-        self.assertEqual(result["scores"], {"P01": 1, "P02": 1, "P03": 1, "P04": 0})
-        self.assertEqual(result["attempts"], {"P01": 1, "P02": 1, "P03": 1, "P04": 0})
+        self.assertEqual(result["survivors"], result["ranking"][:2])
+        self.assertEqual(result["eliminated"], ["P01", "P04"])
+        self.assertEqual(result["ranking_groups"], [["P03"], ["P02"], ["P01", "P04"]])
+        self.assertEqual(result["scores"], {"P01": 0, "P02": 1, "P03": 1, "P04": 0})
+        self.assertEqual(result["attempts"], {"P01": 0, "P02": 1, "P03": 1, "P04": 0})
+        self.assertEqual(rows(match, "fence_setup")[0]["survivors"], 2)
         self.assertEqual(result["finish_turns"], dict.fromkeys(result["survivors"], 1))
         self.assertEqual(result["turns"], 1)
         self.assertEqual(len(rows(match, "fence_puzzle")), 1)
@@ -103,7 +104,7 @@ class LoopFenceTest(unittest.TestCase):
         with puzzles():
             match = LiveMatch(times=dict.fromkeys(PLAYERS, 900_000_000_000))
             result = game.play(match)
-        self.assertEqual(result["ranking"], rows(match, "fence_setup")[0]["priority"])
+        self.assertEqual(result["survivors"], rows(match, "fence_setup")[0]["priority"][:2])
         self.assertTrue(all(row["correct"] for row in rows(match, "fence_verdict")))
         self.assertTrue(all(row["elapsed_ns"] == 900_000_000_000 for row in result["finishes"]))
 
@@ -119,10 +120,10 @@ class LoopFenceTest(unittest.TestCase):
         with puzzles():
             match = LiveMatch(reply=reply)
             result = game.play(match)
-        self.assertEqual(result["ranking"], ["P01", "P02", "P04", "P03"])
+        self.assertEqual(result["ranking"], ["P01", "P02", "P03", "P04"])
         self.assertEqual(result["turns"], 3)
-        self.assertEqual(result["attempts"], {"P01": 1, "P02": 2, "P03": 0, "P04": 1})
-        self.assertEqual([row["correct"] for row in rows(match, "fence_verdict")], [False, True, True, True])
+        self.assertEqual(result["attempts"], {"P01": 1, "P02": 2, "P03": 0, "P04": 0})
+        self.assertEqual([row["correct"] for row in rows(match, "fence_verdict")], [False, True, True])
         self.assertEqual(rows(match, "fence_window")[2]["active"], ["P02", "P03", "P04"])
         self.assertEqual(len(rows(match, "invalid_action")), 2)
         self.assertEqual(len(rows(match, "fence_board")), 6)
@@ -171,13 +172,13 @@ class LoopFenceTest(unittest.TestCase):
         self.assertEqual(len(rows(match, "fence_puzzle")), 1)
         self.assertTrue(all(row["window"] == 3 for row in rows(match, "fence_verdict")))
 
-    def test_work_and_finished_answers_stay_private_until_all_three_survivors_are_safe(self):
+    def test_work_and_finished_answers_stay_private_until_both_survivors_are_safe(self):
         with puzzles():
             match = LiveMatch()
             game.play(match)
         reveal = next(index for index, event in enumerate(match.events) if event.msg_type == "fence_reveal")
         finish_indices = [index for index, event in enumerate(match.events) if event.msg_type == "fence_finish"]
-        self.assertEqual(len(finish_indices), 3)
+        self.assertEqual(len(finish_indices), 2)
         self.assertGreater(reveal, max(finish_indices))
         for index, event in enumerate(match.events):
             if event.msg_type in {"action", "decision_note", "fence_board"}:
@@ -231,6 +232,34 @@ class LoopFenceTest(unittest.TestCase):
                     actual = [json.loads(line) for line in output.read_text().splitlines()]
                     self.assertEqual(actual, expected)
                     self.assertEqual(actual[:len(prefix) - 1], prefix[:-1])
+
+    def test_historical_three_survivor_setup_replays_without_changing_the_prefix(self):
+        def interrupt(match):
+            record = match.on_event
+
+            def stop(event):
+                record(event)
+                if event.msg_type == "fence_finish" and json.loads(event.content)["rank"] == 2:
+                    raise RuntimeError("two historical finishers saved")
+
+            match.on_event = stop
+            return game.play(match)
+
+        with TemporaryDirectory() as directory, puzzles(), redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            full, partial = Path(directory) / "full.jsonl", Path(directory) / "partial.jsonl"
+            arguments = ["--players", *PLAYERS, "--model-turns", "0", "--seed", "19"]
+            with patch.object(game, "_survivor_count", return_value=3):
+                run_cli(game.play, title=FOURTH_EXILE, seats=4, argv=[*arguments, "--output", str(full)])
+                with self.assertRaisesRegex(RuntimeError, "historical finishers"):
+                    run_cli(interrupt, title=FOURTH_EXILE, seats=4, argv=[*arguments, "--output", str(partial)])
+            before = partial.read_text().splitlines()
+            setup = next(json.loads(row["content"]) for row in map(json.loads, before)
+                         if row.get("msg_type") == "fence_setup")
+            self.assertEqual(setup["survivors"], 3)
+            run_cli(game.play, title=FOURTH_EXILE, seats=4, argv=["--resume", "--output", str(partial)])
+            self.assertEqual(partial.read_bytes(), full.read_bytes())
+            self.assertEqual(partial.read_text().splitlines()[:len(before) - 1], before[:-1])
+            self.assertEqual(len(json.loads(partial.read_text().splitlines()[-1])["survivors"]), 3)
 
 
 if __name__ == "__main__":

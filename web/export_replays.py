@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
-from games.match import canonical_game_title
+from games.match import DAY_SIX_MAIN, canonical_game_title
 
 from .spectator import CASE_STAGES, EVENT_FIELDS, EXILE_GAMES, exile_sources, source_paths
 from .translate_events import translation_rows
@@ -30,7 +30,7 @@ HEADER_FIELDS = (
     "type", "game", "players", "seed", "pieces", "model", "effort", "provider",
     "model_players", "model_overrides", "image_model", "image_model_overrides", "image_effort_overrides",
     "allow_review", "model_turn_limit",
-    "returnee", "returnee_pieces",
+    "returnee", "returnee_pieces", "exile_schedule",
 )
 RESULT_FIELDS = (
     "type", "ranking", "scores", "priority", "grass_placements", "alliance_saved",
@@ -43,6 +43,7 @@ RESULT_FIELDS = (
     "finish_rounds", "round_winners", "questions",
     "finishes", "attempts", "tie_order",
     "chips", "finalists", "interest", "matches",
+    "returnee", "winner", "replays",
 )
 
 
@@ -78,6 +79,17 @@ def prepare_match(log, game, predecessors, logs, source_root, campaign):
         if logs[prior].resolve() not in source_paths(source_root, header.get(key)):
             raise ValueError(f"{log}: {key} must point to this run's {STAGES[prior]}")
         header_out[key] = f"matches/{campaign}/{STAGES[prior]}/events.jsonl"
+    if "from_returnee" in header:
+        returnee_log = logs[0].parent.parent / "exile8/events.jsonl"
+        if (game != DAY_SIX_MAIN.split(" · ", 1)[0]
+                or returnee_log.resolve() not in source_paths(source_root, header["from_returnee"])):
+            raise ValueError(f"{log}: from_returnee must point to this run's final exile match")
+        from games.exile_match.roster import read_exile_returnee
+
+        player, pieces = read_exile_returnee(returnee_log, logs[8], logs[9])
+        if header.get("returnee") != player or header.get("returnee_pieces") != pieces:
+            raise ValueError(f"{log}: returnee does not match the final exile result")
+        header_out["from_returnee"] = f"matches/{campaign}/exile8/events.jsonl"
 
     event_rows = []
     turns = set()

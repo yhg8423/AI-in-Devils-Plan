@@ -122,6 +122,10 @@ WORKBENCH_RULES = FOCUS_RULES + WORKBENCH_INSTRUCTIONS
 DIAGONAL_RULE = "초록은 G1의 가장 긴 변과 45도를 이루는 반사축이 하나 이상 있어야 합니다. 배치 전체를 회전해도 이 각도 차이는 같습니다."
 ORIGINAL_RULES = (WORKBENCH_RULES + "\n빨강과 초록에는 이 시뮬레이션에서 새로 만든 조각 세트를 사용합니다.\n"
                   + DIAGONAL_RULE + "\n")
+TWO_SURVIVOR_RULES = ORIGINAL_RULES.replace(
+    "참가자보다 한 명 적은 인원이 완성하면 끝나고 남은 한 명이 탈락합니다.",
+    "참가자 4명 중 먼저 완성한 2명이 생존하고 남은 2명은 탈락합니다.",
+)
 
 
 def _initial_protocol(match):
@@ -134,7 +138,7 @@ def _initial_protocol(match):
                                                5: WORKBENCH_RULES}[setup["version"]]
         if rules is not None:
             return (2 if rules == LEGACY_RULES else 3 if rules == RULES else 4 if rules == FOCUS_RULES else 5), rules
-    return 5, ORIGINAL_RULES
+    return 5, TWO_SURVIVOR_RULES
 
 
 def _puzzle_pack(match, rules):
@@ -143,7 +147,7 @@ def _puzzle_pack(match, rules):
         saved_setup = next((row for row in log.events if row["msg_type"] == "sym_setup"), None)
         if saved_setup is not None:
             return json.loads(saved_setup["content"]).get("puzzle_pack", "broadcast")
-    return "original" if rules == ORIGINAL_RULES else "broadcast"
+    return "original" if rules in (ORIGINAL_RULES, TWO_SURVIVOR_RULES) else "broadcast"
 
 
 def _next_saved_event(match):
@@ -320,12 +324,13 @@ def merged_placements(action, previous, focus_color=None):
 
 def play(match: Match):
     players = list(match.players)
-    if len(players) not in (3, 4) or len(set(players)) != len(players):
-        raise ValueError("대칭 퍼즐에는 서로 다른 참가자 3명 또는 4명이 필요합니다.")
+    version, rules = _initial_protocol(match)
+    if (len(players) not in (3, 4) or len(set(players)) != len(players)
+            or len(players) != 4 and rules == TWO_SURVIVOR_RULES):
+        raise ValueError("새 대칭 퍼즐에는 서로 다른 참가자 4명이 필요합니다.")
     match.relationship_reviews_enabled = False
     match.model_observations = lambda name, events: [event for event in events if event.msg_type == "rules"]
     priority = match.rng.sample(players, len(players))
-    version, rules = _initial_protocol(match)
     pack = _puzzle_pack(match, rules)
     puzzles = make_puzzles(match.rng.randrange(2 ** 32), pack=pack)
     modern = version >= 3
@@ -350,7 +355,12 @@ def play(match: Match):
     visited = {name: {color: OrderedDict() for color in COLORS} for name in players}
     attempts, last_verdict = dict.fromkeys(players, 0), dict.fromkeys(players, None)
     finishes, winners, window = [], [], 0
-    slots = len(players) - 1
+    saved_setup = (next((json.loads(event["content"]) for event in match.resume_log.events
+                         if event["msg_type"] == "sym_setup"), None)
+                   if match.resume_log is not None and match.resume_log.resume else None)
+    slots = saved_setup.get("survivors") if saved_setup is not None else 2 if rules == TWO_SURVIVOR_RULES else len(players) - 1
+    if type(slots) is not int or slots not in (2, 3) or slots >= len(players):
+        raise ValueError("저장된 대칭 퍼즐의 생존 인원이 올바르지 않습니다.")
     match.event("rules", rules)
     match.event("sym_setup", {"version": version, "players": players, "priority": priority,
                               "survivors": slots, "mode": "polygons", **({"thinking_passes": 3} if modern else {}),
@@ -560,6 +570,6 @@ def play(match: Match):
         scores[name] = sum(axis is not None for axis in axes[name].values())
     match.event("sym_reveal", {"boards": deepcopy(states), "axes": axes})
     ranking = winners + [name for name in players if name not in winners]
-    return {"ranking": ranking, "ranking_groups": [[name] for name in ranking], "survivors": winners,
-            "eliminated": ranking[-1:], "scores": scores, "finish_turns": {row["player"]: row["window"] for row in finishes},
+    return {"ranking": ranking, "ranking_groups": [[name] for name in winners] + [ranking[slots:]], "survivors": winners,
+            "eliminated": ranking[slots:], "scores": scores, "finish_turns": {row["player"]: row["window"] for row in finishes},
             "finishes": finishes, "turns": window, "attempts": attempts, "pieces": match.pieces.copy()}

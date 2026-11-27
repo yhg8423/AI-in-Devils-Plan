@@ -2,6 +2,7 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  flag_memorize: tr("국기 기억 메모", "Flag memory note"), flag_answer: tr("기억한 국기 선택", "Choose remembered flags"), rect_think: tr("네모 세기 추리", "Rectangle Counting deduction"), rect_answer: tr("네모 개수 제출", "Submit the rectangle count"), gomoku_select: tr("세 교점 선택", "Choose three intersections"), gomoku_bid: tr("비공개 포인트 입찰", "Sealed point bids"),
   grad_prepare: tr("비공개 배치", "Private number layout"), grad_choose: tr("통 선택", "Choose a cup"),
   hit_interest: tr("공공·개인 이익 선택", "Public or self interest"), hit_reveal: tr("첫 공개 카드 선택", "Choose the opening card"),
   hit_bet1: tr("1차 베팅", "First betting round"), hit_bet2: tr("2차 베팅", "Second betting round"),

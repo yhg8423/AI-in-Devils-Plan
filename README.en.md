@@ -274,14 +274,17 @@ Affinity represents how willing a player is to interact or collaborate again. Tr
 | Exile match 1 | Piece Puzzle | 4 | Assemble eight slotted pieces into a lattice by matching notch directions and depths. Players build privately; the first three to finish survive. |
 | Exile match 2 | Spot the Difference | 4 | Memorize the original picture, then mark five changed areas. The top two survive after three rounds; only ties at the survival boundary play overtime. |
 | Exile match 3 | Secret Code | 4 | Find a four-letter code from illustrated cards and clues. The first correct answer each round secures survival; the last remaining player is eliminated. |
-| Exile match 4 | Loop Fence Puzzle | 4 | Draw one closed loop satisfying every numbered clue. Players edit privately; the first three to finish survive. |
-| Exile match 5 | Symmetrical Puzzle | 3–4 | Assemble the blue, red and green pieces into reflection-symmetric shapes without flipping them. Complete all three puzzles to survive; the last player is eliminated. |
+| Exile match 4 | Loop Fence Puzzle | 4 | Draw one closed loop satisfying every numbered clue. The first two to finish survive; the other two are eliminated. |
+| Exile match 5 | Symmetrical Puzzle | 4 | Assemble the blue, red and green pieces into three reflection-symmetric shapes. The first two to finish survive; the other two are eliminated. |
+| Day 5 exile match 6 | Flags Around the World | 4 | Memorize ten flags and identify five previously seen flags among twenty-five choices. The top three survive after three rounds; boundary ties play overtime. |
+| Day 5 exile match 7 | Rectangle Counting | 4 | Count rectangles whose numbers sum to the target. The first two correct players survive; the other two are eliminated. |
+| Day 6 exile match 8 | Point Gomoku | 2 | Select three consecutive empty points and bid privately for their stones. The winner returns to the main competition with five Pieces. |
 
 Each match can run on its own or continue with the previous matches’ survivors and their IDs, personas, Pieces, and relationship ratings. Use **Jump to section** in the replay to read the rules.
 
 Tower of Equations follows the bidding, demonstration and scoring in the [published rules summary](https://namu.moe/w/데블스%20플랜:%20데드%20어게인/5일차#s-5.1). Public sources do not establish the complete broadcast inventory, so the simulator uses an original fixed set of twenty blocks across four stacks and generates reachable targets. There is no discussion or relationship assessment; model response times determine bidding and demonstration deadlines.
 
-HIT, STAY follows the [Day 6 rules](https://namu.moe/w/데블스%20플랜:%20데드%20어게인/6일차#s-3.1). In the five-player Hidden Word route, three Day 5 survivors join one exile returnee for a four-player match. The final exile contest is not implemented yet, so explicitly designate its survivor and starting Pieces with `--returnee` and `--returnee-pieces`; the simulator does not choose that player automatically.
+HIT, STAY follows the [Day 6 rules](https://namu.moe/w/데블스%20플랜:%20데드%20어게인/6일차#s-3.1). In the five-player Hidden Word route, three Day 5 survivors join one exile returnee for a four-player match. Pass the completed Point Gomoku `events.jsonl` to `--from-returnee` to validate the shared campaign and admit its winner with five Pieces. Manual selection remains available through `--returnee` and `--returnee-pieces`.
 
 Gradation follows the [published rules](https://namu.moe/w/데블스%20플랜:%20데드%20어게인/6일차#s-5.1), concealing both numbers and original cup positions. The two-player single-duel route is a simulator variation for current campaign sizes; tied duels use fresh layouts and replay. There is no discussion or relationship assessment.
 
@@ -342,19 +345,22 @@ uv run --locked --python 3.12 python -m games.exile_match.loop_fence \
   --output runs/matches/exile-demo/exile4/events.jsonl
 ```
 
-The fifth match joins the fourth exile match's three survivors with the next eliminated main/prison player. All three current campaigns need sources through Day 3 prison.
+The fifth match joins the two Loop Fence survivors with the Day 3 prison and Day 4 main eliminations. Supply main/prison sources through Day 4 main. The example below uses a fresh Loop Fence result under the corrected two-survivor rule.
 
 ```bash
 uv run --locked --python 3.12 python -m games.exile_match.symmetry \
-  --from-exile play_results/matches/all-luna-16/exile4/events.jsonl \
+  --from-exile runs/matches/exile-demo/exile4/events.jsonl \
   --from-matches play_results/matches/all-luna-16/day1-main/events.jsonl \
                  play_results/matches/all-luna-16/day1-prison/events.jsonl \
                  play_results/matches/all-luna-16/day2-main/events.jsonl \
                  play_results/matches/all-luna-16/day2-prison/events.jsonl \
                  play_results/matches/all-luna-16/day3-main/events.jsonl \
                  play_results/matches/all-luna-16/day3-prison/events.jsonl \
+                 play_results/matches/all-luna-16/day4-main/events.jsonl \
   --output runs/matches/exile-demo/exile5/events.jsonl
 ```
+
+The two Symmetrical Puzzle survivors join the Day 4 prison and Day 5 main eliminations for four-player Flags (`games.exile_match.flags`), with three survivors. Those three join the Day 5 prison elimination for four-player Rectangle Counting (`games.exile_match.rectangle_race`), with two survivors. The final pair play Point Gomoku (`games.exile_match.point_gomoku`) before Day 6 main to determine one returnee. Each command takes the preceding exile result with `--from-exile`. Supply main/prison sources through Day 5 main for Flags, and through Day 5 prison for Rectangle Counting and Point Gomoku. Existing published outcomes are preserved; the corrected player flow starts with a fresh Loop Fence result.
 
 Use the same `--provider`, `--model`, and `--player-model` options as other matches for model play. Resume an interrupted run with `--resume --output <events.jsonl>`.
 

@@ -25,6 +25,7 @@ const gameNames = new Map([
   ["유배지 매치 3", "Exile Match 3"], ["비밀 코드", "Secret Code"],
   ["유배지 매치 4", "Exile Match 4"], ["울타리 치기", "Loop Fence Puzzle"],
   ["유배지 매치 5", "Exile Match 5"], ["대칭 퍼즐", "Symmetrical Puzzle"],
+  ["유배지 매치 6", "Exile Match 6"], ["만국기", "Flags"], ["유배지 매치 7", "Exile Match 7"], ["유배지 매치 8", "Exile Match 8"], ["포인트 오목", "Point Gomoku"],
   ["양자택일", "Either/Or"], ["무거운 13", "Heavy 13"],
   ["미스터리 거래소", "Mystery Stock Exchange"], ["러시안 룰렛", "Russian Roulette"],
   ["큐브 세기", "Cube Counting"], ["네모 세기", "Rectangle Counting"],

@@ -242,7 +242,7 @@ class SymmetryTest(unittest.TestCase):
             self.assertEqual(own[1][4][0], game._image_bytes([render(PUZZLES[0], SOLUTION["blue"], detailed=True)])[0])
             self.assertEqual(len(own[1][4]), 4)
 
-    def test_three_or_four_players_race_one_pack_until_first_n_minus_one_finish(self):
+    def test_historical_three_or_four_player_protocols_keep_their_original_cutoff(self):
         for players in (PLAYERS[:3], PLAYERS):
             with self.subTest(players=players), puzzles():
                 match = LiveMatch(players, times={"P01": 90, "P02": 60, "P03": 30, "P04": 120})
@@ -261,6 +261,49 @@ class SymmetryTest(unittest.TestCase):
                 self.assertEqual(len(rows(match, "sym_puzzles")), 1)
                 self.assertEqual([row["player"] for row in rows(match, "sym_buzz")], expected[:-1])
                 self.assertFalse(match.relationship_reviews_enabled)
+
+    def test_new_four_player_game_stops_after_two_and_eliminates_both_remaining_players(self):
+        protocol = game._initial_protocol
+        with puzzles(5), patch.object(game, "_initial_protocol", side_effect=protocol):
+            match = LiveMatch(reply=lambda name, window: arrange(submit=window >= 3),
+                              times={"P01": 90, "P02": 60, "P03": 30, "P04": 120})
+            result = game.play(match)
+        self.assertEqual(result["survivors"], ["P03", "P02"])
+        self.assertEqual(result["eliminated"], ["P01", "P04"])
+        self.assertEqual(result["ranking_groups"], [["P03"], ["P02"], ["P01", "P04"]])
+        self.assertEqual(rows(match, "sym_setup")[0]["survivors"], 2)
+        self.assertEqual(len(rows(match, "sym_finish")), 2)
+        self.assertEqual([row["player"] for row in rows(match, "sym_buzz")], ["P03", "P02"])
+        self.assertTrue(all(result["attempts"][name] == 0 for name in result["eliminated"]))
+        self.assertIn("먼저 완성한 2명이 생존", next(event.content for event in match.events if event.msg_type == "rules"))
+        with self.assertRaisesRegex(ValueError, "4명"):
+            game.play(Match(PLAYERS[:3], 19))
+
+    def test_historical_three_player_log_keeps_its_two_survivors_on_resume(self):
+        original_event = Match.event
+
+        def stop_after_first_finisher(match, kind, value, **kwargs):
+            original_event(match, kind, value, **kwargs)
+            if kind == "sym_finish":
+                raise RuntimeError("historical finisher saved")
+
+        with (TemporaryDirectory() as directory, puzzles(3), redirect_stdout(StringIO()), redirect_stderr(StringIO()),
+              patch.object(Match, "_query", return_value=(arrange(), StrategyNote(text="private"))),
+              patch("games.match.monotonic_ns", return_value=70_000_000_000)):
+            full, partial = Path(directory) / "full.jsonl", Path(directory) / "partial.jsonl"
+            arguments = ["--players", *PLAYERS[:3], "--seed", "19", "--model", "test", "--model-turns", "3"]
+            run_cli(game.play, title=FIFTH_EXILE, seats=(4, 3), argv=[*arguments, "--output", str(full)])
+            with patch.object(Match, "event", stop_after_first_finisher), self.assertRaisesRegex(RuntimeError, "historical finisher"):
+                run_cli(game.play, title=FIFTH_EXILE, seats=(4, 3), argv=[*arguments, "--output", str(partial)])
+            before = partial.read_text().splitlines()
+            setup = next(json.loads(row["content"]) for row in map(json.loads, before)
+                         if row.get("msg_type") == "sym_setup")
+            self.assertEqual(setup["survivors"], 2)
+            self.assertEqual(len(setup["players"]), 3)
+            with patch.object(Match, "_query", side_effect=AssertionError("saved response queried twice")):
+                run_cli(game.play, title=FIFTH_EXILE, seats=(4, 3), argv=["--resume", "--output", str(partial)])
+            self.assertEqual(partial.read_bytes(), full.read_bytes())
+            self.assertEqual(partial.read_text().splitlines()[:len(before) - 1], before[:-1])
 
     def test_equal_slow_responses_follow_disclosed_priority_without_a_timer(self):
         with puzzles():
@@ -489,6 +532,8 @@ class SymmetryTest(unittest.TestCase):
             arguments = ["--players", *PLAYERS, "--seed", "19", "--model", "test", "--model-turns", "4"]
             run_cli(game.play, title=FIFTH_EXILE, seats=(3, 4), argv=[*arguments, "--output", str(full)])
             expected = [json.loads(line) for line in full.read_text().splitlines()]
+            historical_setup = next(json.loads(row["content"]) for row in expected if row.get("msg_type") == "sym_setup")
+            self.assertEqual(historical_setup["survivors"], 3)
             saved = json.loads(full.with_name("full.decisions.jsonl").read_text().splitlines()[0])["value"]["value"]
             self.assertTrue(all(reply[2] == 0 for reply in saved.values()))
             initial = {"rules", "sym_setup", "sym_puzzles", "sym_tutorial"}

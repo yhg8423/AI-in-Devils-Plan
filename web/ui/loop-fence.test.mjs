@@ -41,6 +41,19 @@ function render(steps, {language = "ko", view = "public", selected = "", frame =
 const completedSteps = [setup, puzzle, window(1), drawing("P01"), drawing("P02"), privateNote("P01"), privateNote("P02"), window(2), ...players.map((player) => drawing(player, 2, true)), buzz("P01", 2), verdict("P01", true, 2), finish("P01", 1), buzz("P02", 2), verdict("P02", true, 2), finish("P02", 2), buzz("P03", 2), verdict("P03", true, 2), finish("P03", 3), reveal, final];
 
 for (const language of ["ko", "en"]) {
+  test(`${language}: recorded survivor slots govern new two-survivor and historical three-survivor races`, () => {
+    for (const slots of [2, 3]) {
+      const prefix = [event("fence_setup", {...setupData, survivors: slots}), puzzle, window(1)];
+      const html = render(prefix, {language});
+      assert.equal((html.match(/data-filled="false"/g) ?? []).length, slots);
+      assert.match(html, language === "ko" ? new RegExp(`먼저 완성한 ${slots}명이 생존하고 나머지 ${4 - slots}명`) : new RegExp(`first ${slots} players to complete the same puzzle survive; the other ${4 - slots}`));
+      const ended = render([...prefix, ...players.slice(0, slots).map((p, i) => finish(p, i + 1)), reveal,
+        event("match_result", {ranking: players, survivors: players.slice(0, slots), eliminated: players.slice(slots)})], {language});
+      assert.equal((ended.match(/data-status="safe"/g) ?? []).length, slots);
+      assert.equal((ended.match(/data-status="eliminated"/g) ?? []).length, 4 - slots);
+      assert.match(ended, /data-board-id="P01-COMPLETED"/);
+    }
+  });
   test(`${language}: shared puzzle has four corner platforms, a native enlargement dialog and single-race progress`, () => {
     const html = render([setup, puzzle, window(1)], {language});
     assert.match(html, /data-board-id="UNMARKED-BASE"/);

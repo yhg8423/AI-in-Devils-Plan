@@ -6,7 +6,7 @@ import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {after, test} from "node:test";
 import {build} from "esbuild";
-import {caseMatches} from "./cases.js";
+import {caseMatches, gameOrder} from "./cases.js";
 import {rulesSummary} from "./rule-summaries.js";
 
 const directory = mkdtempSync(join(tmpdir(), "exile-ui-"));
@@ -46,6 +46,18 @@ test("campaign navigation interleaves exile matches with their source matches", 
   assert.deepEqual(caseMatches(caseRecord).map(({id}) => id),
     ["day1-main", "day1-prison", "exile-demo", "day2-main", "day3-main", "exile3", "exile4", "day3-prison"]);
   assert.match(render([setup], {caseRecord}), /href="\/\?run=day2-main&amp;case=day1-main"/);
+});
+
+test("the corrected catalog schedules each later exile after the entrants arrive and before Day 6 main", () => {
+  const later = gameOrder.slice(gameOrder.indexOf("3일차 메인 매치"));
+  assert.deepEqual(later, ["3일차 메인 매치", "유배지 매치 4", "3일차 감옥 매치", "4일차 메인 매치", "유배지 매치 5", "4일차 감옥 매치", "5일차 메인 매치", "유배지 매치 6", "5일차 감옥 매치", "유배지 매치 7", "유배지 매치 8", "6일차 메인 매치", "6일차 감옥 매치"]);
+  const matches = ["day3-main", "day3-prison", "day4-main", "day4-prison", "day5-main", "day5-prison", "day6-main", "day6-prison"].map((id) => ({id}));
+  const exile_matches = [{id: "exile4", after: "day3-main"}, {id: "exile5", after: "day4-main"}, {id: "exile6", after: "day5-main"}, {id: "exile7", after: "day5-prison"}, {id: "exile8", after: "day5-prison"}];
+  assert.deepEqual(caseMatches({matches, exile_matches}).map(({id}) => id), ["day3-main", "exile4", "day3-prison", "day4-main", "exile5", "day4-prison", "day5-main", "exile6", "day5-prison", "exile7", "exile8", "day6-main", "day6-prison"]);
+  // Archived campaigns keep their recorded source link even when it predates the corrected schedule.
+  const historical = exile_matches.map((match) => match.id === "exile5" ? {...match, after: "day3-prison"} : match);
+  const ids = caseMatches({matches, exile_matches: historical}).map(({id}) => id);
+  assert.equal(ids.indexOf("exile5"), ids.indexOf("day3-prison") + 1);
 });
 
 for (const language of ["ko", "en"]) {
