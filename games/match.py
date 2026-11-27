@@ -37,6 +37,7 @@ DAY_FOUR_MAIN = "4일차 메인 매치 · 경매 빙고"
 DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
 DAY_FIVE_MAIN = "5일차 메인 매치 · 히든 워드"
 DAY_FIVE_PRISON = "5일차 감옥 매치 · 수식의 탑"
+DAY_SIX_MAIN = "6일차 메인 매치 · HIT, STAY"
 FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
 SECOND_EXILE = "유배지 매치 2 · 달라진 그림 찾기"
 THIRD_EXILE = "유배지 매치 3 · 비밀 코드"
@@ -61,6 +62,7 @@ RELATIONSHIP_EVIDENCE = {
     "pig_deposit", "pig_claim", "pig_doubt", "pig_replace", "pig_reset", "pig_challenge", "pig_reset_vote",
     "bingo_shapes", "bingo_result", "bingo_reveal", "bingo_submission",
     "word_similarity", "word_clue", "word_verdict", "word_final",
+    "hit_interest", "hit_bet", "hit_showdown", "hit_bust",
 }
 
 
@@ -511,7 +513,7 @@ def parse_group_image_model(value: str) -> tuple[str | None, str, str, str, str 
 def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             previous_main: str | None = None, after_prison: bool = False,
             guest: str | None = None, exile_roster: bool = False,
-            previous_exile: str | None = None, argv=None) -> None:
+            previous_exile: str | None = None, returnee: bool = False, argv=None) -> None:
     seat_counts = (seats,) if isinstance(seats, int) else seats
     roster_args = seat_counts[0] if len(seat_counts) == 1 else "+"
     parser = argparse.ArgumentParser(description=title)
@@ -523,6 +525,9 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
                             help="유배지 참가자가 모이는 시점까지, 1일차 메인부터 순서대로 완료 기록 지정")
     if previous_exile:
         parser.add_argument("--from-exile", type=Path, help=f"완료된 {previous_exile}의 events.jsonl")
+    if returnee:
+        parser.add_argument("--returnee", metavar="ID", help="유배지 최종 생존자 ID를 지정하여 합류")
+        parser.add_argument("--returnee-pieces", type=int, metavar="N", help="복귀자의 시작 피스 (기본값 1)")
     if previous_main:
         parser.add_argument("--from-main", type=Path, help=f"완료된 {previous_main}의 events.jsonl")
     if after_prison:
@@ -612,6 +617,20 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
         else:
             players = args.players or [f"P{i:02}" for i in range(1, seat_counts[0] + 1)]
             pieces = args.pieces
+        returning = getattr(args, "returnee", None)
+        returning_pieces = getattr(args, "returnee_pieces", None)
+        if returning_pieces is not None and not returning:
+            parser.error("--returnee-pieces에는 --returnee가 필요합니다.")
+        if returning:
+            if not main_path and args.players is None:
+                parser.error("--returnee에는 선행 기록 또는 --players 명단이 필요합니다.")
+            if returning in players:
+                parser.error("유배지 복귀자는 기존 생존자와 다른 ID여야 합니다.")
+            returning_pieces = 1 if returning_pieces is None else returning_pieces
+            if type(returning_pieces) is not int or returning_pieces < 0:
+                parser.error("복귀자의 시작 피스는 0 이상의 정수여야 합니다.")
+            pieces = [*(pieces if pieces is not None else [1] * len(players)), returning_pieces]
+            players = [*players, returning]
         if len(players) not in seat_counts:
             parser.error(f"이 매치는 참가자 {' 또는 '.join(map(str, seat_counts))}명이 필요합니다. 입력 {len(players)}명.")
         if any(not isinstance(name, str) or not name or any(char.isspace() for char in name)
@@ -703,7 +722,7 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
                 label = event.content.split("\n", 1)[0]
             elif event.msg_type in {"pig_turn", "wall_turn"}:
                 label = f"{json.loads(event.content)['turn']}턴"
-            elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round", "bingo_round", "tower_problem"}:
+            elif event.msg_type in {"round", "market", "market_tick", "negotiation_round", "gem_round", "bingo_round", "tower_problem", "hit_round"}:
                 data = json.loads(event.content)
                 label = f"{data['round']}라운드"
                 if event.msg_type == "negotiation_round":
@@ -746,6 +765,8 @@ def run_cli(play, *, title: str, seats: int | tuple[int, ...],
             header["from_matches"] = [str(path) for path in source_matches]
         if exile_path:
             header["from_exile"] = str(exile_path)
+        if returning:
+            header.update(returnee=returning, returnee_pieces=returning_pieces)
         try:
             if log is not None:
                 log.write(header)
@@ -818,7 +839,18 @@ def restore_resume_args(args, saved: dict, *, guest: str | None = None) -> None:
             raise ValueError("--from-matches 값이 저장된 설정과 일치하지 않습니다.")
         args.from_matches = paths
 
-    roster = [name for name in players if name != guest]
+    returning = saved.get("returnee")
+    if returning is not None:
+        if (not hasattr(args, "returnee") or not isinstance(returning, str) or returning not in players
+                or type(saved.get("returnee_pieces")) is not int or saved["returnee_pieces"] < 0
+                or pieces.get(returning) != saved["returnee_pieces"]):
+            raise ValueError("저장된 유배지 복귀자 설정이 올바르지 않습니다.")
+    if hasattr(args, "returnee"):
+        for option, value in (("returnee", returning), ("returnee_pieces", saved.get("returnee_pieces"))):
+            if getattr(args, option) is not None and getattr(args, option) != value:
+                raise ValueError(f"--{option.replace('_', '-')} 값이 저장된 설정과 일치하지 않습니다.")
+            setattr(args, option, value)
+    roster = [name for name in players if name not in {guest, returning}]
     if guest is not None and (players != [*roster, guest] or pieces.get(guest) != 1):
         raise ValueError("저장된 게스트 명단이나 시작 피스가 올바르지 않습니다.")
     ordered_pieces = [pieces[name] for name in roster]

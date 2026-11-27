@@ -57,7 +57,7 @@ class EquationTowerCampaignTest(unittest.TestCase):
         export_replays([self.campaign], self.source, self.output)
         self.assertEqual({path: path.read_bytes() for path in original}, original)
 
-        self.assertEqual(len(CASE_STAGES), 10)
+        self.assertEqual(CASE_STAGES[9], "5일차 감옥 매치")
         case, = case_catalog(self.output)
         self.assertEqual([match["id"] for match in case["matches"]], [
             f"matches/example/{stage}" for stage in (

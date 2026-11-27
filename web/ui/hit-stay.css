@@ -1,0 +1,56 @@
+.hit-arena { min-width: 0; align-self: start; overflow: hidden; background: #101b28; }
+.hit-arena svg { display: block; width: 100%; height: auto; max-height: 68vh; }
+.hit-arena text { text-anchor: middle; font-family: var(--pixel-font); }
+.hit-room-title { fill: #f2dca7; font-size: 15px; font-weight: 700; letter-spacing: 2px; paint-order: stroke; stroke: #17202d; stroke-width: 4px; }
+.hit-die-label { fill: #4b504b; font-size: 8px; }
+.hit-die-number { fill: #26313a; font-size: 25px; font-weight: 700; }
+.hit-pot-value { fill: #f1d898; font-size: 14px; font-weight: 700; }
+.hit-deck text { fill: #c5d6e2; font-size: 9px; }
+.hit-round-label { fill: #c7dfd0; font-size: 10px; }
+.hit-ante-label { fill: #b5cbbd; font-size: 9px; }
+.hit-seat { cursor: pointer; }
+.hit-seat-panel { fill: #202b39; fill-opacity: .97; stroke: #667482; stroke-width: 2px; }
+.hit-seat[aria-pressed="true"] .hit-seat-panel { stroke: #f3dca5; stroke-width: 3px; }
+.hit-seat:focus-visible { outline: none; }
+.hit-seat:focus-visible .hit-seat-panel { stroke: #fff0af; stroke-width: 4px; }
+.hit-seat.hit-acting .hit-seat-panel { stroke: #f6cd69; animation: hit-turn-pulse 1.4s ease-in-out infinite alternate; }
+.hit-seat.hit-winner .hit-seat-panel { stroke: #9bd19b; fill: #294239; }
+.hit-seat.hit-inactive .hit-seat-panel { fill: #282c35; stroke: #565c68; }
+.hit-seat.hit-folded .hit-player-status { fill: #e6ab9b; }
+.hit-player-name { fill: #f5e7c8; font-size: 12px; font-weight: 700; }
+.hit-player-chips { fill: #c9d3da; font-size: 10px; }
+.hit-player-status { fill: #e3c78e; font-size: 9px; }
+.hit-playing-card rect { fill: #eee6ce; stroke: #b4a98c; stroke-width: 1px; }
+.hit-playing-card text { fill: #26313a; font-size: 11px; font-weight: 700; }
+.hit-card-back rect { fill: #384b75; stroke: #b0bac7; }
+.hit-card-back path { stroke: #8da1c8; stroke-width: 1px; fill: none; }
+.hit-folded .hit-playing-card { opacity: .65; }
+.hit-view-label { fill: #bfcec9; font-size: 9px; }
+.hit-scene-status { margin: 0; padding: 9px 12px; border-top: 2px solid #425063; color: #e8d7b4; font-size: 12px; overflow-wrap: anywhere; }
+.hit-stage, .hit-information { min-width: 0; overflow-wrap: anywhere; }
+.hit-information.caption { display: block; }
+.hit-stage h2 { margin-top: 0; }
+.hit-stage h3, .hit-information h3 { margin: 10px 0 7px; font-size: 13px; }
+.hit-phase { color: #ecd09a; font-weight: 700; }
+.hit-round-summary { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 11px; margin-block: 12px; border: 2px solid #7f7755; background: #28362f; color: #ead8ab; }
+.hit-round-summary strong { width: 100%; }
+.hit-round-summary b { font-size: 18px; }
+.hit-bet-cap { padding: 10px; border-left: 3px solid #c1a964; background: #2b313b; }
+.hit-bet-cap small { display: block; margin-top: 6px; color: #bac5cf; }
+.hit-stage .match-table, .hit-information .match-table { font-size: 12px; }
+.hit-stage .match-table :is(th, td), .hit-information .match-table :is(th, td) { padding: 6px; }
+.hit-last-action { padding: 9px; border-left: 3px solid #8ba5bb; background: #252e3a; }
+.hit-showdown { padding: 10px; border: 1px solid #8eb79a; background: #253b32; color: #c9e7c6; }
+.hit-showdown h3 { margin-top: 0; }
+.hit-interest { margin-top: 13px; }
+.hit-interest summary { cursor: pointer; color: #d6c18d; }
+.hit-tiebreak { color: #e9c0a3; }
+.hit-rules p { white-space: pre-wrap; line-height: 1.65; }
+.hit-round-result { padding: 10px 0; border-bottom: 1px solid #3b4854; }
+.hit-round-result h3 button, .hit-bet-log button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.hit-round-result h3 button:focus-visible, .hit-bet-log button:focus-visible { outline: 2px solid #edcf8f; outline-offset: 3px; }
+.hit-bet-log { padding-left: 20px; }
+.hit-bet-log li { padding: 8px 0; border-bottom: 1px solid #343e4b; overflow-wrap: anywhere; }
+@keyframes hit-turn-pulse { to { stroke: #fff2c6; } }
+@media (prefers-reduced-motion: reduce) { .hit-seat.hit-acting .hit-seat-panel { animation: none; } }
+@media (max-width: 600px) { .hit-arena svg { max-height: none; } .hit-stage .match-table :is(th, td), .hit-information .match-table :is(th, td) { padding: 5px; } }

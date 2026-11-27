@@ -18,6 +18,7 @@ const games = [
   {session: "4일차 감옥 매치", name: "벽바둑 2", description: tr("서로 다른 말을 움직이고 벽을 세워 가장 넓은 영역을 확보한다.", "Move two kinds of counters and build walls to claim the largest territory.")},
   {session: "5일차 메인 매치", name: "히든 워드", description: tr("Word2Vec 유사도와 공개된 힌트로 상대의 숨겨진 단어를 추리한다.", "Use Word2Vec similarity scores and revealed clues to deduce each hidden word.")},
   {session: "5일차 감옥 매치", name: "수식의 탑", description: tr("이동 횟수를 입찰하고 블록을 옮겨 목표 높이와 수식을 완성한다.", "Bid a move count, then rearrange blocks to reach the target height and value.")},
+  {session: "6일차 메인 매치", name: "HIT, STAY", description: tr("한계 수를 넘지 않게 카드를 받고 베팅해 결승 직행을 노린다.", "Draw and bet without exceeding the limit to secure a place in the final.")},
   {session: "유배지 매치 1", name: "피스 퍼즐", description: tr("홈의 방향과 깊이를 살펴 8개의 피스로 격자를 완성한다.", "Match notch directions and depths to assemble eight pieces into a lattice.")},
   {session: "유배지 매치 2", name: "달라진 그림 찾기", description: tr("원본을 기억하고 달라진 다섯 곳을 찾아 두 명의 생존자를 가린다.", "Remember the original and find five changes to secure one of two survival places.")},
   {session: "유배지 매치 3", name: "비밀 코드", description: tr("26장 카드의 단서로 네 글자 코드를 추리하고 버저로 생존을 확정한다.", "Deduce a four-letter code from 26 cards and their clues, then buzz to secure survival.")},

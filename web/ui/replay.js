@@ -2,6 +2,9 @@ import {useEffect, useState} from "react";
 import {en, language, tr} from "./locale.js";
 
 export const phaseNames = {
+  hit_interest: tr("공공·개인 이익 선택", "Public or self interest"), hit_reveal: tr("첫 공개 카드 선택", "Choose the opening card"),
+  hit_bet1: tr("1차 베팅", "First betting round"), hit_bet2: tr("2차 베팅", "Second betting round"),
+  hit_draw: tr("HIT / STAY 선택", "Choose HIT or STAY"), hit_discussion: tr("시작 전 대화", "Opening discussion"),
   tower_opening_bid: tr("최초 이동 입찰", "Opening move-count bid"), tower_counter_bid: tr("추가 이동 입찰", "Counterbid"),
   tower_execute: tr("수식 실연", "Demonstrate the equation"),
   word_preparation: tr("비공개 전략 준비", "Private preparation"), word_discussion: tr("히든 워드 대화", "Hidden Word discussion"),
@@ -87,6 +90,8 @@ export function decisionNoteLabel(phase) {
 }
 
 const relationshipCheckpoints = {
+  "HIT, STAY 시작 전 대화 종료": "End of opening discussion · HIT, STAY",
+  "HIT, STAY 이익 선택 공개": "Interest choices revealed · HIT, STAY",
   "이전 매치에서 이어받음": "Carried over from the previous match", "매치 종료": "End of match",
   "팀 구성 및 네모 세기 결과": "Teams and Rectangle Counting results", "선택 4 투표 공개": "Choice 4 votes revealed",
   "선택 5 전 협상 종료": "End of negotiations before Choice 5", "미리보기 후 협상 종료": "End of negotiations after the preview",
@@ -101,6 +106,8 @@ const relationshipCheckpoints = {
 
 export function checkpointLabel(checkpoint, translated) {
   if (!en || !checkpoint) return checkpoint;
+  const hitRound = checkpoint.match(/^HIT, STAY (\d+)라운드 정산$/);
+  if (hitRound) return `Round ${hitRound[1]} settlement · HIT, STAY`;
   if (checkpoint === "히든 워드 매치 종료") return "End of match · Hidden Word";
   const wordTalk = checkpoint.match(/^히든 워드 (\d+)라운드 (opening|before_setter) 대화 종료$/);
   if (wordTalk) return `${wordTalk[2] === "opening" ? "End of opening discussion" : `End of pre-setter discussion · Round ${wordTalk[1]}`} · Hidden Word`;
