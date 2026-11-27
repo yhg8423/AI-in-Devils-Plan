@@ -37,7 +37,7 @@ EVENT_TYPES = {
     "grass_tile", "grass_choices", "grass_obstacle", "grass_placement", "grass_bonus",
 }
 EVENT_FIELDS = ("msg_type", "agent_name", "content", "visible_to")
-CASE_STAGES = ("1일차 메인 매치", "1일차 감옥 매치", "2일차 메인 매치", "2일차 감옥 매치", "3일차 메인 매치", "3일차 감옥 매치", "4일차 메인 매치", "4일차 감옥 매치", "5일차 메인 매치", "5일차 감옥 매치", "6일차 메인 매치")
+CASE_STAGES = ("1일차 메인 매치", "1일차 감옥 매치", "2일차 메인 매치", "2일차 감옥 매치", "3일차 메인 매치", "3일차 감옥 매치", "4일차 메인 매치", "4일차 감옥 매치", "5일차 메인 매치", "5일차 감옥 매치", "6일차 메인 매치", "6일차 감옥 매치")
 EXILE_GAMES = (FIRST_EXILE, SECOND_EXILE, THIRD_EXILE, FOURTH_EXILE, FIFTH_EXILE)
 
 

@@ -1,0 +1,49 @@
+.grad-arena { min-width: 0; align-self: start; overflow: hidden; background: #171e28; }
+.grad-arena svg { display: block; width: 100%; height: auto; max-height: 68vh; }
+.grad-arena text { text-anchor: middle; font-family: var(--pixel-font); }
+.grad-room-title { fill: #e7d5ae; font-size: 13px; font-weight: 700; }
+.grad-cup > path { stroke: #d6d6ce; stroke-width: 1.4px; }
+.grad-cup .grad-cup-rim { stroke: #d6d6ce; stroke-width: 1.1px; }
+.grad-cup-number { fill: #172333; font-size: 20px; font-weight: 700; }
+.grad-cup-number.grad-light-ink { fill: #f4ead0; }
+.grad-cup .grad-used-mark { fill: none; stroke: #ed8d7f; stroke-width: 3px; }
+.grad-used-cup > :not(title):not(.grad-used-mark) { opacity: .4; }
+.grad-offered-cup > path { stroke-width: 2px; }
+.grad-slot-label, .grad-color-count { fill: #e4d8c1; font-size: 9px; }
+.grad-row-caption { fill: #c8c9c2; font-size: 9px; }
+.grad-player { cursor: pointer; }
+.grad-player:focus-visible { outline: none; filter: drop-shadow(0 0 3px #f6d999); }
+.grad-player[aria-pressed="true"] { filter: drop-shadow(0 0 3px #f6d999); }
+.grad-player-name { fill: #e9ddc5; font-size: 12px; font-weight: 700; }
+.grad-round-board text { fill: #ead69c; font-size: 12px; }
+.grad-offer-player { fill: #d5d9d7; font-size: 10px; }
+.grad-offer-wait { fill: #b9c2cb; font-size: 10px; }
+.grad-offer-label { fill: #dbcba8; font-size: 9px; }
+.grad-waiting-player { cursor: pointer; }
+.grad-waiting-player text { fill: #ddd0ba; font-size: 11px; }
+.grad-waiting-player:focus-visible, .grad-waiting-player[aria-pressed="true"] { outline: none; filter: drop-shadow(0 0 3px #f6d999); }
+.grad-view-label { fill: #c5cec9; font-size: 10px; }
+.grad-scene-status { padding: 9px 12px; margin: 0; border-top: 2px solid #495564; color: #e5d2a7; overflow-wrap: anywhere; font-size: 12px; }
+.grad-scene-status.grad-revealed { background: #29382f; color: #d0e4bc; }
+.grad-stage, .grad-information { min-width: 0; overflow-wrap: anywhere; }
+.grad-information.caption { display: block; }
+.grad-stage h2 { margin-top: 0; }
+.grad-stage h3, .grad-information h3 { margin: 10px 0 7px; font-size: 13px; }
+.grad-phase { color: #edcf96; font-weight: 700; }
+.grad-mode { padding: 8px 10px; border-left: 3px solid #d4b76d; background: #2c313a; }
+.grad-score-board { display: grid; grid-template-columns: 1fr auto; gap: 8px 12px; padding: 11px; margin-block: 12px; border: 2px solid #8c7a55; background: #2c3030; color: #edd9a7; }
+.grad-score-board strong { grid-column: 1 / -1; }
+.grad-score-board b { grid-column: 2; grid-row: 2 / span 2; font: 700 24px var(--pixel-font); }
+.grad-score-board > span:last-child { grid-column: 1; }
+.grad-stage .match-table, .grad-information .match-table { font-size: 12px; }
+.grad-stage .match-table :is(th, td), .grad-information .match-table :is(th, td) { padding: 6px; }
+.grad-streak { color: #e9cc84; }
+.grad-last-reveal { padding: 10px; border: 1px solid #8eae8c; background: #293c30; color: #d1e5c4; }
+.grad-tie { color: #dac1a2; }
+.grad-rules p { white-space: pre-wrap; line-height: 1.65; }
+.grad-match-result { padding: 10px 0; border-bottom: 1px solid #3a4854; }
+.grad-match-result button, .grad-offer-log button { padding: 0; border: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.grad-match-result button:focus-visible, .grad-offer-log button:focus-visible { outline: 2px solid #edcf8f; outline-offset: 3px; }
+.grad-offer-log { padding-left: 20px; }
+.grad-offer-log li { padding: 8px 0; border-bottom: 1px solid #343e4b; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .grad-arena svg { max-height: none; } .grad-stage .match-table :is(th, td), .grad-information .match-table :is(th, td) { padding: 5px; } }

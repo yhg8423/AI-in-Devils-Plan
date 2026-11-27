@@ -38,6 +38,7 @@ DAY_FOUR_PRISON = "4일차 감옥 매치 · 벽바둑 2"
 DAY_FIVE_MAIN = "5일차 메인 매치 · 히든 워드"
 DAY_FIVE_PRISON = "5일차 감옥 매치 · 수식의 탑"
 DAY_SIX_MAIN = "6일차 메인 매치 · HIT, STAY"
+DAY_SIX_PRISON = "6일차 감옥 매치 · 그라데이션"
 FIRST_EXILE = "유배지 매치 1 · 피스 퍼즐"
 SECOND_EXILE = "유배지 매치 2 · 달라진 그림 찾기"
 THIRD_EXILE = "유배지 매치 3 · 비밀 코드"
@@ -54,6 +55,7 @@ PRISON_STAGES = {
     DAY_ONE_MAIN: (DAY_ONE_PRISON, 7), DAY_TWO_MAIN: (DAY_TWO_PRISON, 6), DAY_THREE_MAIN: (DAY_THREE_PRISON, 4),
     DAY_FOUR_MAIN: (DAY_FOUR_PRISON, 3),
     DAY_FIVE_MAIN: (DAY_FIVE_PRISON, (3, 2)),
+    DAY_SIX_MAIN: (DAY_SIX_PRISON, (3, 2)),
 }
 RELATIONSHIP_EVIDENCE = {
     "room_move", "teams", "rectangle_result", "team_vote", "choice_4_result", "grass_choices", "grass_placement",
